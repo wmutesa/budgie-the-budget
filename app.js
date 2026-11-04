@@ -21,6 +21,12 @@ const VIEWS = [
   ['settings', 'Settings', '⚙', 'Preferences and your data'],
 ];
 
+const NAV_GROUPS = [
+  ['General', ['overview', 'ledger']],
+  ['Plan', ['budgets', 'goals', 'subs']],
+  ['Assist', ['assistant', 'settings']],
+];
+
 const CYCLE = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
 const ACCOUNT_TYPES = [['checking', 'Checking'], ['savings', 'Savings'], ['cash', 'Cash']];
 const GOAL_KINDS = [['college', 'College'], ['savings', 'Savings'], ['emergency', 'Emergency fund'], ['other', 'Other']];
@@ -156,6 +162,7 @@ const ui = {
   view: 'overview',
   month: thisMonth(),
   f: { q: '', type: '', cat: '', acc: '', month: thisMonth() },
+  range: 30,
   chat: [],
   ai: { ok: false, error: 'checking', models: [] },
 };
@@ -302,9 +309,9 @@ function sparkline(vals) {
   const W = 600, H = 120;
   const pts = vals.map((v, i) => `${(i / (vals.length - 1) * W).toFixed(1)},${(H - 8 - (v - min) / span * (H - 16)).toFixed(1)}`);
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Net worth over the last 45 days">
-    <defs><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#e9b44c" stop-opacity=".28"/><stop offset="1" stop-color="#e9b44c" stop-opacity="0"/></linearGradient></defs>
+    <defs><linearGradient id="sl" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#a855f7"/><stop offset="1" stop-color="#ec4899"/></linearGradient><linearGradient id="sg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a855f7" stop-opacity=".35"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/></linearGradient></defs>
     <polygon points="0,${H} ${pts.join(' ')} ${W},${H}" fill="url(#sg)"/>
-    <polyline points="${pts.join(' ')}" fill="none" stroke="#e9b44c" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+    <polyline points="${pts.join(' ')}" fill="none" stroke="url(#sl)" stroke-width="2.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
   </svg>`;
 }
 
@@ -421,41 +428,104 @@ function chatLog() {
 
 /* ---------- Views ---------- */
 
+const pctChange = (cur, prev) => (prev ? (cur - prev) / Math.abs(prev) * 100 : null);
+const monthShort = m => monthName(m).split(' ')[0].slice(0, 3);
+
+function statCard(label, value, change, goodWhenUp, note) {
+  let chip = '';
+  if (change !== null && Number.isFinite(change)) {
+    const up = change >= 0;
+    chip = `<span class="chip ${up === goodWhenUp ? 'up' : 'down'}">${up ? '↑' : '↓'} ${Math.abs(change).toFixed(1)}%</span>`;
+  }
+  return `<div class="stat card"><p class="label">${esc(label)}</p><p class="stat-val">${value}</p><div class="stat-foot">${chip}<span class="muted small">${esc(note)}</span></div></div>`;
+}
+
+function gauge(pct) {
+  const r = 90, C = Math.PI * r;
+  const share = Math.min(100, Math.max(0, pct));
+  return `<svg class="gauge" viewBox="0 0 220 124" aria-hidden="true">
+    <path d="M20 112 A90 90 0 0 1 200 112" class="g-track" pathLength="100"/>
+    <path d="M20 112 A90 90 0 0 1 200 112" class="g-fill" pathLength="100" stroke-dasharray="${share.toFixed(2)} 100"/>
+  </svg>`;
+}
+
+function goalHero(g) {
+  if (!g) {
+    return `<section class="card hero-grad"><p class="label">Goal</p><h3>Plan your first goal</h3><p class="small">Add a College Fund to see progress and the monthly target here.</p><div class="row"><button class="light" data-action="add-goal">+ Goal</button></div></section>`;
+  }
+  const saved = goalSaved(g);
+  const pct = g.target > 0 ? Math.min(100, saved / g.target * 100) : 0;
+  const need = neededMonthly(g);
+  const detail = need > 0 ? `${money(need)}/mo to finish by ${fmtDate(g.deadline)}` : saved >= g.target ? 'Fully funded' : 'Set a target date for a monthly figure';
+  return `<section class="card hero-grad">
+    <div class="card-head"><span class="label">${esc(g.name)}</span><button class="icon" data-action="edit-goal" data-id="${g.id}" title="Edit goal" aria-label="Edit goal">✎</button></div>
+    ${gauge(pct)}
+    <div class="gauge-val"><b>${money(saved)}</b><span>of ${money(g.target)} · ${pct.toFixed(0)}%</span></div>
+    <p class="small" style="text-align:center;margin:10px 0 0">${esc(detail)}</p>
+    <div class="row"><button class="light" data-action="contribute" data-id="${g.id}">Add money</button></div>
+  </section>`;
+}
+
+function accountRow(a) {
+  const b = acctBalance(a);
+  const low = a.type === 'checking' && b < state.settings.lowBalance;
+  const type = (ACCOUNT_TYPES.find(x => x[0] === a.type) || [])[1] || a.type;
+  const initial = (a.name || '•').trim().split(/\s+/).slice(0, 2).map(w => w.charAt(0)).join('').toUpperCase();
+  return `<div class="acct-row ${low ? 'low' : ''}">
+    <span class="avatar-sm">${esc(initial)}</span>
+    <div class="grow"><b>${esc(a.name)}</b><span class="muted small">${esc(type)}${a.institution ? ' · ' + esc(a.institution) : ''}${low ? ' · below your floor' : ''}</span></div>
+    <div class="acct-bal ${b < 0 ? 'bad' : ''}">${money(b)}</div>
+    <button class="icon" data-action="edit-account" data-id="${a.id}" title="Edit or update balance" aria-label="Edit account">✎</button>
+  </div>`;
+}
+
 function vOverview() {
   const m = ui.month;
   const ms = monthSummary(m);
+  const pms = monthSummary(shiftMonth(m, -1));
   const p = plan();
   const alerts = computeAlerts();
   const liquid = sum(state.accounts, acctBalance);
   const goalsTot = sum(state.goals, goalSaved);
+  const nw = round2(liquid + goalsTot);
+  const days = ui.range || 30;
+  const series = netWorthSeries(days);
+  const nwChange = series.length > 1 ? pctChange(series[series.length - 1], series[0]) : null;
+  const goal = state.goals.find(g => g.kind === 'college') || state.goals[0];
   const spend = spendParts(m);
   const upcoming = [...state.subscriptions]
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate))
     .filter(s => daysBetween(today(), s.nextDate) <= 30);
   const recent = [...state.transactions].sort(byDate).slice(0, 7);
-  const pacePct = ms.income > 0 ? Math.min(100, ms.expense / ms.income * 100) : 0;
-  const paceHTML = ms.income > 0
-    ? `<div class="meter"><i style="width:${pacePct.toFixed(1)}%"></i></div><p class="muted small">${Math.round(ms.expense / ms.income * 100)}% of this month's income spent so far.</p>`
-    : `<p class="muted small">Set your monthly income in Budgets &amp; plan to see your pace.</p>`;
+  const seg = [[30, '1M'], [90, '3M'], [365, '1Y']]
+    .map(([n, l]) => `<button class="${days === n ? 'on' : ''}" data-action="range" data-id="${n}">${l}</button>`).join('');
+  const span = days === 365 ? 'over a year' : days === 90 ? 'over 3 months' : 'over a month';
 
   return `
+  <div class="stat-row">
+    ${statCard('Net worth', money(nw), nwChange, true, span)}
+    ${statCard(`Income · ${monthShort(m)}`, money(ms.income), pctChange(ms.income, pms.income), true, 'vs last month')}
+    ${statCard('Spent', money(ms.expense), pctChange(ms.expense, pms.expense), false, 'vs last month')}
+    ${statCard('Left to plan', p.income ? money(p.left) : '—', null, true, p.income ? 'after budgets, subs and goals' : 'set income in Budgets')}
+  </div>
+
   <div class="bento">
-    <section class="card">
-      <p class="label">Net worth</p>
-      <p class="big">${money(liquid + goalsTot)}</p>
-      <p class="muted small">${money(liquid)} in accounts · ${money(goalsTot)} toward goals</p>
-      ${sparkline(netWorthSeries(45))}
+    <section class="card span-2">
+      <div class="card-head">
+        <div><p class="label">Net worth</p><p class="big">${money(nw)}</p></div>
+        <div class="seg" role="group" aria-label="Chart range">${seg}</div>
+      </div>
+      ${sparkline(series)}
+      <div class="axis"><span>${fmtDate(shiftDate(today(), -(days - 1)))}</span><span>${fmtDate(today())}</span></div>
     </section>
 
-    <section class="card">
-      <p class="label">${monthName(m)}</p>
-      <dl class="stats">
-        <div><dt>Income</dt><dd class="good">${money(ms.income)}</dd></div>
-        <div><dt>Spent</dt><dd class="bad">${money(ms.expense)}</dd></div>
-        <div><dt>To goals</dt><dd>${money(ms.saved)}</dd></div>
-        <div><dt>Left to plan</dt><dd class="${p.income && p.left < 0 ? 'bad' : ''}">${p.income ? money(p.left) : '—'}</dd></div>
-      </dl>
-      ${paceHTML}
+    ${goalHero(goal)}
+
+    <section class="card span-2">
+      <div class="card-head"><h3>Accounts</h3><button class="ghost small-btn" data-action="add-account">+ Account</button></div>
+      <div class="acct-list">${state.accounts.length
+        ? state.accounts.map(accountRow).join('')
+        : emptyState('No accounts yet', 'Add Chase Checking and your savings to begin.')}</div>
     </section>
 
     <section class="card">
@@ -464,10 +534,8 @@ function vOverview() {
     </section>
 
     <section class="card span-2">
-      <div class="card-head"><h3>Accounts</h3><button class="ghost small-btn" data-action="add-account">+ Account</button></div>
-      <div class="accounts">${state.accounts.length
-        ? state.accounts.map(accountCard).join('')
-        : emptyState('No accounts yet', 'Add Chase Checking and your savings to begin. You can update a balance any time with ✎.')}</div>
+      <div class="card-head"><h3>Where it went</h3><span class="muted small">${monthShort(m)}</span></div>
+      <div class="spend">${donut(spend, ms.expense)}${barList(spend)}</div>
     </section>
 
     <section class="card">
@@ -475,13 +543,8 @@ function vOverview() {
       ${upcoming.length ? upcoming.map(subRow).join('') : '<p class="muted">Nothing renews in the next 30 days.</p>'}
     </section>
 
-    <section class="card">
-      <div class="card-head"><h3>Where it went</h3></div>
-      <div class="spend">${donut(spend, ms.expense)}${barList(spend)}</div>
-    </section>
-
-    <section class="card span-2">
-      <div class="card-head"><h3>Recent movement</h3><button class="ghost small-btn" data-view="ledger">Full ledger</button></div>
+    <section class="card full">
+      <div class="card-head"><h3>Recent activity</h3><button class="ghost small-btn" data-view="ledger">Full ledger</button></div>
       ${txList(recent)}
     </section>
   </div>`;
@@ -521,7 +584,7 @@ function vBudgets() {
   const m = ui.month;
   const ms = monthSummary(m);
   const p = plan();
-  const segs = [['Category budgets', p.budgets, '#e9b44c'], ['Subscriptions', p.subs, '#86b7ff'], ['Goal savings', p.goals, '#8fd694']];
+  const segs = [['Category budgets', p.budgets, '#a855f7'], ['Subscriptions', p.subs, '#86b7ff'], ['Goal savings', p.goals, '#8fd694']];
   const assigned = segs.reduce((s, x) => s + x[1], 0);
   const free = Math.max(0, p.income - assigned);
   const stack = p.income > 0
@@ -603,7 +666,7 @@ function vAssistant() {
   return `<section class="card chat">
     <div class="chat-status ${on && ai.ok ? 'on' : ''}"><span class="dot"></span><span>${status}</span><button class="ghost small-btn" data-action="ai-test">Recheck</button></div>
     <div class="log" id="chat-log">${chatLog()}</div>
-    <div class="chips">${QUICK.map(q => `<button class="chip ghost" data-action="ask" data-id="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    <div class="chips">${QUICK.map(q => `<button class="chip-btn ghost" data-action="ask" data-id="${esc(q)}">${esc(q)}</button>`).join('')}</div>
     <form id="chat-form" class="chatform" autocomplete="off"><input name="q" placeholder="Ask about your money…" aria-label="Ask a question"><button class="primary" type="submit">Ask</button></form>
   </section>`;
 }
@@ -668,8 +731,11 @@ function topActions() {
 
 function render() {
   const v = VIEWS.find(x => x[0] === ui.view) || VIEWS[0];
-  $('#nav').innerHTML = VIEWS.map(([id, label, icon]) =>
-    `<button class="nav-item${ui.view === id ? ' on' : ''}" data-view="${id}" aria-current="${ui.view === id ? 'page' : 'false'}" title="${label}"><span class="ic">${icon}</span><span class="lbl">${label}</span></button>`
+  $('#nav').innerHTML = NAV_GROUPS.map(([group, ids]) =>
+    `<p class="nav-group">${group}</p>` + ids.map(id => {
+      const [, label, icon] = VIEWS.find(x => x[0] === id);
+      return `<button class="nav-item${ui.view === id ? ' on' : ''}" data-view="${id}" aria-current="${ui.view === id ? 'page' : 'false'}" title="${label}"><span class="ic">${icon}</span><span class="lbl">${label}</span></button>`;
+    }).join('')
   ).join('');
   $('#title').textContent = v[1];
   $('#eyebrow').textContent = `${v[3]} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`;
@@ -1199,6 +1265,12 @@ const ACTIONS = {
     toast(`${c.name} deleted`);
   },
   'dismiss': id => { state.dismissed[id] = today(); commit(); },
+  'range': id => { ui.range = Number(id); render(); },
+  'theme': () => {
+    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('ledgerline.theme', next); } catch (e) { /* storage blocked: theme still switches */ }
+  },
   'ask': id => askAssistant(id),
   'clear-chat': () => { ui.chat = []; render(); },
   'ai-test': () => testAI(),
@@ -1271,6 +1343,13 @@ function init() {
   });
 
   document.addEventListener('submit', e => {
+    if (e.target.id === 'global-search') {
+      e.preventDefault();
+      ui.view = 'ledger';
+      ui.f.q = e.target.elements.q.value.trim();
+      render();
+      return;
+    }
     if (e.target.id !== 'chat-form') return;
     e.preventDefault();
     const input = e.target.elements.q;
@@ -1297,6 +1376,10 @@ function init() {
     e.target.value = '';
   });
 
+  try {
+    const saved = localStorage.getItem('ledgerline.theme');
+    if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+  } catch (e) { /* storage blocked: keep the default theme */ }
   render();
   maybeNotify();
   testAI();
