@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { account, signIn, registerWithInvite, passkeyError, canUsePasskeys } from '../lib/account';
+import SignInBackdrop from './SignInBackdrop.vue';
 
 // The first screen for anyone not signed in: sign in with a passkey, or
 // create one from an invite link.
@@ -17,7 +18,19 @@ async function run(fn) {
 
 <template>
   <main class="signin">
+    <SignInBackdrop />
+
     <section class="si-card">
+      <!-- A small pixel budgie perched on the card. -->
+      <svg class="si-bird" :class="{ busy }" viewBox="0 0 10 10" width="60" height="60" shape-rendering="crispEdges" aria-hidden="true">
+        <g fill="#fde047"><rect x="3" y="1" width="3" height="1" /><rect x="2" y="2" width="5" height="1" /><rect x="2" y="3" width="4" height="1" /></g>
+        <rect class="si-eye" x="5" y="2" width="1" height="1" fill="#18181b" />
+        <rect x="6" y="3" width="1" height="1" fill="#fb923c" />
+        <g fill="#86efac"><rect x="2" y="4" width="4" height="1" /><rect x="1" y="5" width="5" height="2" /><rect x="2" y="7" width="3" height="1" /></g>
+        <g fill="#22c55e"><rect x="2" y="5" width="2" height="1" /><rect x="3" y="6" width="2" height="1" /></g>
+        <g fill="#93c5fd"><rect x="0" y="7" width="2" height="1" /><rect x="0" y="8" width="1" height="1" /></g>
+        <g fill="#18181b"><rect x="3" y="8" width="1" height="1" /><rect x="5" y="8" width="1" height="1" /></g>
+      </svg>
       <p class="brand-word">BUDGIE</p>
 
       <template v-if="account.invite?.token">

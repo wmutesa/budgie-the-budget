@@ -1170,3 +1170,20 @@ html, body { background: #fff; }
 .acct-list li > button { grid-area: btn; }
 .acct-list li.pending > span:first-child { font-weight: 500; color: #6d28d9; }
 .acct-out { justify-self: start; }
+
+/* ---------- Sign-in background ---------- */
+.signin { position: relative; overflow: hidden; isolation: isolate; background: #fff; }
+.si-backdrop { position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(#eef0ee 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, #eef0ee 1px, transparent 1px) 0 0 / 48px 48px; }
+.si-backdrop canvas { display: block; }
+.si-card { position: relative; z-index: 1; box-shadow: 8px 8px 0 #ede9fe; }
+
+/* The budgie sits on the card's top edge, blinks, and bobs while it waits. */
+.si-bird { position: absolute; right: 28px; top: -54px; image-rendering: pixelated; transform-origin: 50% 100%; }
+.si-bird .si-eye { animation: siBlink 5s steps(1) infinite; }
+.si-bird.busy { animation: siBob .5s ease-in-out infinite alternate; }
+@keyframes siBlink { 0%, 94%, 100% { opacity: 1; } 95%, 98% { opacity: 0; } }
+@keyframes siBob { from { transform: translateY(0); } to { transform: translateY(-5px) rotate(-4deg); } }
+@media (prefers-reduced-motion: reduce) { .si-bird .si-eye, .si-bird.busy { animation: none; } }
