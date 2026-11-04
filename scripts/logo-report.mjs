@@ -15,7 +15,8 @@ Last checked ${r.checkedAt.slice(0, 16).replace('T', ' ')} UTC.
 | **Logos updated this run** | **${r.firstRun ? 'first run, nothing to compare yet' : changed}** |
 | Logos that disappeared | ${r.lost.length} |
 | Could not be checked | ${r.errors.length} |
-${section('Updated logos', r.updated)}${section('Newly found logos', r.found)}${section('New companies with a logo', r.added)}${section('Logos that disappeared', r.lost)}${section('Without a logo: fix the domain in src/data/directory.js', r.missing)}${section('Could not be checked', r.errors)}
+| Logo from the second source (DuckDuckGo) | ${(r.fromFallback || []).length} |
+${section('Updated logos', r.updated)}${section('Newly found logos', r.found)}${section('New companies with a logo', r.added)}${section('Logos that disappeared', r.lost)}${section('Without a logo: fix the domain in src/data/directory.js', r.missing)}${section('Could not be checked', r.errors)}${section('Logo from the second source (DuckDuckGo)', r.fromFallback || [])}
 In the app, anyone can fix a single logo by clicking it.
 
 <!-- logo-state ${JSON.stringify(r.state)} -->

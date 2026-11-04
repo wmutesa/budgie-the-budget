@@ -3,6 +3,18 @@
 const WD = 'https://www.wikidata.org/w/api.php';
 
 export const logoUrl = domain => `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+// Second source, used when Google has no icon for a site.
+export const fallbackLogoUrl = domain => `https://icons.duckduckgo.com/ip3/${encodeURIComponent(domain)}.ico`;
+
+// If a Google logo fails to load anywhere in the app, try the second source once.
+export function swapToFallback(img) {
+  const src = img.currentSrc || img.src || '';
+  if (!src.includes('google.com/s2/favicons')) return false;
+  const domain = new URL(src).searchParams.get('domain');
+  if (!domain) return false;
+  img.src = fallbackLogoUrl(domain);
+  return true;
+}
 
 export async function searchBrands(query, { signal } = {}) {
   const q = query.trim();
