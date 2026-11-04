@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "deploy": "wrangler deploy",
     "check": "vite build",
-    "test": "node tests/smoke.cjs"
+    "test": "node tests/smoke.cjs",
+    "test:accounts": "node tests/accounts.cjs",
+    "dev:api": "wrangler dev --local --port 8787"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.10",
@@ -18,6 +20,8 @@
     "wrangler": "^4.0.0"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
     "pdfjs-dist": "^6.5.438",
     "read-excel-file": "^9.3.14",
     "tesseract.js": "^7.0.0",

@@ -1,34 +1,58 @@
-// App state that belongs to the user: base currency, tracked subscriptions,
-// and the search text. Saved in this browser only.
+// App state that belongs to the signed-in person: base currency, transactions,
+// subscriptions, budgets and plan. It syncs to their account (see sync.js) and
+// a copy is kept in this browser so the app opens instantly and works offline.
 import { reactive, watch } from 'vue';
 import { sampleTransactions, budgets as defaultBudgets } from '../data/demo';
 
-const KEY = 'budgie.v2';
+// Data saved before personal accounts existed; moved into the first account
+// that signs in on this device.
+export const LEGACY_KEY = 'budgie.v2';
+const userKey = id => `budgie.v3:${id}`;
+let activeKey = null;
 
-function read() {
-  try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; }
+function readKey(key) {
+  try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
 }
 
-const saved = read();
+// Build the saved part of the state from a stored object, filling gaps with defaults.
+function fromSaved(saved = {}) {
+  return {
+    base: saved.base || 'USD',
+    subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
+    transactions: Array.isArray(saved.transactions) ? saved.transactions : sampleTransactions(),
+    drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
+    budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
+    dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
+    banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
+    plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
+    logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
+  };
+}
+const SAVED_FIELDS = Object.keys(fromSaved());
 
-export const store = reactive({
-  base: saved.base || 'USD',
-  subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
-  transactions: Array.isArray(saved.transactions) ? saved.transactions : sampleTransactions(),
-  drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
-  budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
-  dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
-  banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
-  plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
-  logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
-  query: '',
-});
+export const store = reactive({ ...fromSaved(), query: '' });
 
-watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan, logoOverrides: store.logoOverrides }),
-  value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
-  { deep: true },
-);
+// The saved part of the state, as a plain object.
+export const snapshot = () => JSON.parse(JSON.stringify(Object.fromEntries(SAVED_FIELDS.map(k => [k, store[k]]))));
+
+// Replace the saved part of the state, for example with data from the server.
+export function applySnapshot(data) {
+  Object.assign(store, fromSaved(data || {}));
+}
+
+// Switch to a person's local copy. Returns what was stored for them, if anything.
+export function openLocal(userId) {
+  activeKey = userId ? userKey(userId) : null;
+  return activeKey ? readKey(activeKey) : null;
+}
+export const readLegacy = () => readKey(LEGACY_KEY);
+export function clearLegacy() { try { localStorage.removeItem(LEGACY_KEY); } catch { /* storage blocked */ } }
+export function clearLocal(userId) { try { localStorage.removeItem(userKey(userId)); } catch { /* storage blocked */ } }
+
+watch(snapshot, value => {
+  if (!activeKey) return;
+  try { localStorage.setItem(activeKey, JSON.stringify(value)); } catch { /* storage blocked */ }
+}, { deep: true });
 
 // Cost of a subscription per month, in its own currency.
 export function monthly(s) {

@@ -62,7 +62,30 @@ window.SpeechRecognition = FakeRec;
 window.webkitSpeechRecognition = FakeRec;
 `;
 
-async function fakeNetwork(page) {
+// A stand-in for the account server (worker/index.js): signed in as the owner,
+// with data kept in memory so reloads and other pages see the same account.
+// tests/accounts.cjs tests the real server.
+const fakeAccount = { data: null, version: 0 };
+async function fakeApi(page, account = fakeAccount) {
+  await page.route('**/api/**', async route => {
+    const req = route.request();
+    const p = new URL(req.url()).pathname;
+    if (p === '/api/me') return route.fulfill({ json: { user: { id: 'u1', name: 'Willy', role: 'owner' } } });
+    if (p === '/api/data' && req.method() === 'GET') return route.fulfill({ json: { data: account.data, version: account.version } });
+    if (p === '/api/data' && req.method() === 'PUT') {
+      const body = JSON.parse(req.postData());
+      account.data = body.data;
+      account.version += 1;
+      return route.fulfill({ json: { version: account.version } });
+    }
+    if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
+    if (p === '/api/people') return route.fulfill({ json: { people: [{ id: 'u1', name: 'Willy', role: 'owner', last_seen: Date.now() }], invites: [] } });
+    return route.fulfill({ status: 404, json: { error: 'Not found' } });
+  });
+}
+
+async function fakeNetwork(page, account) {
+  await fakeApi(page, account);
   await page.route('**/open.er-api.com/**', route => route.fulfill({
     json: { result: 'success', time_last_update_utc: 'Wed, 04 Nov 2026 00:02:31 +0000', rates: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 151.3, CAD: 1.37, INR: 84.1, KES: 129.5, NGN: 1550, BDT: 122.2, RWF: 1450, THB: 33.8 } },
   }));
@@ -213,13 +236,11 @@ async function run(url) {
 
   // A long subscription list stays compact.
   const many = await context.newPage();
-  await fakeNetwork(many);
-  await many.addInitScript(() => {
-    const names = ['Netflix', 'Spotify', 'YouTube Premium', 'Disney+', 'Hulu', 'Max', 'Apple Music', 'iCloud+', 'Google One', 'Dropbox', 'Notion', 'Figma', 'GitHub', 'Vercel', 'Cursor', 'Claude', 'ChatGPT', 'Canva', 'Adobe Creative Cloud', 'Duolingo', 'Headspace', 'Calm', 'Strava', 'Audible', 'Crunchyroll', 'Peacock', 'Paramount+', 'Tidal', 'NordVPN', '1Password'];
-    const subs = names.map((n, i) => ({ id: 's' + i, name: n, domain: '', logo: null, amount: 5 + i, currency: i % 5 === 0 ? 'RWF' : 'USD', cycle: 'monthly', next: '2026-12-0' + ((i % 9) + 1) }));
-    localStorage.setItem('budgie.v2', JSON.stringify({ base: 'USD', subscriptions: subs }));
-  });
+  const names = ['Netflix', 'Spotify', 'YouTube Premium', 'Disney+', 'Hulu', 'Max', 'Apple Music', 'iCloud+', 'Google One', 'Dropbox', 'Notion', 'Figma', 'GitHub', 'Vercel', 'Cursor', 'Claude', 'ChatGPT', 'Canva', 'Adobe Creative Cloud', 'Duolingo', 'Headspace', 'Calm', 'Strava', 'Audible', 'Crunchyroll', 'Peacock', 'Paramount+', 'Tidal', 'NordVPN', '1Password'];
+  const subs = names.map((n, i) => ({ id: 's' + i, name: n, domain: '', logo: null, amount: 5 + i, currency: i % 5 === 0 ? 'RWF' : 'USD', cycle: 'monthly', next: '2026-12-0' + ((i % 9) + 1) }));
+  await fakeNetwork(many, { data: { base: 'USD', subscriptions: subs }, version: 1 });
   await many.goto(url, { waitUntil: 'load' });
+  await many.waitForSelector('.acct-dot.saved');
   assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 6, '30 subscriptions show 6 at first');
   assert.match(await many.textContent('[data-test="subs-more"]'), /Show 24 more/, 'the rest sit behind a toggle');
   await many.click('[data-test="subs-more"]');

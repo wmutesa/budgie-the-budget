@@ -1,14 +1,28 @@
 {
-  // Budgie is a static Vue site. Cloudflare's GitHub integration deploys every
-  // push to main by running `npx wrangler deploy`, which first runs the build
-  // command below, so the dashboard's own build-command field can stay empty.
+  // Budgie is a Vue site plus a small Worker for personal accounts.
+  // Cloudflare's GitHub integration deploys every push to main by running
+  // `npx wrangler deploy`, which first runs the build command below.
   "name": "budgie",
+  "main": "worker/index.js",
   "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
   "build": {
     "command": "npm run build"
   },
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Account and sync requests go to the Worker; everything else is a file.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "budgie",
+      "database_id": "38794957-9e93-4178-bf96-584749ba9b96",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "observability": { "enabled": true }
 }

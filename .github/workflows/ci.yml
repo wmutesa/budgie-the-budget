@@ -39,3 +39,6 @@ jobs:
 
       - name: Smoke test in a real browser
         run: npm test
+
+      - name: Accounts test (local Worker and database, virtual passkeys)
+        run: npm run test:accounts

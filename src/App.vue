@@ -23,6 +23,9 @@ import KpiStrip from './components/KpiStrip.vue';
 import InsightsCell from './components/InsightsCell.vue';
 import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
+import SignIn from './components/SignIn.vue';
+import AccountMenu from './components/AccountMenu.vue';
+import { account, startAccount } from './lib/account';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
@@ -38,6 +41,7 @@ const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: '
 
 let timer = null;
 onMounted(() => {
+  startAccount();
   loadRates(store.base);
   detectAI();
   timer = setInterval(() => loadRates(store.base, { force: true }), 30 * 60 * 1000);
@@ -49,7 +53,9 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
 </script>
 
 <template>
-  <div class="app">
+  <div v-if="account.status === 'loading'" class="boot" aria-busy="true"><span class="brand-word">BUDGIE</span></div>
+  <SignIn v-else-if="account.status === 'signed-out'" />
+  <div v-else class="app">
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header class="cell nav-bar span-12">
@@ -69,6 +75,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
           <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
+          <AccountMenu />
         </div>
       </header>
 
