@@ -1,0 +1,11 @@
+{
+  // Ledgerline is a static site: Cloudflare serves the files in this folder.
+  // No Worker code runs and no user data leaves the browser.
+  "name": "ledgerline",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

@@ -55,3 +55,32 @@ If the Assistant can't reach Ollama, it falls back to built-in rules. Those answ
 - `styles.css`: design system (dark, serif numerals, bento grid, responsive)
 - `app.js`: data model, calculations, views, forms, alerts, demo data
 - `ai.js`: connection to the local model server
+
+## Cloudflare test deployment
+
+Ledgerline is static files, so it deploys as Cloudflare Workers static assets. `wrangler.jsonc` serves this folder, and `.assetsignore` keeps the repository files private.
+
+One-time setup, on your machine:
+
+```bash
+npm install
+npx wrangler login
+```
+
+Test locally in a Cloudflare-like environment:
+
+```bash
+npm run dev        # http://127.0.0.1:8787
+```
+
+Publish a test deployment:
+
+```bash
+npm run deploy     # prints a https://ledgerline.<your-subdomain>.workers.dev URL
+```
+
+Notes for testing:
+
+- Data stays in each visitor's browser. The deployed site stores nothing on Cloudflare.
+- The deployed site cannot reach a local AI, because Ollama runs on your computer. The Assistant falls back to built-in rules there. To test the local AI, use `python3 -m http.server 8080` (see above) or `npm run dev`.
+- For a custom domain, add it in the Cloudflare dashboard under Workers & Pages, then Ledgerline, then Settings, then Domains & Routes.
