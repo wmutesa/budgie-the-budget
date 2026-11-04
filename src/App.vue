@@ -45,14 +45,14 @@ const period = ref('This month');
 
       <template v-if="active === 'Overview'">
         <div class="grid">
-          <BalanceCard class="span-4" />
-          <AccountCards class="span-8" />
-          <CashFlowChart class="span-8" />
-          <SpendingCard class="span-4" />
-          <WalletCards class="span-4" />
-          <BillsList class="span-4" />
-          <GoalsPanel class="span-4 dark" />
-          <TransactionsTable class="span-8" />
+          <BalanceCard class="a-hero" />
+          <AccountCards class="a-accts" />
+          <GoalsPanel class="a-goals dark" />
+          <CashFlowChart class="a-chart" />
+          <WalletCards class="a-wallet" />
+          <SpendingCard class="a-spend" />
+          <BillsList class="a-bills" />
+          <TransactionsTable class="a-act" />
         </div>
       </template>
       <template v-else>
