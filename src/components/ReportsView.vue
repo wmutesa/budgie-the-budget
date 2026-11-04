@@ -11,7 +11,7 @@ const rate = Math.round((saved / income) * 100);
 const best = cashFlow.reduce((a, b) => (net(b) > net(a) ? b : a));
 const maxFlow = Math.max(...cashFlow.map(d => Math.max(d.income, d.expense)));
 const topM = Math.max(...merchants.map(m => m.total));
-const tints = ['#7c3aed', '#16a34a', '#2563eb', '#db2777', '#d97706'];
+const tints = ['#7c3aed']; // one accent; the rest stays neutral
 
 // A small area chart of net savings per month.
 const spark = computed(() => {
