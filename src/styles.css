@@ -662,3 +662,10 @@ html, body { background: #fff; }
 .nav-pages { gap: 16px; }
 .nav-pages button { font-size: 20px; }
 @media (max-width: 900px) { .insight-grid { grid-template-columns: 1fr; } }
+@media (max-width: 680px) {
+  .nav-pages { flex-wrap: wrap; gap: 6px 14px; }
+  .nav-pages button { font-size: 17px; }
+  .nav-actions { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .toolbar-right { flex-wrap: wrap; }
+  .search-field { width: 100%; }
+}
