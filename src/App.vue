@@ -23,6 +23,10 @@ const period = ref('This month');
         <button v-for="t in tabs" :key="t" :class="{ on: active === t }" @click="active = t">{{ t }}</button>
       </nav>
       <div class="tools">
+        <label class="search">
+          <span aria-hidden="true">⌕</span>
+          <input type="search" placeholder="Search transactions" aria-label="Search transactions" />
+        </label>
         <select v-model="period" class="period" aria-label="Period">
           <option>This month</option><option>This year</option>
         </select>
