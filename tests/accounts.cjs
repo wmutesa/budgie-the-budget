@@ -122,12 +122,12 @@ async function main() {
     await alex.page.waitForSelector('text=Welcome, Alex');
     await alex.page.click('[data-test="create-passkey"]');
     await alex.page.waitForSelector('[data-test="recovery-codes"]');
-    await alex.page.check('[data-test="codes-saved"]');
-    await alex.page.click('[data-test="codes-done"]');
+    await alex.page.click('[data-test="codes-skip"]');
     await alex.page.waitForSelector('[data-test="guide-skip"]');
     await alex.page.click('[data-test="guide-skip"]');
     await alex.page.waitForSelector('.nb-pages');
     await alex.page.waitForSelector('.acct-dot.saved');
+    assert.equal((await getJSON(alex.page, '/api/recovery-codes')).body.left, 0, 'skipping cancels the recovery codes');
     const alexData = await getJSON(alex.page, '/api/data');
     assert.ok(!JSON.stringify(alexData.body).includes('Blue Bottle'), 'people do not see each other\'s data');
     assert.equal((await getJSON(alex.page, '/api/people')).status, 403, 'members cannot manage people');
@@ -180,7 +180,11 @@ async function main() {
     await owner.page.click('.icon-x');
     await owner.page.click('[data-test="account"]');
     await owner.page.waitForSelector('.acct-list li:has-text("Alex") button');
-    await owner.page.click('.acct-list li:has-text("Alex") button');
+    await owner.page.waitForFunction(() => document.querySelector('[data-test="codes-left"]')?.textContent.trim());
+    await Promise.all([
+      owner.page.waitForResponse(r => r.url().includes('/api/people/') && r.request().method() === 'DELETE'),
+      owner.page.click('.acct-list li:has-text("Alex") button'),
+    ]);
     await owner.page.waitForFunction(() => !document.querySelector('.acct-sheet').textContent.includes('Alex'));
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
 
@@ -195,4 +199,4 @@ async function main() {
   }
 }
 
-main().then(() => process.exit(0), e => { console.error(`accounts test failed: ${e.message}`); process.exit(1); });
+main().then(() => process.exit(0), e => { console.error(`accounts test failed: ${e.stack}`); process.exit(1); });

@@ -33,13 +33,19 @@ const syncText = computed(() => ({
 }[account.sync]));
 const date = t => (t ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'never');
 
+// Loads run together; only the newest result is shown, so an older, slower
+// load cannot bring back someone who was just removed.
+let loadSeq = 0;
 async function load() {
   error.value = '';
+  const seq = ++loadSeq;
   try {
-    passkeys.value = (await listPasskeys()).passkeys;
-    codesLeft.value = (await recoveryStatus()).left;
-    if (isOwner.value) ({ people: people.value, invites: invites.value } = await listPeople());
-  } catch (e) { error.value = e.message; }
+    const [pk, rc, pp] = await Promise.all([listPasskeys(), recoveryStatus(), isOwner.value ? listPeople() : null]);
+    if (seq !== loadSeq) return;
+    passkeys.value = pk.passkeys;
+    codesLeft.value = rc.left;
+    if (pp) ({ people: people.value, invites: invites.value } = pp);
+  } catch (e) { if (seq === loadSeq) error.value = e.message; }
 }
 function show() { open.value = true; link.value = null; freshCodes.value = null; load(); }
 
@@ -127,7 +133,7 @@ const tour = () => { open.value = false; emit('tour'); };
             <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes">{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
           </div>
           <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
-            {{ codesLeft === null ? '' : codesLeft === 0 ? 'You have no recovery codes. Make some so you can get back in if you lose your devices.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
+            {{ codesLeft === null ? '' : codesLeft === 0 ? 'No recovery codes. That is fine if your passkey syncs with iCloud or Google, or you have added a second device. Otherwise, make some.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
           </p>
           <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
         </section>

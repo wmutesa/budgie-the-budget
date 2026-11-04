@@ -312,6 +312,11 @@ async function routes(request, env, url) {
   if (path === '/api/recovery-codes' && method === 'POST') {
     return json({ recoveryCodes: await issueRecoveryCodes(env, user.id) });
   }
+  // Someone who relies on synced passkeys can turn codes off; unseen codes should not stay valid.
+  if (path === '/api/recovery-codes' && method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(user.id).run();
+    return json({ left: 0 });
+  }
 
   // --- your devices ---
   if (path === '/api/passkeys' && method === 'GET') {

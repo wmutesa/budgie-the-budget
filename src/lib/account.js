@@ -233,6 +233,7 @@ export async function recoverWithCode(code) {
 }
 export const recoveryStatus = () => api('/api/recovery-codes');
 export const newRecoveryCodes = () => api('/api/recovery-codes', { method: 'POST', body: {} });
+export const dropRecoveryCodes = () => api('/api/recovery-codes', { method: 'DELETE' });
 export const listPasskeys = () => api('/api/passkeys');
 export const removePasskey = id => api(`/api/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const deviceLink = () => api('/api/devices/link', { method: 'POST', body: {} });

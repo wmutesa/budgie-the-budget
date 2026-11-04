@@ -28,7 +28,7 @@ import AccountMenu from './components/AccountMenu.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
-import { account, startAccount } from './lib/account';
+import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
@@ -44,6 +44,8 @@ const touring = ref(false);
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
 }, { immediate: true });
+// Skipping recovery codes cancels them so unseen codes cannot be used.
+const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* still hidden; they can be remade later */ } account.recoveryCodes = null; };
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
 const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
@@ -69,7 +71,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
     <section class="si-card">
       <p class="brand-word">BUDGIE</p>
       <h1>Save your recovery codes</h1>
-      <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" />
+      <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" @skip="skipCodes" />
     </section>
   </main>
   <div v-else class="app">

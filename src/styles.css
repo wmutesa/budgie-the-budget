@@ -1243,4 +1243,8 @@ html, body { background: #fff; }
 .acct-qr .qr { border: 1px solid var(--line); flex-shrink: 0; }
 .acct-qr p { margin: 0; }
 .acct-warn { color: #b45309; }
+.acct-sec [data-test="codes-left"] { margin: 0; }
 @media (max-width: 420px) { .rc-list { grid-template-columns: 1fr; } }
+.rc-skip { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
+.rc-skip p { margin: 0; font-size: 11.5px; color: #71717a; line-height: 1.45; }
+[data-test="codes-left"] { min-height: 1.45em; }
