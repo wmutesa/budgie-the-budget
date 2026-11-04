@@ -15,6 +15,18 @@ const dist = path.resolve(__dirname, '..', 'dist');
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
+// Send the same security headers Cloudflare will send (from public/_headers),
+// so the test fails if the Content Security Policy blocks something the app needs.
+const headers = {};
+const headerFile = path.join(dist, '_headers');
+if (fs.existsSync(headerFile)) {
+  fs.readFileSync(headerFile, 'utf8').split('\n').filter(l => /^\s+\S/.test(l)).forEach(l => {
+    const i = l.indexOf(':');
+    headers[l.slice(0, i).trim()] = l.slice(i + 1).trim().replace(/;\s*upgrade-insecure-requests/, '');
+  });
+  delete headers['Strict-Transport-Security'];
+}
+
 const server = http.createServer((req, res) => {
   const urlPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
   const file = path.join(dist, urlPath);
@@ -22,7 +34,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(404);
     return res.end('not found');
   }
-  res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
+  res.writeHead(200, { ...headers, 'Content-Type': types[path.extname(file)] || 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
 });
 
@@ -48,10 +60,12 @@ async function run(url) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   page.on('pageerror', e => errors.push(`page error: ${e.message}`));
+  page.on('console', m => { if (/Content Security Policy/i.test(m.text())) errors.push(`CSP: ${m.text()}`); });
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
   assert.match(await page.textContent('.nav-bar .brand-word'), /BUDGIE/, 'navigation renders inside the grid');
+  assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   assert.match(await page.textContent('.lede'), /You hold/, 'the brief renders');
   for (const label of ['Savings goal', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);

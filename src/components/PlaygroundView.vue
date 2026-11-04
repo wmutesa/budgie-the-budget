@@ -7,8 +7,10 @@ import { monthTotals } from '../lib/ledger';
 import { logoUrl } from '../lib/brands';
 import { CATEGORIES } from '../lib/categorize';
 import PickMenu from './PickMenu.vue';
+import MicButton from './MicButton.vue';
+import { useDictation, canDictate } from '../lib/dictation';
 
-// Playground: write anything, Budgie organises it into a plan you can shape.
+// Playground: write or say anything, Budgie organises it into a plan you can shape.
 const plan = store.plan;
 if (!plan.income) plan.income = Math.round(monthTotals.value.income) || 0;
 
@@ -24,6 +26,18 @@ function runOrganize() {
 }
 watch(() => plan.text, () => { if (!plan.auto) return; clearTimeout(timer); timer = setTimeout(runOrganize, 700); });
 const useExample = () => { plan.text = EXAMPLE; runOrganize(); };
+
+// Dictate into the scratchpad: words appear live and are kept on their own line.
+let baseText = '';
+const dict = useDictation({
+  continuous: true,
+  onText: t => { plan.text = `${baseText}${t}`; },
+  onFinal: () => { plan.text = `${plan.text.trim()}\n`; runOrganize(); },
+});
+const toggleDictate = () => {
+  if (!dict.listening.value) baseText = plan.text && !plan.text.endsWith('\n') ? `${plan.text}\n` : plan.text;
+  dict.toggle();
+};
 
 const byGroup = computed(() => Object.fromEntries(GROUPS.filter(g => g !== 'Income').map(g => [g, plan.items.filter(i => i.group === g)])));
 const totals = computed(() => {
@@ -123,8 +137,14 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
         <button class="btn primary small" data-test="organize" @click="runOrganize">Organize</button>
       </div>
     </div>
-    <textarea v-model="plan.text" class="scratch-pad" data-test="scratch" spellcheck="false"
-      placeholder="salary 4700&#10;rent 1450, groceries maybe 400&#10;netflix 15.49, github 4&#10;save 3000 for japan by june" />
+    <div class="scratch-wrap" :class="{ live: dict.listening.value }">
+      <textarea v-model="plan.text" class="scratch-pad" data-test="scratch" spellcheck="false"
+        placeholder="salary 4700&#10;rent 1450, groceries maybe 400&#10;netflix 15.49, github 4&#10;save 3000 for japan by june" />
+      <div v-if="canDictate" class="scratch-mic">
+        <span v-if="dict.listening.value" class="live-tag">Listening · speak one item at a time</span>
+        <MicButton :listening="dict.listening.value" label="Dictate your plan" @toggle="toggleDictate" />
+      </div>
+    </div>
 
     <div class="board">
       <div v-for="(items, g) in byGroup" :key="g" class="lane" :data-group="g">
