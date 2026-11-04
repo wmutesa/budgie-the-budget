@@ -26,6 +26,8 @@ import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
 import GuideTour from './components/GuideTour.vue';
+import RecoveryCodes from './components/RecoveryCodes.vue';
+import SignInBackdrop from './components/SignInBackdrop.vue';
 import { account, startAccount } from './lib/account';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
@@ -39,8 +41,8 @@ const seed = ref('');
 const openSearch = (q = '') => { seed.value = q; searching.value = true; };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
-watch(() => [account.status, account.sync, store.guide?.done], () => {
-  if (account.status === 'signed-in' && account.sync !== 'saving' && store.guide && !store.guide.done) touring.value = true;
+watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
+  if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
 }, { immediate: true });
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
@@ -62,6 +64,14 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
 <template>
   <div v-if="account.status === 'loading'" class="boot" aria-busy="true"><span class="brand-word">BUDGIE</span></div>
   <SignIn v-else-if="account.status === 'signed-out'" />
+  <main v-else-if="account.recoveryCodes" class="signin">
+    <SignInBackdrop />
+    <section class="si-card">
+      <p class="brand-word">BUDGIE</p>
+      <h1>Save your recovery codes</h1>
+      <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" />
+    </section>
+  </main>
   <div v-else class="app">
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->

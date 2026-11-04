@@ -27,6 +27,8 @@ Highlights:
 
 - **Invite-only.** The owner invites people from the account menu (the initial in the top bar). Each invite link works once and expires after 7 days.
 - **Passkeys, no passwords.** People sign in with their fingerprint, face or device PIN. To use another device, open the account menu, choose **Add a device**, and open the link on that device within 24 hours.
+- **Recovery codes.** Everyone gets 8 single-use codes when they join, shown once. If they lose every device, "Lost your device?" on the sign-in page trades a code for a 15-minute link to make a new passkey. New codes can be made from the account menu, which cancels the old ones. Only hashes are stored, and wrong guesses are limited to 10 an hour per network address.
+- **QR codes.** Device and invite links come with a QR code to scan with the other device.
 - **First-time guide.** New people get a welcome note and a short tour of each page, including how passkeys work and their risks. It shows once per person and can be replayed from the account menu, which also keeps the passkey note.
 - **Each person's data is their own.** Nobody, including the owner, sees anyone else's data in the app. The owner can remove a person, which deletes their account and data.
 

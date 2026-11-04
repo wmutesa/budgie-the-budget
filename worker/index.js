@@ -11,6 +11,9 @@ const SESSION_DAYS = 30;
 const INVITE_DAYS = 7;
 const CHALLENGE_MS = 5 * 60 * 1000;
 const MAX_DATA_BYTES = 1_500_000;
+const RECOVERY_CODES = 8;
+const RECOVERY_LINK_MS = 15 * 60 * 1000;
+const MAX_FAILED_RECOVERIES = 10; // per network address per hour
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -46,6 +49,42 @@ async function body(request) {
 // The site's own address decides the passkey domain, so it works on
 // workers.dev, a custom domain and localhost without configuration.
 const rp = url => ({ rpID: url.hostname, origin: url.origin, rpName: 'Budgie' });
+
+// ---------- recovery codes ----------
+// Ten characters from an alphabet without look-alikes (no 0/O, 1/I/L), shown as XXXXX-XXXXX.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function newRecoveryCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const raw = Array.from(bytes, b => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
+  return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+}
+const normalizeCode = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+// Replace a person's recovery codes and return the new ones (shown once).
+async function issueRecoveryCodes(env, userId) {
+  const codes = Array.from({ length: RECOVERY_CODES }, newRecoveryCode);
+  const t = now();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(userId),
+    ...await Promise.all(codes.map(async c => env.DB.prepare('INSERT INTO recovery_codes (id, user_id, code_hash, created_at) VALUES (?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), userId, await sha256(normalizeCode(c)), t))),
+  ]);
+  return codes;
+}
+
+// A simple per-address limit on failed attempts.
+async function tooManyAttempts(env, key) {
+  const row = await env.DB.prepare('SELECT count, window_start FROM attempts WHERE key = ?').bind(key).first();
+  return Boolean(row && now() - row.window_start < 3600e3 && row.count >= MAX_FAILED_RECOVERIES);
+}
+async function countFailure(env, key) {
+  await env.DB.prepare(
+    `INSERT INTO attempts (key, count, window_start) VALUES (?1, 1, ?2)
+     ON CONFLICT(key) DO UPDATE SET
+       count = CASE WHEN ?2 - window_start > 3600000 THEN 1 ELSE count + 1 END,
+       window_start = CASE WHEN ?2 - window_start > 3600000 THEN ?2 ELSE window_start END`,
+  ).bind(key, now()).run();
+}
 
 // ---------- sessions ----------
 async function currentUser(request, env) {
@@ -167,7 +206,33 @@ async function routes(request, env, url) {
     await env.DB.batch(statements);
     const cookie = await startSession(request, env, userId);
     const user = await env.DB.prepare('SELECT id, name, role FROM users WHERE id = ?').bind(userId).first();
-    return json({ user }, 200, { 'Set-Cookie': cookie });
+    // New people get recovery codes straight away; so does anyone who has none left.
+    const left = (await env.DB.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').bind(userId).first()).n;
+    const recoveryCodes = !invite.user_id || left === 0 ? await issueRecoveryCodes(env, userId) : null;
+    return json({ user, recoveryCodes }, 200, { 'Set-Cookie': cookie });
+  }
+
+  // --- lost every passkey: a recovery code gives a short link to add a new one ---
+  if (path === '/api/recover' && method === 'POST') {
+    const key = `recover:${request.headers.get('CF-Connecting-IP') || 'local'}`;
+    if (await tooManyAttempts(env, key)) return fail(429, 'Too many tries. Wait an hour and try again.');
+    const code = normalizeCode((await body(request)).code);
+    const row = code.length === 10
+      ? await env.DB.prepare(
+        `UPDATE recovery_codes SET used_at = ? WHERE code_hash = ? AND used_at IS NULL
+         RETURNING user_id`,
+      ).bind(now(), await sha256(code)).first()
+      : null;
+    if (!row) {
+      await countFailure(env, key);
+      return fail(401, 'That recovery code is not valid or has been used.');
+    }
+    const user = await env.DB.prepare('SELECT id, name, role FROM users WHERE id = ?').bind(row.user_id).first();
+    const token = randomToken();
+    await env.DB.prepare('INSERT INTO invites (id, token_hash, name, role, user_id, created_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), await sha256(token), user.name, user.role, user.id, user.id, now(), now() + RECOVERY_LINK_MS).run();
+    const left = (await env.DB.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').bind(user.id).first()).n;
+    return json({ token, name: user.name, role: user.role, codesLeft: left });
   }
 
   // --- sign in with a passkey ---
@@ -239,6 +304,15 @@ async function routes(request, env, url) {
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
   }
 
+  // --- recovery codes ---
+  if (path === '/api/recovery-codes' && method === 'GET') {
+    const left = (await env.DB.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').bind(user.id).first()).n;
+    return json({ left });
+  }
+  if (path === '/api/recovery-codes' && method === 'POST') {
+    return json({ recoveryCodes: await issueRecoveryCodes(env, user.id) });
+  }
+
   // --- your devices ---
   if (path === '/api/passkeys' && method === 'GET') {
     const { results } = await env.DB.prepare('SELECT id, label, created_at, last_used_at FROM credentials WHERE user_id = ? ORDER BY created_at').bind(user.id).all();
@@ -300,6 +374,7 @@ async function routes(request, env, url) {
         env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(id),
+        env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(id),
         env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(id),
       ]);
       return json({ ok: true });

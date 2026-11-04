@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { account, signIn, registerWithInvite, passkeyError, canUsePasskeys } from '../lib/account';
+import { account, signIn, registerWithInvite, recoverWithCode, passkeyError, canUsePasskeys } from '../lib/account';
 import SignInBackdrop from './SignInBackdrop.vue';
 import PasskeyNote from './PasskeyNote.vue';
 
@@ -9,6 +9,9 @@ import PasskeyNote from './PasskeyNote.vue';
 const busy = ref(false);
 const error = ref('');
 const supported = canUsePasskeys();
+const recovering = ref(false);
+const code = ref('');
+const useCode = () => run(async () => { await recoverWithCode(code.value); code.value = ''; recovering.value = false; });
 
 async function run(fn) {
   busy.value = true;
@@ -36,6 +39,7 @@ async function run(fn) {
 
       <template v-if="account.invite?.token">
         <h1>{{ account.invite.addsDevice ? `Add this device, ${account.invite.name}` : `Welcome, ${account.invite.name}` }}</h1>
+        <p v-if="account.invite.recovered" class="si-ok" role="status">Recovery code accepted. {{ account.invite.codesLeft }} {{ account.invite.codesLeft === 1 ? 'code' : 'codes' }} left. Create a new passkey within 15 minutes.</p>
         <p class="si-lead">
           {{ account.invite.addsDevice
             ? 'Create a passkey on this device so you can sign in here too.'
@@ -53,6 +57,17 @@ async function run(fn) {
         <button class="btn primary si-btn" data-test="sign-in" :disabled="busy || !supported" @click="run(signIn)">
           {{ busy ? 'Waiting for your passkey…' : 'Sign in with a passkey' }}
         </button>
+        <p class="si-tip">On someone else's computer? In the passkey prompt, choose <b>Use a phone or tablet</b> and scan the code with your phone.</p>
+
+        <button v-if="!recovering" class="si-link" type="button" data-test="lost-device" @click="recovering = true">Lost your device? Use a recovery code</button>
+        <form v-else class="si-recover" @submit.prevent="useCode">
+          <label class="si-k" for="rc-input">Recovery code</label>
+          <div class="acct-link-row">
+            <input id="rc-input" v-model="code" class="field" placeholder="XXXXX-XXXXX" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" data-test="recovery-input" />
+            <button class="btn primary small" type="submit" data-test="recovery-use" :disabled="busy || code.replace(/[^a-z0-9]/gi, '').length < 10">Use code</button>
+          </div>
+          <button class="si-link" type="button" @click="recovering = false">Cancel</button>
+        </form>
       </template>
 
       <p v-if="!supported" class="si-error" role="alert">This browser cannot use passkeys. Try an up-to-date Chrome, Safari, Edge or Firefox.</p>

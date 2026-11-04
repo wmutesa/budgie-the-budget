@@ -78,6 +78,7 @@ async function fakeApi(page, account = fakeAccount) {
       account.version += 1;
       return route.fulfill({ json: { version: account.version } });
     }
+    if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
     if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
     if (p === '/api/people') return route.fulfill({ json: { people: [{ id: 'u1', name: 'Willy', role: 'owner', last_seen: Date.now() }], invites: [] } });
     return route.fulfill({ status: 404, json: { error: 'Not found' } });

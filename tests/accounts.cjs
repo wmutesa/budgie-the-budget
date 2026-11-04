@@ -72,6 +72,14 @@ async function main() {
     await owner.page.goto(`${base}/invite#${ownerToken}`);
     await owner.page.waitForSelector('text=Welcome, Willy');
     await owner.page.click('[data-test="create-passkey"]');
+    // New people see their recovery codes once, before the app.
+    await owner.page.waitForSelector('[data-test="recovery-codes"]');
+    const codes = await owner.page.$$eval('.rc-list code', els => els.map(e => e.textContent));
+    assert.equal(codes.length, 8, 'eight recovery codes are shown');
+    assert.ok(codes.every(c => /^[A-Z2-9]{5}-[A-Z2-9]{5}$/.test(c)), 'codes are easy to read');
+    assert.ok(await owner.page.isDisabled('[data-test="codes-done"]'), 'you must confirm you saved them');
+    await owner.page.check('[data-test="codes-saved"]');
+    await owner.page.click('[data-test="codes-done"]');
     await owner.page.waitForSelector('[data-test="guide-skip"]');
     await owner.page.click('[data-test="guide-skip"]');
     await owner.page.waitForSelector('.nb-pages');
@@ -113,6 +121,9 @@ async function main() {
     await alex.page.goto(inviteLink.replace(/^https?:\/\/[^/]+/, base));
     await alex.page.waitForSelector('text=Welcome, Alex');
     await alex.page.click('[data-test="create-passkey"]');
+    await alex.page.waitForSelector('[data-test="recovery-codes"]');
+    await alex.page.check('[data-test="codes-saved"]');
+    await alex.page.click('[data-test="codes-done"]');
     await alex.page.waitForSelector('[data-test="guide-skip"]');
     await alex.page.click('[data-test="guide-skip"]');
     await alex.page.waitForSelector('.nb-pages');
@@ -131,6 +142,7 @@ async function main() {
     await owner.page.click('.acct-sec-head button:has-text("Add a device")');
     await owner.page.waitForFunction(old => { const v = document.querySelector('.acct-link .field')?.value; return v && v !== old; }, inviteLink);
     const deviceLink = await owner.page.inputValue('.acct-link .field');
+    assert.ok(await owner.page.isVisible('.acct-qr svg path'), 'device links come with a QR code');
     const laptop = await personPage(browser);
     await laptop.page.goto(deviceLink.replace(/^https?:\/\/[^/]+/, base));
     await laptop.page.waitForSelector('text=Add this device, Willy');
@@ -139,6 +151,30 @@ async function main() {
     await laptop.page.click('.nb-pages button:nth-child(2)');
     await laptop.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
     await laptop.context.close();
+
+    // Lost every device: a recovery code leads to a new passkey.
+    const lost = await personPage(browser);
+    await lost.page.goto(base);
+    await lost.page.click('[data-test="lost-device"]');
+    await lost.page.fill('[data-test="recovery-input"]', 'AAAAA-BBBBB');
+    await lost.page.click('[data-test="recovery-use"]');
+    await lost.page.waitForSelector('text=not valid or has been used');
+    await lost.page.fill('[data-test="recovery-input"]', codes[0].toLowerCase());
+    await lost.page.click('[data-test="recovery-use"]');
+    await lost.page.waitForSelector('text=Recovery code accepted. 7 codes left');
+    await lost.page.click('[data-test="create-passkey"]');
+    await lost.page.waitForSelector('.nb-pages');
+    await lost.page.click('.nb-pages button:nth-child(2)');
+    await lost.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
+    const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
+    assert.equal(reuse.status, 401, 'a recovery code works once');
+    await lost.page.click('[data-test="account"]');
+    await lost.page.waitForSelector('[data-test="codes-left"]:has-text("7 unused codes")');
+    await lost.page.click('[data-test="new-codes"]');
+    await lost.page.waitForSelector('.acct-sheet .rc-list code');
+    const old = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[1] }) });
+    assert.equal(old.status, 401, 'making new codes cancels the old ones');
+    await lost.context.close();
 
     // The owner removes Alex, whose session stops working.
     await owner.page.click('.icon-x');

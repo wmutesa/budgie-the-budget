@@ -1224,3 +1224,23 @@ html, body { background: #fff; }
 .gt-pk { max-height: 44vh; overflow: auto; }
 .gt-pk summary { pointer-events: none; }
 .gt-pk summary::after { display: none; }
+
+/* ---------- Recovery codes and QR ---------- */
+.rc { display: grid; gap: 12px; }
+.rc-lead { margin: 0; font-size: 13px; line-height: 1.5; color: #3f3f46; }
+.rc-list { margin: 0; padding: 12px; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; background: #faf8ff; border: 1px dashed #c4b5fd; counter-reset: rc; }
+.rc-list li { counter-increment: rc; display: flex; gap: 8px; align-items: baseline; }
+.rc-list li::before { content: counter(rc); font-size: 10px; color: #a1a1aa; width: 12px; text-align: right; }
+.rc-list code { font: 600 14px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; color: #18181b; }
+.rc-acts { display: flex; gap: 8px; }
+.rc-check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.rc-check input { width: 16px; height: 16px; accent-color: #7c3aed; }
+.si-tip { margin: 0; font-size: 12px; color: #52525b; line-height: 1.45; }
+.si-link { justify-self: start; border: 0; background: none; padding: 0; font-size: 12.5px; color: #6d28d9; text-decoration: underline; text-underline-offset: 2px; }
+.si-recover { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); background: #fcfcfd; }
+.si-ok { margin: 0; padding: 8px 10px; background: #f0fdf4; color: #166534; font-size: 12.5px; }
+.acct-qr { display: flex; gap: 12px; align-items: center; }
+.acct-qr .qr { border: 1px solid var(--line); flex-shrink: 0; }
+.acct-qr p { margin: 0; }
+.acct-warn { color: #b45309; }
+@media (max-width: 420px) { .rc-list { grid-template-columns: 1fr; } }

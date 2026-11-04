@@ -15,6 +15,7 @@ export const account = reactive({
   syncedAt: null,
   note: '',                 // a short message, such as "Updated from another device"
   invite: null,             // { token, name, addsDevice } when opened from an invite link
+  recoveryCodes: null,      // new codes to show once after joining
 });
 export const canUsePasskeys = () => browserSupportsWebAuthn();
 
@@ -194,8 +195,9 @@ export async function registerWithInvite() {
   if (!token) throw new Error('This invite link is not valid.');
   const { challengeId, options } = await api('/api/register/options', { method: 'POST', body: { token } });
   const response = await startRegistration({ optionsJSON: options });
-  const { user } = await api('/api/register/verify', { method: 'POST', body: { challengeId, response, token } });
+  const { user, recoveryCodes } = await api('/api/register/verify', { method: 'POST', body: { challengeId, response, token } });
   account.invite = null;
+  account.recoveryCodes = recoveryCodes || null;
   stopWatch?.();
   await becomeSignedIn(user);
 }
@@ -224,6 +226,13 @@ export function passkeyError(e) {
 }
 
 // ---------- devices and people ----------
+// Lost every passkey: trade a recovery code for a short link to add one on this device.
+export async function recoverWithCode(code) {
+  const r = await api('/api/recover', { method: 'POST', body: { code } });
+  account.invite = { token: r.token, name: r.name, role: r.role, addsDevice: true, recovered: true, codesLeft: r.codesLeft };
+}
+export const recoveryStatus = () => api('/api/recovery-codes');
+export const newRecoveryCodes = () => api('/api/recovery-codes', { method: 'POST', body: {} });
 export const listPasskeys = () => api('/api/passkeys');
 export const removePasskey = id => api(`/api/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const deviceLink = () => api('/api/devices/link', { method: 'POST', body: {} });

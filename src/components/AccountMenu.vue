@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
 import PasskeyNote from './PasskeyNote.vue';
+import QrCode from './QrCode.vue';
+import RecoveryCodes from './RecoveryCodes.vue';
 import {
-  account, signOut, listPasskeys, removePasskey, deviceLink,
+  account, signOut, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
 } from '../lib/account';
 
@@ -10,6 +12,8 @@ import {
 // your devices, and (for the owner) the people who can use Budgie.
 const open = ref(false);
 const passkeys = ref([]);
+const codesLeft = ref(null);
+const freshCodes = ref(null);
 const people = ref([]);
 const invites = ref([]);
 const inviteName = ref('');
@@ -33,10 +37,11 @@ async function load() {
   error.value = '';
   try {
     passkeys.value = (await listPasskeys()).passkeys;
+    codesLeft.value = (await recoveryStatus()).left;
     if (isOwner.value) ({ people: people.value, invites: invites.value } = await listPeople());
   } catch (e) { error.value = e.message; }
 }
-function show() { open.value = true; link.value = null; load(); }
+function show() { open.value = true; link.value = null; freshCodes.value = null; load(); }
 
 async function act(fn) {
   busy.value = true;
@@ -53,6 +58,11 @@ const sendInvite = () => act(async () => {
   link.value = { label: `Send this to ${inviteName.value.trim()}. It works once and expires in ${r.expiresInDays} days`, url: r.link };
   inviteName.value = '';
   await load();
+});
+const makeCodes = () => act(async () => {
+  if (codesLeft.value > 0 && !confirm('Make new recovery codes? Your current codes will stop working.')) return;
+  freshCodes.value = (await newRecoveryCodes()).recoveryCodes;
+  codesLeft.value = freshCodes.value.length;
 });
 const dropInvite = id => act(async () => { await cancelInvite(id); await load(); });
 const dropPasskey = p => act(async () => {
@@ -94,6 +104,10 @@ const tour = () => { open.value = false; emit('tour'); };
             <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
             <button class="btn primary small" type="button" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
           </div>
+          <div class="acct-qr">
+            <QrCode :text="link.url" :size="148" />
+            <p class="small muted">Or scan this with the other device's camera.</p>
+          </div>
         </div>
 
         <section class="acct-sec">
@@ -105,6 +119,17 @@ const tour = () => { open.value = false; emit('tour'); };
               <button v-if="passkeys.length > 1" class="btn small" :disabled="busy" @click="dropPasskey(p)">Remove</button>
             </li>
           </ul>
+        </section>
+
+        <section class="acct-sec">
+          <div class="acct-sec-head">
+            <p class="kicker">Recovery codes</p>
+            <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes">{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
+          </div>
+          <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
+            {{ codesLeft === null ? '' : codesLeft === 0 ? 'You have no recovery codes. Make some so you can get back in if you lose your devices.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
+          </p>
+          <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
         </section>
 
         <section v-if="isOwner" class="acct-sec">
