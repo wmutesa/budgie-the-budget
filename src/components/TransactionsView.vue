@@ -34,6 +34,25 @@ const groups = computed(() => {
   return out;
 });
 
+// Last 14 days of spending, for the small chart on the full ledger.
+const days14 = computed(() => {
+  const out = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const spent = store.transactions.filter(t => t.date === key && t.amount < 0).reduce((s, t) => s - t.amount, 0);
+    out.push({ key, spent, label: d.toLocaleDateString('en-US', { weekday: 'narrow' }) });
+  }
+  const max = Math.max(1, ...out.map(x => x.spent));
+  return out.map(x => ({ ...x, h: (x.spent / max) * 100 }));
+});
+const totalsShown = computed(() => ({
+  income: filtered.value.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0),
+  spent: filtered.value.filter(t => t.amount < 0).reduce((s, t) => s - t.amount, 0),
+}));
+const catColor = c => store.budgets.find(b => b.name === c)?.color || (c === 'Income' ? '#16a34a' : '#a1a1aa');
+const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
 const fmt = (n, c) => (n < 0 ? '−' : '+') + new Intl.NumberFormat('en-US', { style: 'currency', currency: c || 'USD' }).format(Math.abs(n));
 const day = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const remove = id => { store.transactions = store.transactions.filter(t => t.id !== id); };
@@ -45,6 +64,18 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
     <div class="cell-head">
       <p class="label">{{ title }}</p>
       <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>
+    </div>
+    <div v-if="full" class="act-summary">
+      <div class="act-totals">
+        <div class="at in-tint"><span class="small">Income shown</span><b>{{ money(totalsShown.income) }}</b></div>
+        <div class="at out-tint"><span class="small">Spending shown</span><b>{{ money(totalsShown.spent) }}</b></div>
+      </div>
+      <div class="day-chart" aria-label="Spending over the last 14 days">
+        <div v-for="d in days14" :key="d.key" class="dc-col" :title="`${d.key}: ${money(d.spent)}`">
+          <i :style="{ height: Math.max(d.spent ? 6 : 2, d.h) + '%' }" :class="{ zero: !d.spent }" />
+          <span>{{ d.label }}</span>
+        </div>
+      </div>
     </div>
     <div v-if="full" class="toolbar">
       <div class="chips">
@@ -61,7 +92,7 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
         <div v-for="t in g.items" :key="t.id" class="tx-row">
           <img v-if="t.logo" :src="t.logo" :alt="`${t.merchant} logo`" width="26" height="26" />
           <span v-else class="logo-fallback">{{ t.merchant[0] }}</span>
-          <div class="grow"><b>{{ t.merchant }}</b><span class="muted small">{{ t.category }} · {{ sourceLabel[t.source] || t.source }}</span></div>
+          <div class="grow"><b>{{ t.merchant }}</b><span class="tx-meta"><span class="cat-tag" :style="{ '--c': catColor(t.category) }">{{ t.category }}</span><span class="muted small">{{ sourceLabel[t.source] || t.source }}</span></span></div>
           <span class="tx-amt" :class="t.amount > 0 ? 'in' : 'out'">{{ fmt(t.amount, t.currency) }}</span>
           <button class="icon-x" :aria-label="`Delete ${t.merchant}`" @click="remove(t.id)">×</button>
         </div>
