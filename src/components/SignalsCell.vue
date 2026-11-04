@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { budgets } from '../data/demo';
+import { budgetRows } from '../lib/ledger';
 import { store, daysUntil } from '../lib/store';
 import { rates } from '../lib/rates';
 
@@ -11,7 +11,7 @@ const signals = computed(() => {
     if (d >= 0 && d <= 7) out.push({ tone: 'info', title: `${s.name} renews ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}`, body: `${s.amount} ${s.currency}, ${s.cycle}.` });
     if (d < 0) out.push({ tone: 'warn', title: `${s.name} payment date passed`, body: 'Update the next payment date.' });
   });
-  budgets.filter(b => b.spent > b.budget).forEach(b => out.push({ tone: 'warn', title: `${b.name} is over budget`, body: `$${b.spent} of $${b.budget} this month.` }));
+  budgetRows.value.filter(b => b.spent > b.budget).forEach(b => out.push({ tone: 'warn', title: `${b.name} is over budget`, body: `$${Math.round(b.spent)} of $${b.budget} this month.` }));
   if (rates.status === 'error') out.push({ tone: 'warn', title: 'Exchange rates offline', body: 'Converted amounts are hidden until rates load.' });
   if (!out.length) out.push({ tone: 'good', title: 'All quiet', body: 'Nothing needs attention right now.' });
   return out;

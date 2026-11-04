@@ -16,6 +16,11 @@ import ReportsView from './components/ReportsView.vue';
 import BudgetsView from './components/BudgetsView.vue';
 import TransactionsView from './components/TransactionsView.vue';
 import SubscriptionSearch from './components/SubscriptionSearch.vue';
+import CaptureCell from './components/CaptureCell.vue';
+import ReviewQueue from './components/ReviewQueue.vue';
+import SpendSummary from './components/SpendSummary.vue';
+import KpiStrip from './components/KpiStrip.vue';
+import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
 
@@ -25,11 +30,13 @@ const active = ref('Overview');
 const searching = ref(false);
 const seed = ref('');
 const openSearch = (q = '') => { seed.value = q; searching.value = true; };
+const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
 const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
 let timer = null;
 onMounted(() => {
   loadRates(store.base);
+  detectAI();
   timer = setInterval(() => loadRates(store.base, { force: true }), 30 * 60 * 1000);
 });
 onUnmounted(() => clearInterval(timer));
@@ -37,43 +44,47 @@ onUnmounted(() => clearInterval(timer));
 
 <template>
   <div class="app">
-    <header class="top">
-      <div class="brand-line"><span class="brand-word">BUDGIE</span><span class="muted small">{{ today }}</span></div>
-      <nav class="pages" aria-label="Pages">
-        <button v-for="t in tabs" :key="t" :class="{ on: active === t }" @click="active = t">{{ t.toUpperCase() }}</button>
-      </nav>
-      <div class="tools">
-        <label class="search">
-          <input v-model="store.query" type="search" placeholder="Search transactions" aria-label="Search transactions" @keydown.enter="active = 'Transactions'" />
-        </label>
-        <span class="ai-pill" :class="rates.status">FX · {{ ratesLabel() || 'idle' }}</span>
-        <button class="btn primary" @click="openSearch('')">+ Subscription</button>
+    <main class="grid hl canvas">
+      <!-- The navigation lives inside the grid as its first row of cells. -->
+      <div class="cell nav-brand span-3">
+        <span class="brand-word">BUDGIE</span>
+        <span class="muted small">{{ today }}</span>
       </div>
-    </header>
+      <nav class="cell nav-pages span-4" aria-label="Pages">
+        <button v-for="(t, i) in tabs" :key="t" :class="{ on: active === t }" @click="active = t">
+          <sup>0{{ i + 1 }}</sup>{{ t }}
+        </button>
+      </nav>
+      <div class="cell nav-search span-3">
+        <input v-model="store.query" type="search" placeholder="Search transactions" aria-label="Search transactions" @keydown.enter="active = 'Transactions'" />
+      </div>
+      <div class="cell nav-actions span-2">
+        <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
+        <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
+      </div>
 
-    <main class="page">
       <template v-if="active === 'Overview'">
-        <div class="grid hl">
-          <HeadlineCell class="span-8" id="overview" />
-          <GoalCell class="span-4" id="goals" />
-          <NetWorthCell class="span-5" />
-          <MonthCell class="span-3" />
-          <PlanCell class="span-4" id="plan" />
-          <FlowCapsules class="span-8" />
-          <RatesCell class="span-4" id="rates" />
-          <SubscriptionsCell class="span-8" id="subscriptions" @add="openSearch" />
-          <ExpenseStripes class="span-4" />
-          <AccountCards class="span-8" id="accounts" />
-          <SignalsCell class="span-4" />
-          <WalletCards class="span-12" />
-          <ReportsView class="span-12" id="reports" />
-        </div>
+        <HeadlineCell class="span-8" id="overview" />
+        <GoalCell class="span-4" id="goals" />
+        <NetWorthCell class="span-5" />
+        <MonthCell class="span-3" />
+        <PlanCell class="span-4" id="plan" />
+        <FlowCapsules class="span-8" />
+        <RatesCell class="span-4" id="rates" />
+        <SubscriptionsCell class="span-8" id="subscriptions" @add="openSearch" />
+        <ExpenseStripes class="span-4" />
+        <AccountCards class="span-8" id="accounts" />
+        <SignalsCell class="span-4" />
+        <WalletCards class="span-12" />
+        <ReportsView class="span-12" id="reports" />
       </template>
       <template v-else>
-        <div class="stack-pages">
-          <BudgetsView />
-          <TransactionsView />
-        </div>
+        <KpiStrip />
+        <CaptureCell class="span-8" id="capture" />
+        <SpendSummary class="span-4" />
+        <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
+        <BudgetsView class="span-4" id="budgets" />
+        <TransactionsView class="span-8" id="ledger" />
       </template>
     </main>
 

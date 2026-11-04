@@ -33,7 +33,8 @@ async function fakeNetwork(page) {
   await page.route('**/www.wikidata.org/**', route => {
     const action = new URL(route.request().url()).searchParams.get('action');
     if (action === 'wbsearchentities') {
-      return route.fulfill({ json: { search: [{ id: 'Q907311', label: 'Netflix', description: 'American streaming service' }] } });
+      const q = (new URL(route.request().url()).searchParams.get('search') || '').toLowerCase();
+      return route.fulfill({ json: { search: q.includes('netflix') ? [{ id: 'Q907311', label: 'Netflix', description: 'American streaming service' }] : [] } });
     }
     return route.fulfill({ json: { entities: { Q907311: { claims: { P856: [{ mainsnak: { datavalue: { value: 'https://www.netflix.com/' } } }] } } } } });
   });
@@ -50,7 +51,7 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  assert.match(await page.textContent('.brand-word'), /BUDGIE/, 'masthead renders');
+  assert.match(await page.textContent('.brand-word'), /BUDGIE/, 'navigation renders inside the grid');
   assert.match(await page.textContent('.lede'), /You hold/, 'the brief renders');
   for (const label of ['Savings goal', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
@@ -77,12 +78,31 @@ async function run(url) {
   await page.reload({ waitUntil: 'load' });
   assert.match(await page.textContent('#subscriptions'), /Netflix/, 'subscriptions survive a reload');
 
-  await page.click('.pages button:nth-child(2)');
+  await page.click('.nav-pages button:nth-child(2)');
   assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
   assert.match(await page.textContent('body'), /Recent activity/, 'transactions page lists activity');
-  await page.click('.chip-btn >> nth=1');
-  assert.ok((await page.locator('.table tbody tr').count()) > 0, 'income filter keeps rows');
-  await page.click('.pages button:nth-child(1)');
+  assert.equal(await page.locator('.kpi').count(), 4, 'four summary tiles');
+
+  // Import a bank statement: three rows go to review, then into the ledger.
+  const csv = 'Date,Description,Amount\n2026-11-02,Trader Joe\'s,-54.20\n2026-11-03,Uber,-18.75\n2026-11-03,Payroll,2350.00\n';
+  await page.setInputFiles('[data-test="file-input"]', { name: 'statement.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.waitForSelector('#review');
+  assert.equal(await page.locator('.draft').count(), 3, 'three statement rows wait for review');
+  assert.match(await page.textContent('#review'), /Transport/, 'Uber is categorised as transport');
+
+  // A one-line note, matched to the company on the web.
+  await page.fill('[data-test="quick-note"]', 'Netflix 15.49 today');
+  await page.press('[data-test="quick-note"]', 'Enter');
+  await page.waitForFunction(() => document.querySelectorAll('.draft').length === 4);
+  assert.match(await page.textContent('#review'), /netflix\.com/, 'the note is matched to netflix.com');
+
+  await page.click('[data-test="accept-all"]');
+  assert.equal(await page.$('#review'), null, 'review queue clears after accepting');
+  assert.match(await page.textContent('#ledger'), /Uber/, 'imported rows reach the ledger');
+  assert.match(await page.textContent('#budgets'), /Transport/, 'budgets update');
+  await page.click('.chip-btn:has-text("Imported")');
+  assert.match(await page.textContent('#ledger'), /Payroll/, 'imported filter shows statement rows');
+  await page.click('.nav-pages button:nth-child(1)');
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });

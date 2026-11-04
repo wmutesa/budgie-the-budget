@@ -1,6 +1,7 @@
 // App state that belongs to the user: base currency, tracked subscriptions,
 // and the search text. Saved in this browser only.
 import { reactive, watch } from 'vue';
+import { sampleTransactions } from '../data/demo';
 
 const KEY = 'budgie.v2';
 
@@ -13,11 +14,13 @@ const saved = read();
 export const store = reactive({
   base: saved.base || 'USD',
   subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
+  transactions: Array.isArray(saved.transactions) ? saved.transactions : sampleTransactions(),
+  drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
   query: '',
 });
 
 watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions }),
+  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts }),
   value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
   { deep: true },
 );
@@ -37,3 +40,7 @@ export function daysUntil(iso) {
   now.setHours(0, 0, 0, 0);
   return Math.round((due - now) / 864e5);
 }
+
+export const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+export const thisMonth = () => new Date().toISOString().slice(0, 7);

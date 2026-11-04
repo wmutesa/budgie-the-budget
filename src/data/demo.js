@@ -37,14 +37,6 @@ export const spending = [
   { name: 'Others', amount: 800, color: '#db2777' },
 ];
 
-export const transactions = [
-  { id: 1, title: 'Mobile app purchase', date: 'Wed, 10:29 AM', amount: 25500, status: 'Success', kind: 'in' },
-  { id: 2, title: 'Software license', date: 'Wed, 10:29 AM', amount: -25500, status: 'Success', kind: 'out' },
-  { id: 3, title: 'Trader Joe’s', date: 'Yesterday', amount: -86.4, status: 'Success', kind: 'out' },
-  { id: 4, title: 'Payroll · Employer', date: 'Nov 1', amount: 2350, status: 'Success', kind: 'in' },
-  { id: 5, title: 'Metro top-up', date: 'Nov 6', amount: -64, status: 'Pending', kind: 'out' },
-];
-
 export const goals = [
   { name: 'Emergency fund', saved: 7200, target: 10000, color: '#db2777' },
   { name: 'Europe vacation', saved: 1400, target: 5000, color: '#16a34a' },
@@ -52,11 +44,12 @@ export const goals = [
 ];
 
 export const budgets = [
-  { name: 'Housing', budget: 2000, spent: 2000, color: '#7c3aed' },
-  { name: 'Food & dining', budget: 600, spent: 432, color: '#16a34a' },
-  { name: 'Transport', budget: 300, spent: 214, color: '#2563eb' },
-  { name: 'Shopping', budget: 250, spent: 286, color: '#db2777' },
-  { name: 'Entertainment', budget: 150, spent: 58, color: '#d97706' },
+  { name: 'Housing', budget: 2000, color: '#7c3aed' },
+  { name: 'Food & dining', budget: 600, color: '#16a34a' },
+  { name: 'Transport', budget: 300, color: '#2563eb' },
+  { name: 'Shopping', budget: 250, color: '#db2777' },
+  { name: 'Entertainment', budget: 150, color: '#d97706' },
+  { name: 'Health', budget: 120, color: '#0891b2' },
 ];
 
 // Top merchants over the last three months.
@@ -67,3 +60,23 @@ export const merchants = [
   { name: 'Trader Joe’s', total: 259.2, count: 3 },
   { name: 'Uniqlo', total: 236, count: 2 },
 ];
+
+// Sample transactions dated relative to today, so the current month always has data.
+export function sampleTransactions() {
+  const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const rows = [
+    [0, 'Trader Joe’s', -86.4, 'Food & dining'],
+    [1, 'Metro top-up', -64, 'Transport'],
+    [2, 'Rent share', -1450, 'Housing'],
+    [2, 'Uniqlo', -118, 'Shopping'],
+    [3, 'Payroll · Employer', 2350, 'Income'],
+    [4, 'Chipotle', -42.1, 'Food & dining'],
+    [5, 'Pharmacy', -57.3, 'Health'],
+    [6, 'Cinema', -28, 'Entertainment'],
+    [8, 'Amazon', -168, 'Shopping'],
+    [9, 'Groceries', -64.9, 'Food & dining'],
+  ];
+  return rows.map(([n, merchant, amount, category], i) => ({
+    id: `s${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'sample', domain: '', logo: null,
+  }));
+}
