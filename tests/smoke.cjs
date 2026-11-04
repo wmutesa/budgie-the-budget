@@ -65,6 +65,13 @@ async function run(url) {
   await page.locator('.cap-col').nth(5).hover();
   assert.match(await page.textContent('.cap-tip'), /Jun/, 'hovering a month shows its totals');
 
+  // Known companies appear instantly from the built-in directory.
+  await page.click('[data-test="add-sub"]');
+  await page.fill('[data-test="brand-search"]', 'Shopee');
+  await page.waitForSelector('[data-test="brand-result"]');
+  assert.match(await page.textContent('.results'), /shopee\.com/, 'Shopee is found in the directory');
+  await page.keyboard.press('Escape');
+
   await page.click('[data-test="add-sub"]');
   await page.fill('[data-test="brand-search"]', 'Netflix');
   await page.waitForSelector('[data-test="brand-result"]');
@@ -116,6 +123,18 @@ async function run(url) {
   assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');
   await page.click('#activity .chip-btn:has-text("Imported")');
   assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
+
+  // Playground: messy notes become an organised plan, then budgets.
+  await page.click('.nav-pages button:nth-child(4)');
+  await page.fill('[data-test="scratch"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
+  await page.click('[data-test="organize"]');
+  assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
+  assert.match(await page.textContent('.lane[data-group="Wants"]'), /Netflix/, 'Netflix lands in wants');
+  assert.match(await page.textContent('.lane[data-group="Savings & goals"]'), /Laptop/i, 'the laptop goal lands in savings');
+  assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'income is picked up from the notes');
+  await page.click('[data-test="apply-plan"]');
+  await page.click('.nav-pages button:nth-child(2)');
+  assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
   await page.click('.nav-pages button:nth-child(1)');
 
   const mobile = await context.newPage();

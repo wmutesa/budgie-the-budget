@@ -1,5 +1,7 @@
 // Category guesses from a merchant name and, when known, the web description.
-export const CATEGORIES = ['Housing', 'Food & dining', 'Transport', 'Shopping', 'Entertainment', 'Health', 'Income', 'Other'];
+import { matchMerchant } from '../data/directory';
+
+export const CATEGORIES = ['Housing', 'Food & dining', 'Transport', 'Shopping', 'Entertainment', 'Software', 'Health', 'Income', 'Other'];
 
 const RULES = [
   ['Food & dining', /trader joe|whole foods|walmart|kroger|aldi|costco|safeway|carrefour|tesco|lidl|grocer|supermarket|market|restaurant|cafe|coffee|starbucks|mcdonald|kfc|chipotle|pizza|burger|kitchen|grill|bakery|food|java house|naivas|quickmart/i],
@@ -13,6 +15,8 @@ const RULES = [
 
 export function guessCategory(text = '', amount = 0) {
   if (amount > 0 && !/refund/i.test(text)) return 'Income';
+  const known = matchMerchant(text);
+  if (known) return known.category;
   for (const [cat, re] of RULES) if (re.test(text)) return cat;
   return 'Other';
 }

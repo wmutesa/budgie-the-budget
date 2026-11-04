@@ -19,11 +19,12 @@ export const store = reactive({
   budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
   dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
   banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
+  plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
   query: '',
 });
 
 watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks }),
+  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan }),
   value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
   { deep: true },
 );

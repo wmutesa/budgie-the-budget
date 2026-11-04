@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue';
-import { searchBrands } from '../lib/brands';
+import { searchBrands, logoUrl } from '../lib/brands';
+import { searchDirectory } from '../data/directory';
 
 // Search a company or service on the web and pick it. Shared by subscriptions and transactions.
 const props = defineProps({ seed: { type: String, default: '' }, allowManual: { type: Boolean, default: true } });
@@ -18,13 +19,19 @@ async function run() {
   if (ctl) ctl.abort();
   ctl = new AbortController();
   if (q.value.trim().length < 2) { results.value = []; return; }
+  const local = searchDirectory(q.value).map(e => ({ id: `dir:${e.domain}:${e.name}`, name: e.name, description: e.category, domain: e.domain, logo: logoUrl(e.domain), website: `https://${e.domain}`, local: true }));
+  results.value = local;
   loading.value = true;
   error.value = '';
-  try { results.value = await searchBrands(q.value, { signal: ctl.signal }); }
+  try {
+    const web = await searchBrands(q.value, { signal: ctl.signal });
+    const seen = new Set(local.map(r => r.domain));
+    results.value = [...local, ...web.filter(r => !seen.has(r.domain))];
+  }
   catch (e) { if (e.name !== 'AbortError') error.value = 'Could not reach the web search.'; }
   finally { loading.value = false; }
 }
-watch(q, () => { clearTimeout(timer); timer = setTimeout(run, 350); });
+watch(q, () => { clearTimeout(timer); timer = setTimeout(run, 200); });
 onMounted(() => { input.value?.focus(); if (q.value) run(); });
 const manual = () => emit('pick', { name: q.value.trim(), domain: '', logo: null, description: 'Added manually', website: null });
 </script>
@@ -39,11 +46,11 @@ const manual = () => emit('pick', { name: q.value.trim(), domain: '', logo: null
         <button class="result" data-test="brand-result" @click="emit('pick', r)">
           <img :src="r.logo" :alt="`${r.name} logo`" width="28" height="28" />
           <span class="grow"><b>{{ r.name }}</b><span class="muted small">{{ r.description || r.domain }}</span></span>
-          <span class="muted small">{{ r.domain }}</span>
+          <span class="muted small">{{ r.local ? `${r.domain} · known` : r.domain }}</span>
         </button>
       </li>
     </ul>
     <button v-if="allowManual && q.trim().length > 1 && !loading" class="btn small" @click="manual">Use “{{ q.trim() }}” without web details</button>
-    <p class="meta small">Results come from Wikidata. Logos come from each site’s own icon.</p>
+    <p class="meta small">Known companies appear instantly; more come from Wikidata. Logos come from each site’s own icon.</p>
   </div>
 </template>

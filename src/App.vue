@@ -22,12 +22,13 @@ import SpendSummary from './components/SpendSummary.vue';
 import KpiStrip from './components/KpiStrip.vue';
 import InsightsCell from './components/InsightsCell.vue';
 import OpportunitiesCell from './components/OpportunitiesCell.vue';
+import PlaygroundView from './components/PlaygroundView.vue';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
 
-// Three pages: Overview (the dashboard), Transactions (capture, review, budgets), Reports (analysis, advice, full ledger).
-const tabs = ['Overview', 'Transactions', 'Reports'];
+// Four pages: Overview (dashboard), Transactions (capture, review, budgets), Reports (analysis, advice, full ledger), Playground (build a plan).
+const tabs = ['Overview', 'Transactions', 'Reports', 'Playground'];
 const active = ref('Overview');
 const searching = ref(false);
 const seed = ref('');
@@ -51,11 +52,11 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
   <div class="app">
     <main class="grid hl canvas">
       <!-- The navigation lives inside the grid as its first row of cells. -->
-      <div class="cell nav-brand span-3">
+      <div class="cell nav-brand span-2">
         <span class="brand-word">BUDGIE</span>
         <span class="muted small">{{ today }}</span>
       </div>
-      <nav class="cell nav-pages span-4" aria-label="Pages">
+      <nav class="cell nav-pages span-5" aria-label="Pages">
         <button v-for="(t, i) in tabs" :key="t" :class="{ on: active === t }" @click="active = t">
           <sup>0{{ i + 1 }}</sup>{{ t }}
         </button>
@@ -89,6 +90,9 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
         <TransactionsView class="span-8" id="ledger" :limit="8" />
+      </template>
+      <template v-else-if="active === 'Playground'">
+        <PlaygroundView />
       </template>
       <template v-else>
         <InsightsCell class="span-8" id="insights" />

@@ -3,6 +3,8 @@ import { receiptToDraft, rowsToDrafts, parseCSV, statementToDrafts, quickToDraft
 import { aiReadReceipt, ai } from './ai';
 import { searchBrands } from './brands';
 import { guessCategory, CATEGORIES } from './categorize';
+import { matchMerchant } from '../data/directory';
+import { logoUrl } from './brands';
 
 const brandCache = new Map();
 
@@ -10,6 +12,12 @@ export async function brandFor(name) {
   const key = name.trim().toLowerCase();
   if (!key || key === 'unknown' || key === 'unknown merchant') return null;
   if (brandCache.has(key)) return brandCache.get(key);
+  const known = matchMerchant(name);
+  if (known) {
+    const hit = { name: known.name, domain: known.domain, logo: logoUrl(known.domain), description: known.category, website: `https://${known.domain}` };
+    brandCache.set(key, hit);
+    return hit;
+  }
   let hit = null;
   try { hit = (await searchBrands(name))[0] || null; } catch { hit = null; }
   brandCache.set(key, hit);

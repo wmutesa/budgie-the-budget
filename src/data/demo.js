@@ -49,6 +49,7 @@ export const budgets = [
   { name: 'Transport', budget: 300, color: '#2563eb' },
   { name: 'Shopping', budget: 250, color: '#db2777' },
   { name: 'Entertainment', budget: 150, color: '#d97706' },
+  { name: 'Software', budget: 100, color: '#4f46e5' },
   { name: 'Health', budget: 120, color: '#0891b2' },
 ];
 
