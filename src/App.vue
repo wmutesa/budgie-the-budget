@@ -41,8 +41,6 @@ const seed = ref('');
 const openSearch = (q = '') => { seed.value = q; searching.value = true; };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
-// AI availability is checked once someone is signed in.
-watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immediate: true });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
 }, { immediate: true });
@@ -56,6 +54,7 @@ let timer = null;
 onMounted(() => {
   startAccount();
   loadRates(store.base);
+  detectAI();
   timer = setInterval(() => loadRates(store.base, { force: true }), 30 * 60 * 1000);
   document.addEventListener('visibilitychange', onVisible);
 });

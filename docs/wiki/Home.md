@@ -1,6 +1,6 @@
 # Budgie wiki
 
-Budgie is a budgeting web app for spending, subscriptions, savings goals and plans, with live exchange rates and AI on Cloudflare. There is nothing to install: it runs in any up-to-date browser, and each person's data syncs to their own invite-only account.
+Budgie is a budgeting web app for spending, subscriptions, savings goals and plans, with live exchange rates and optional AI with Ollama on your computer. There is nothing to install: it runs in any up-to-date browser, and each person's data syncs to their own invite-only account.
 
 - **Live site:** https://budgie.engineering-willy-mutesa.workers.dev
 - **Code:** https://github.com/wmutesa/budgie-the-budget

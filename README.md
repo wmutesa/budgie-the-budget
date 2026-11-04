@@ -2,7 +2,7 @@
 
 # Budgie
 
-Budgie is a budgeting web app for tracking spending, subscriptions, savings goals and plans, with live exchange rates and an AI helper. There is nothing to install: open it in any up-to-date browser on a phone, tablet or computer. It is invite-only: each person signs in with a passkey, and their data syncs to their own account.
+Budgie is a budgeting web app for tracking spending, subscriptions, savings goals and plans, with live exchange rates and an optional AI helper (Ollama). There is nothing to install: open it in any up-to-date browser on a phone, tablet or computer. It is invite-only: each person signs in with a passkey, and their data syncs to their own account.
 
 On a phone you can add it to your home screen from the browser's share or menu button; it opens full screen like an app, but it is still the same website.
 
@@ -23,7 +23,7 @@ Highlights:
 - **Dictation:** speak an entry or a whole plan; text appears as you talk.
 - **Find any company:** a built-in directory of more than 300 brands across the US, Rwanda, Thailand and beyond, plus a live search of Wikidata for everything else. Logos come from each company's own site.
 - **Live exchange rates:** 160+ currencies, including the Rwandan franc and Thai baht, refreshed through the day and cached for offline use.
-- **AI on Cloudflare:** receipts are read and suggestions written by an open model (Meta's Llama 3.1, the same family [Ollama](https://ollama.com) runs) on Cloudflare Workers AI, called through Budgie's own Worker. Only signed-in people can use it, up to 60 requests an hour each. If it is unavailable, Budgie uses its built-in rules.
+- **AI with Ollama, optional:** when [Ollama](https://ollama.com) runs on your computer, Budgie uses it to read receipts and write suggestions with a local model. Nothing goes to a cloud AI service. Without it, Budgie uses its built-in rules.
 
 ## Accounts
 
@@ -39,8 +39,7 @@ Highlights:
 - Your data is stored in your account in Cloudflare D1, in a database only this app's Worker can reach, and a copy is kept in your browser so Budgie opens instantly and works offline. Changes made offline sync when you reconnect.
 - Signing out removes this device's copy, unless it holds changes that have not synced yet.
 - Sessions use a secure, HttpOnly cookie. Only hashes of session cookies and invite links are stored.
-- To read a receipt or write a suggestion, the receipt text or a short summary of your month (totals, not individual entries) is sent to Cloudflare Workers AI. It runs inside Cloudflare, the same company that hosts Budgie; see Cloudflare's Workers AI terms for how it handles this data.
-- Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files.
+- Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files, and Ollama on your own computer (`localhost`) if you run it.
 - Balances and the year's history are sample data until real accounts are connected.
 - Export features are on the roadmap.
 
@@ -59,7 +58,12 @@ npm run dev:api      # the site and the account server at http://localhost:8787
 
 To create the first (owner) invite on your local database, see "First owner" below.
 
-AI calls need a Cloudflare login, so they are off in local development and in tests (`--var AI_DISABLED:1`); Budgie then uses its built-in rules. Run `npx wrangler login` first if you want to try them locally.
+Optional AI with Ollama:
+
+```bash
+./scripts/ollama-setup.sh
+OLLAMA_ORIGINS="http://localhost:8787,https://budgie.engineering-willy-mutesa.workers.dev" ollama serve
+```
 
 ## Test
 
@@ -77,7 +81,7 @@ The smoke test opens every page, adds spending several ways, checks the review q
 2. GitHub Actions runs the build and the browser test (`.github/workflows/ci.yml`) and CodeQL scanning.
 3. Cloudflare's GitHub integration deploys `main`: `npx wrangler deploy` runs `npm run build` first (see `wrangler.jsonc`) and publishes `dist/`.
 4. `public/_headers` sets the security headers Cloudflare sends with every page.
-5. `worker/index.js` handles `/api/*` (sign-in, invites, sync, AI); everything else is served from `dist/`. Database changes live in `migrations/` and are applied with `npx wrangler d1 migrations apply budgie --remote`.
+5. `worker/index.js` handles `/api/*` (sign-in, invites, sync); everything else is served from `dist/`. Database changes live in `migrations/` and are applied with `npx wrangler d1 migrations apply budgie --remote`.
 
 ### First owner
 

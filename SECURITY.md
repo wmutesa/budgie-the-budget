@@ -17,11 +17,11 @@ Only the current `main` branch, which is what the live site runs, receives fixes
 
 - **Accounts:** invite-only sign-in with passkeys. Sessions are HttpOnly, Secure cookies; only hashes of session cookies, invite links and recovery codes are stored, in Cloudflare D1. Requests that change data must come from the site itself, and each person can reach only their own data.
 - **Security headers** (`public/_headers`, sent by Cloudflare with every page):
-  - A Content Security Policy that only allows the services Budgie uses: exchange rates, Wikidata, Google favicons and fonts, and jsDelivr for receipt reading. The page never connects to your own computer or local network.
+  - A Content Security Policy that only allows the services Budgie uses: exchange rates, Wikidata, Google favicons and fonts, jsDelivr for receipt reading, and Ollama on `localhost` if you run it.
   - No framing (`frame-ancestors 'none'`, `X-Frame-Options: DENY`), `nosniff`, a strict referrer policy, HSTS, and a Permissions Policy that allows only the camera and microphone, for receipt scanning and dictation.
 - **Safe rendering:** all text from files, the web and dictation is shown as text. The app never inserts raw HTML.
 - **External links** open with `noopener` and `noreferrer`.
-- **AI** runs on Cloudflare Workers AI through Budgie's Worker, only for signed-in people and with an hourly limit. It receives receipt text or a short summary of the month, never your passkeys or session.
+- **AI** is optional and runs on your own computer through Ollama. No cloud AI service receives your data.
 - **Automated checks:** Dependabot keeps dependencies current, CodeQL scans the code, and the browser smoke test runs with the production security headers, so a policy that blocks the app fails CI.
 
 ## Things to know

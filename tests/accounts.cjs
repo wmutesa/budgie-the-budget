@@ -52,7 +52,7 @@ async function main() {
   const hash = b64url(crypto.createHash('sha256').update(ownerToken).digest());
   d1(`INSERT INTO invites (id, token_hash, name, role, created_at, expires_at) VALUES ('owner-invite', '${hash}', 'Willy', 'owner', ${Date.now()}, ${Date.now() + 864e5})`);
 
-  const dev = spawn(wrangler, ['dev', '--local', '--persist-to', state, '--port', String(port), '--ip', '127.0.0.1', '--show-interactive-dev-session=false', '--var', 'AI_DISABLED:1'], { cwd: root, stdio: 'pipe', env: { ...process.env, CI: '1' } });
+  const dev = spawn(wrangler, ['dev', '--local', '--persist-to', state, '--port', String(port), '--ip', '127.0.0.1', '--show-interactive-dev-session=false'], { cwd: root, stdio: 'pipe', env: { ...process.env, CI: '1' } });
   let log = '';
   dev.stdout.on('data', d => (log += d));
   dev.stderr.on('data', d => (log += d));
@@ -135,9 +135,6 @@ async function main() {
     const alexData = await getJSON(alex.page, '/api/data');
     assert.ok(!JSON.stringify(alexData.body).includes('Blue Bottle'), 'people do not see each other\'s data');
     assert.equal((await getJSON(alex.page, '/api/people')).status, 403, 'members cannot manage people');
-    const aiStatus = await getJSON(alex.page, '/api/ai');
-    assert.equal(aiStatus.status, 200, 'AI status needs a session and answers');
-    assert.equal((await fetch(`${base}/api/ai`)).status, 401, 'AI is only for signed-in people');
 
     // An invite works only once.
     const late = await personPage(browser);

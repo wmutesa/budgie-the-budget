@@ -71,7 +71,7 @@ async function onNote() {
   <section class="card cell capture" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
     <div class="cell-head">
       <p class="label">Add spending</p>
-      <span class="muted small">Reader · {{ ai.label }}</span>
+      <span class="muted small">Reader · {{ ai.status === 'ollama' ? `local AI (${ai.model})` : 'on-device rules' }}</span>
     </div>
     <form class="say-bar" :class="{ live: dict.listening.value }" @submit.prevent="dict.listening.value ? dict.stop() : onNote()">
       <span v-if="!dict.listening.value" class="say-icon" aria-hidden="true">+</span>

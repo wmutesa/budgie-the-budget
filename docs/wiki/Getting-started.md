@@ -12,9 +12,16 @@ To use another device, open the account menu (your initial in the top bar), choo
 
 **On a phone:** use the browser's share or menu button and choose **Add to Home Screen**. Budgie then opens full screen like an app. It is still the same website, and updates arrive automatically.
 
-## AI
+## AI with Ollama (optional)
 
-Budgie reads receipts and writes suggestions with an open model (Meta's Llama 3.1) on Cloudflare Workers AI. Ollama itself is a program for your own computer and cannot run on Cloudflare, so Budgie uses Workers AI, which runs the same family of open models on Cloudflare's servers. There is nothing to set up. Without AI, Budgie uses its built-in rules.
+Budgie works without AI. If you run [Ollama](https://ollama.com) on your computer, Budgie uses it to read receipts and write suggestions with a local model, so nothing goes to a cloud AI service.
+
+```bash
+./scripts/ollama-setup.sh
+OLLAMA_ORIGINS="https://budgie.engineering-willy-mutesa.workers.dev" ollama serve
+```
+
+Ollama runs on your computer, not on Cloudflare, so it only helps on the computer where it is running. Your browser may ask whether Budgie can reach devices on your local network; allow it to use Ollama.
 
 ## For developers: run it locally
 
