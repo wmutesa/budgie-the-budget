@@ -51,23 +51,26 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
 <template>
   <div class="app">
     <main class="grid hl canvas">
-      <!-- The navigation lives inside the grid as its first row of cells. -->
-      <div class="cell nav-brand span-2">
-        <span class="brand-word">BUDGIE</span>
-        <span class="muted small">{{ today }}</span>
-      </div>
-      <nav class="cell nav-pages span-5" aria-label="Pages">
-        <button v-for="(t, i) in tabs" :key="t" :class="{ on: active === t }" @click="active = t">
-          <sup>0{{ i + 1 }}</sup>{{ t }}
-        </button>
-      </nav>
-      <div class="cell nav-search span-3">
-        <input v-model="store.query" type="search" placeholder="Search transactions" aria-label="Search transactions" @keydown.enter="active = 'Transactions'" />
-      </div>
-      <div class="cell nav-actions span-2">
-        <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
-        <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
-      </div>
+      <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
+      <header class="cell nav-bar span-12">
+        <div class="nb-brand">
+          <span class="brand-word">BUDGIE</span>
+          <span class="muted small nb-date">{{ today }}</span>
+        </div>
+        <nav class="nb-pages" aria-label="Pages">
+          <button v-for="(t, i) in tabs" :key="t" :class="{ on: active === t }" :aria-current="active === t ? 'page' : undefined" @click="active = t">
+            <sup>0{{ i + 1 }}</sup>{{ t }}
+          </button>
+        </nav>
+        <label class="nb-search">
+          <span aria-hidden="true">⌕</span>
+          <input v-model="store.query" type="search" placeholder="Search transactions" aria-label="Search transactions" @keydown.enter="active = 'Transactions'" />
+        </label>
+        <div class="nb-actions">
+          <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
+          <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
+        </div>
+      </header>
 
       <template v-if="active === 'Overview'">
         <HeadlineCell class="span-8" id="overview" />

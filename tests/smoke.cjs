@@ -51,7 +51,7 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  assert.match(await page.textContent('.brand-word'), /BUDGIE/, 'navigation renders inside the grid');
+  assert.match(await page.textContent('.nav-bar .brand-word'), /BUDGIE/, 'navigation renders inside the grid');
   assert.match(await page.textContent('.lede'), /You hold/, 'the brief renders');
   for (const label of ['Savings goal', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
@@ -85,7 +85,7 @@ async function run(url) {
   await page.reload({ waitUntil: 'load' });
   assert.match(await page.textContent('#subscriptions'), /Netflix/, 'subscriptions survive a reload');
 
-  await page.click('.nav-pages button:nth-child(2)');
+  await page.click('.nb-pages button:nth-child(2)');
   assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
   assert.match(await page.textContent('body'), /Recent activity/, 'transactions page lists activity');
   assert.equal(await page.locator('.kpi').count(), 4, 'four summary tiles');
@@ -116,7 +116,7 @@ async function run(url) {
   assert.ok(Math.abs(hb.height - hl.height) < 2 && Math.abs((hb.y + hb.height) - (hl.y + hl.height)) < 2, 'budgets and recent activity share a bottom line');
 
   // Reports: advice, bank opportunities and the full ledger.
-  await page.click('.nav-pages button:nth-child(3)');
+  await page.click('.nb-pages button:nth-child(3)');
   assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
@@ -125,7 +125,7 @@ async function run(url) {
   assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
 
   // Playground: messy notes become an organised plan, then budgets.
-  await page.click('.nav-pages button:nth-child(4)');
+  await page.click('.nb-pages button:nth-child(4)');
   await page.fill('[data-test="scratch"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
   await page.click('[data-test="organize"]');
   assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
@@ -133,9 +133,9 @@ async function run(url) {
   assert.match(await page.textContent('.lane[data-group="Savings & goals"]'), /Laptop/i, 'the laptop goal lands in savings');
   assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'income is picked up from the notes');
   await page.click('[data-test="apply-plan"]');
-  await page.click('.nav-pages button:nth-child(2)');
+  await page.click('.nb-pages button:nth-child(2)');
   assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
-  await page.click('.nav-pages button:nth-child(1)');
+  await page.click('.nb-pages button:nth-child(1)');
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });
