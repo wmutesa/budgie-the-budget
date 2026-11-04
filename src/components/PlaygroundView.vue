@@ -110,7 +110,7 @@ let aiKey = '';
 watch(tips, async v => {
   const facts = v.map(t => t.text);
   const k = facts.join('|');
-  if (k === aiKey || ai.status !== 'ollama') return;
+  if (k === aiKey || !ai.ready) return;
   aiKey = k;
   aiNote.value = (await aiAdvise([`Monthly income ${usd(plan.income)}.`, ...facts])) || '';
 }, { immediate: true });
@@ -218,7 +218,7 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
   </section>
 
   <section class="card cell span-12 tips-cell">
-    <div class="cell-head"><p class="label">Suggestions while you plan</p><span class="muted small">{{ ai.status === 'ollama' ? `Local AI · ${ai.model}` : 'On-device rules' }}</span></div>
+    <div class="cell-head"><p class="label">Suggestions while you plan</p><span class="muted small">{{ ai.label }}</span></div>
     <p v-if="aiNote" class="think">{{ aiNote }}</p>
     <div class="tip-row">
       <article v-for="(t, n) in tips" :key="n" class="insight" :class="t.tone">

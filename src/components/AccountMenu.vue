@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import PasskeyNote from './PasskeyNote.vue';
 import QrCode from './QrCode.vue';
 import RecoveryCodes from './RecoveryCodes.vue';
+import AIPanel from './AIPanel.vue';
 import {
   account, signOut, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
@@ -157,6 +158,8 @@ const tour = () => { open.value = false; emit('tour'); };
             <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()">Create invite link</button>
           </form>
         </section>
+
+        <AIPanel />
 
         <PasskeyNote :owner="isOwner" />
 

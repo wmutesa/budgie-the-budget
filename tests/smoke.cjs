@@ -310,6 +310,13 @@ async function run(url) {
   await guide.waitForTimeout(800);
   assert.equal(await guide.$('[data-test="guide"]'), null, 'the guide does not come back');
   await guide.click('[data-test="account"]');
+  // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
+  await guide.waitForSelector('[data-test="ai-panel"]');
+  assert.match(await guide.textContent('[data-test="ai-panel"]'), /Built-in rules/, 'without a model, Budgie says it uses its rules');
+  if (await guide.$('[data-test="ai-on"]')) {
+    await guide.click('[data-test="ai-on"]');
+    await guide.waitForFunction(() => /could not start|cannot run AI|Downloading/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
+  }
   await guide.click('[data-test="replay-guide"]');
   await guide.waitForSelector('[data-test="guide"]');
   await guide.click('[data-test="guide-skip"]');

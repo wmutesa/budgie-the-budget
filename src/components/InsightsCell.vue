@@ -17,7 +17,7 @@ async function refresh() {
   reading.value = false;
 }
 onMounted(refresh);
-watch([facts, () => ai.status], refresh);
+watch([facts, () => ai.status], () => { key = ''; refresh(); });
 const dismiss = id => store.dismissed.push(id);
 const apply = c => { c.action.run(); store.dismissed.push(c.id); };
 </script>
@@ -26,7 +26,7 @@ const apply = c => { c.action.run(); store.dismissed.push(c.id); };
   <section class="card cell insights">
     <div class="cell-head">
       <p class="label">What Budgie thinks</p>
-      <span class="muted small">{{ ai.status === 'ollama' ? `Local AI · ${ai.model}` : 'On-device rules' }} · updates as you add spending</span>
+      <span class="muted small">{{ ai.label }} · updates as you add spending</span>
     </div>
     <p class="think">
       <template v-if="read">{{ read }}</template>

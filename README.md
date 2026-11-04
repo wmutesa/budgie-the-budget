@@ -2,7 +2,7 @@
 
 # Budgie
 
-Budgie is a budgeting web app for tracking spending, subscriptions, savings goals and plans, with live exchange rates and an optional AI helper (Ollama). There is nothing to install: open it in any up-to-date browser on a phone, tablet or computer. It is invite-only: each person signs in with a passkey, and their data syncs to their own account.
+Budgie is a budgeting web app for tracking spending, subscriptions, savings goals and plans, with live exchange rates and an optional AI helper that runs on your device. There is nothing to install: open it in any up-to-date browser on a phone, tablet or computer. It is invite-only: each person signs in with a passkey, and their data syncs to their own account.
 
 On a phone you can add it to your home screen from the browser's share or menu button; it opens full screen like an app, but it is still the same website.
 
@@ -23,7 +23,7 @@ Highlights:
 - **Dictation:** speak an entry or a whole plan; text appears as you talk.
 - **Find any company:** a built-in directory of more than 300 brands across the US, Rwanda, Thailand and beyond, plus a live search of Wikidata for everything else. Logos come from each company's own site.
 - **Live exchange rates:** 160+ currencies, including the Rwandan franc and Thai baht, refreshed through the day and cached for offline use.
-- **AI with Ollama, optional:** when [Ollama](https://ollama.com) runs on your computer, Budgie uses it to read receipts and write suggestions with a local model. Nothing goes to a cloud AI service. Without it, Budgie uses its built-in rules.
+- **Local AI, optional, no API key:** Budgie can read receipts and write suggestions with a free open-source model that runs on your own device. Turn on **in-browser AI** in the account menu to run Qwen 2.5 or Llama 3.2 inside the browser ([WebLLM](https://github.com/mlc-ai/web-llm), using your graphics chip); the model downloads once and the browser keeps it. If [Ollama](https://ollama.com) runs on your computer, Budgie uses it instead. Nothing goes to a cloud AI service. Without either, Budgie uses its built-in rules.
 
 ## Accounts
 
@@ -39,7 +39,7 @@ Highlights:
 - Your data is stored in your account in Cloudflare D1, in a database only this app's Worker can reach, and a copy is kept in your browser so Budgie opens instantly and works offline. Changes made offline sync when you reconnect.
 - Signing out removes this device's copy, unless it holds changes that have not synced yet.
 - Sessions use a secure, HttpOnly cookie. Only hashes of session cookies and invite links are stored.
-- Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files, and Ollama on your own computer (`localhost`) if you run it.
+- Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files, Hugging Face and GitHub to download the in-browser model once if you turn it on, and Ollama on your own computer (`localhost`) if you run it.
 - Budgie starts empty. Every number comes from what you add: entries, imported statements, account balances, goals and subscriptions.
 - Export features are on the roadmap.
 

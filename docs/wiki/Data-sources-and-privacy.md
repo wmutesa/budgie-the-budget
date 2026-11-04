@@ -14,6 +14,7 @@ In your account, in Budgie's Cloudflare D1 database, with a copy in your browser
 | Google favicon service | Company logos |
 | Google Fonts | Fonts |
 | jsDelivr | Files for reading receipt photos |
+| Hugging Face and GitHub | One-time download of the optional in-browser AI model |
 | Ollama on your computer (localhost) | Optional AI for receipts and suggestions |
 
 The site's Content Security Policy blocks every other destination.
