@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { store } from '../lib/store';
 import { convert } from '../lib/rates';
+import { currentBalance } from '../lib/accounts';
 
 // Your accounts grouped by currency, converted live to your base currency.
 const fmt = (n, code) => new Intl.NumberFormat('en-US', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(n);
@@ -9,7 +10,7 @@ const wallets = computed(() => {
   const out = {};
   store.balances.forEach(a => {
     out[a.currency] = out[a.currency] || { code: a.currency, balance: 0, count: 0 };
-    out[a.currency].balance += Number(a.balance) || 0;
+    out[a.currency].balance += a.kind === 'card' ? -currentBalance(a) : currentBalance(a);
     out[a.currency].count += 1;
   });
   return Object.values(out).sort((a, b) => (convert(b.balance, b.code, store.base) ?? 0) - (convert(a.balance, a.code, store.base) ?? 0));

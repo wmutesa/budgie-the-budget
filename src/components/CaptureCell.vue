@@ -1,4 +1,5 @@
 <script setup>
+import { matchAccount, stripPayment, guessAccount, accountForFile } from '../lib/accounts';
 import { ref } from 'vue';
 import { store, newId } from '../lib/store';
 import { captureFile, captureNote, enrich } from '../lib/capture';
@@ -22,11 +23,11 @@ function flash(text) {
   fade = setTimeout(() => { if (message.value === text) message.value = ''; }, 1200);
 }
 
-async function addDrafts(drafts, label) {
+async function addDrafts(drafts, label, accountId = null) {
   if (!drafts.length) { message.value = `Nothing to add from ${label}.`; return; }
   busy.value = 'Matching merchants on the web…';
   const enriched = [];
-  for (const d of drafts.slice(0, 200)) enriched.push({ id: newId(), ...(await enrich(d)) });
+  for (const d of drafts.slice(0, 200)) enriched.push({ id: newId(), ...(await enrich(d)), accountId: d.accountId ?? accountId });
   store.drafts.unshift(...enriched);
   flash(`${enriched.length} item${enriched.length === 1 ? '' : 's'} from ${label} ready to review.`);
 }
@@ -38,7 +39,7 @@ async function handle(list) {
     progress.value = 0;
     try {
       const drafts = await captureFile(file, { base: store.base, onProgress: p => { progress.value = p; } });
-      await addDrafts(drafts, file.name);
+      await addDrafts(drafts, file.name, accountForFile(file.name, drafts.map(d => d.merchant).join(' ')));
     } catch (e) {
       message.value = e.message || `Could not read ${file.name}.`;
     }
@@ -59,7 +60,11 @@ const startNote = () => { message.value = ''; before = note.value; dict.toggle()
 const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 async function onNote() {
-  const drafts = captureNote(note.value, store.base);
+  // "coffee 4.50 with my Chase card": find the account, then read the rest as usual.
+  const said = note.value;
+  const mentioned = matchAccount(said);
+  const drafts = captureNote(stripPayment(said, mentioned), store.base);
+  if (drafts.length) drafts[0].accountId = mentioned ? mentioned.id : await guessAccount(said);
   if (!drafts.length) { message.value = 'Add an amount, for example “Uber 23.40 yesterday”.'; return; }
   note.value = '';
   await addDrafts(drafts, 'your note');

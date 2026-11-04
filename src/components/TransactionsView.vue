@@ -62,6 +62,7 @@ const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD
 const fmt = (n, c) => (n < 0 ? '−' : '+') + new Intl.NumberFormat('en-US', { style: 'currency', currency: c || 'USD' }).format(Math.abs(n));
 const day = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const remove = id => { store.transactions = store.transactions.filter(t => t.id !== id); };
+const accountOptions = computed(() => [{ value: '', label: 'No account' }, ...store.balances.map(a => ({ value: a.id, label: a.name }))]);
 const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'Excel', quick: 'note' };
 </script>
 
@@ -104,12 +105,12 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
         <p class="day-label">{{ day(g.date) }}</p>
         <div v-for="t in g.items" :key="t.id" class="tx-row">
           <LogoFix :name="t.merchant" :logo="t.logo || ''" @pick="p => fixLogo(t.merchant, p)" />
-          <div class="grow"><b>{{ t.merchant }}</b><span class="tx-meta"><span class="cat-tag" :style="{ '--c': catColor(t.category) }">{{ t.category }}</span><span class="muted small">{{ sourceLabel[t.source] || t.source }}</span></span></div>
+          <div class="grow"><b>{{ t.merchant }}</b><span class="tx-meta"><span class="cat-tag" :style="{ '--c': catColor(t.category) }">{{ t.category }}</span><span class="muted small">{{ sourceLabel[t.source] || t.source }}</span><PickMenu v-if="store.balances.length" class="tx-acct" :model-value="t.accountId || ''" :options="accountOptions" label="Paid with" @update:model-value="v => (t.accountId = v || null)" /></span></div>
           <span class="tx-amt" :class="t.amount > 0 ? 'in' : 'out'">{{ fmt(t.amount, t.currency) }}</span>
           <button class="icon-x" :aria-label="`Delete ${t.merchant}`" @click="remove(t.id)">×</button>
         </div>
       </div>
-      <p v-if="!rows.length" class="muted">Nothing matches.</p>
+      <p v-if="!rows.length" class="muted">{{ store.transactions.length ? 'Nothing matches.' : 'No entries yet. Add what you spent, or import a bank statement.' }}</p>
     </div>
   </section>
 </template>

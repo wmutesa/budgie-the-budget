@@ -24,6 +24,7 @@ const ROUTES = {
   advice: ['ollama', 'medium', 'small'],
   budget: ['ollama', 'medium', 'small'],
   news: ['ollama', 'medium', 'small'],
+  account: ['ollama', 'small', 'medium'],
 };
 
 const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '' }); // idle | loading | ready | error | skipped | waiting
@@ -34,7 +35,7 @@ export const ai = reactive({
   medium: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { receipt: '', advice: '', budget: '', news: '' }, // which model last did each task
+  used: { receipt: '', advice: '', budget: '', news: '', account: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -224,6 +225,17 @@ export async function aiNewsBrief(headlines, situation) {
     { role: 'user', content: `Situation: ${situation}\nHeadlines:\n${headlines.slice(0, 8).map(h => `- ${h}`).join('\n')}` },
   ], { temperature: 0.2, max_tokens: 140 });
   return reply ? reply.trim() : null;
+}
+
+// Which of the person's accounts a note says they paid with. Returns the account text or null.
+export async function aiPickAccount(text, accounts) {
+  if (!ai.ready || accounts.length < 2) return null;
+  const reply = await route('account', [
+    { role: 'system', content: `Which account paid for this? Accounts: ${JSON.stringify(accounts)}. Reply with JSON only: {"account": one of the accounts exactly, or null if the text does not say}.` },
+    { role: 'user', content: String(text).slice(0, 300) },
+  ], { json: true, temperature: 0, max_tokens: 40 });
+  const out = firstJSON(reply);
+  return typeof out?.account === 'string' && accounts.includes(out.account) ? out.account : null;
 }
 
 // A short read on the month from the given facts. Returns null when no model is ready.

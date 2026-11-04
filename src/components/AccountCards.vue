@@ -4,6 +4,7 @@ import { store, newId } from '../lib/store';
 import { convert } from '../lib/rates';
 import { accountTotal } from '../lib/ledger';
 import PickMenu from './PickMenu.vue';
+import { currentBalance, setBalance, accountIcon } from '../lib/accounts';
 
 // Accounts you track by hand (bank, cash, cards, savings), with their balances.
 const kinds = [
@@ -23,16 +24,45 @@ function add() {
   const name = draft.value.name.trim();
   const balance = Number(draft.value.balance);
   if (!name || !Number.isFinite(balance)) return;
-  store.balances.push({ id: newId(), name: name.slice(0, 40), kind: draft.value.kind, balance, currency: draft.value.currency, updatedAt: new Date().toISOString() });
+  const now = new Date().toISOString();
+  store.balances.push({ id: newId(), name: name.slice(0, 40), kind: draft.value.kind, balance, base: balance, baseAt: now, currency: draft.value.currency, updatedAt: now, icon: null });
   draft.value = { name: '', kind: 'checking', balance: '', currency: draft.value.currency };
   adding.value = false;
 }
-function startEdit(a) { editing.value = a.id; editValue.value = String(a.balance); }
+function startEdit(a) { editing.value = a.id; editValue.value = String(Math.round(currentBalance(a) * 100) / 100); }
 function saveEdit(a) {
   const v = Number(editValue.value);
-  if (Number.isFinite(v)) Object.assign(a, { balance: v, updatedAt: new Date().toISOString() });
+  if (Number.isFinite(v) && v !== Math.round(currentBalance(a) * 100) / 100) setBalance(a, v);
   editing.value = null;
 }
+// Entries paid with an account since its balance was last set.
+const linked = a => store.transactions.filter(t => t.accountId === a.id && String(t.date) >= String(a.baseAt || a.updatedAt).slice(0, 10)).length;
+
+// Your own icon for an account, shrunk to a small square so it syncs quickly.
+const picking = ref(null);
+const fileInput = ref(null);
+function chooseIcon(a) { picking.value = a; fileInput.value.value = ''; fileInput.value.click(); }
+async function onIcon(e) {
+  const file = e.target.files?.[0];
+  const a = picking.value;
+  if (!file || !a || !file.type.startsWith('image/')) return;
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  try {
+    await img.decode();
+    const size = 96;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    const s = Math.min(img.width, img.height);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, size, size);
+    ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+    a.icon = c.toDataURL('image/png');
+  } catch { /* not an image the browser can read */ } finally { URL.revokeObjectURL(img.src); }
+}
+const brokenIcon = ref({});
+
 function remove(a) {
   if (confirm(`Remove ${a.name}? Its balance will no longer count toward your net worth.`)) store.balances = store.balances.filter(x => x.id !== a.id);
 }
@@ -45,22 +75,27 @@ function remove(a) {
       <span class="muted small">{{ store.balances.length ? `${fmt(accountTotal)} in all` : 'Bank, cash, cards, mobile money' }}</span>
     </div>
 
-    <p v-if="!store.balances.length && !adding" class="empty-note">Add the accounts you want to track, such as your bank account, cash or mobile money, with what is in them today. Update a balance any time by clicking it.</p>
+    <input ref="fileInput" type="file" accept="image/*" hidden data-test="account-icon-input" @change="onIcon" />
+    <p v-if="!store.balances.length && !adding" class="empty-note">Add the accounts you want to track, such as your bank account, cards, cash or mobile money, with what is in them today. Spending you link to an account is taken off its balance, for example "lunch 12 with my Chase card". Click a balance to correct it, or an icon to upload your own.</p>
 
     <div v-if="store.balances.length" class="acc-grid">
       <article v-for="a in store.balances" :key="a.id" class="acc">
         <div class="acc-top">
-          <span class="icon-square">{{ a.name[0] }}</span>
+          <button class="acc-icon" type="button" :title="`Upload an icon for ${a.name}`" :aria-label="`Upload an icon for ${a.name}`" @click="chooseIcon(a)">
+            <img v-if="accountIcon(a) && !brokenIcon[a.id]" :src="accountIcon(a)" :alt="`${a.name} icon`" width="34" height="34" @error="brokenIcon[a.id] = true" />
+            <span v-else class="icon-square">{{ a.name[0] }}</span>
+            <span class="acc-icon-edit" aria-hidden="true">↑</span>
+          </button>
           <div class="acc-name"><b>{{ a.name }}</b><span class="muted small">{{ kindLabel(a.kind) }} · {{ a.currency }}</span></div>
           <button class="icon-x" type="button" :aria-label="`Remove ${a.name}`" @click="remove(a)">×</button>
         </div>
         <form v-if="editing === a.id" class="acc-edit" @submit.prevent="saveEdit(a)">
           <input v-model="editValue" class="field" type="number" step="0.01" :aria-label="`New balance for ${a.name}`" autofocus @blur="saveEdit(a)" />
         </form>
-        <button v-else class="acc-amount" type="button" :title="`Update the balance of ${a.name}`" @click="startEdit(a)">{{ fmt(a.balance, a.currency) }}</button>
+        <button v-else class="acc-amount" type="button" :title="`Update the balance of ${a.name}`" @click="startEdit(a)">{{ a.kind === 'card' ? 'Owe ' : '' }}{{ fmt(currentBalance(a), a.currency) }}</button>
         <p class="muted small">
-          <template v-if="a.currency !== 'USD' && convert(a.balance, a.currency, 'USD') !== null">≈ {{ fmt(convert(a.balance, a.currency, 'USD')) }} · </template>
-          updated {{ new Date(a.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}
+          <template v-if="a.currency !== 'USD' && convert(currentBalance(a), a.currency, 'USD') !== null">≈ {{ fmt(convert(currentBalance(a), a.currency, 'USD')) }} · </template>
+          set {{ new Date(a.baseAt || a.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}<template v-if="linked(a)"> · {{ linked(a) }} {{ linked(a) === 1 ? 'entry' : 'entries' }} since</template>
         </p>
       </article>
     </div>

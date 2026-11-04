@@ -185,6 +185,21 @@ async function run(url) {
   assert.equal(await page.locator('.draft-card').count(), 3, 'three statement rows wait for review');
   assert.match(await page.textContent('#review'), /Transport/, 'Uber is categorised as transport');
 
+  // Paying with an account: the note names the card, the entry links to it, and its balance drops.
+  await page.fill('[data-test="quick-note"]', 'lunch 12 at Sweetgreen today with my chase card');
+  await page.press('[data-test="quick-note"]', 'Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('.draft-card')].some(c => /Sweetgreen/.test(c.textContent)));
+  const sg = page.locator('.draft-card', { hasText: 'Sweetgreen' });
+  assert.match(await sg.locator('[data-test="draft-account"]').textContent(), /Chase checking/, 'the note links the entry to the Chase account');
+  assert.doesNotMatch(await sg.locator('.draft-name').textContent(), /chase/i, 'the payment method is not taken for the shop');
+  await sg.locator('.round-btn.ok').click();
+  await page.click('.nb-pages button:nth-child(1)');
+  assert.match(await page.textContent('[data-test="accounts"]'), /\$2,488\.00/, 'the Chase balance drops by the amount spent');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-test="accounts"] .acc-icon >> nth=0')]);
+  await chooser.setFiles({ name: 'chase.png', mimeType: 'image/png', buffer: PNG });
+  await page.waitForFunction(() => document.querySelector('[data-test="accounts"] .acc-icon img')?.src.startsWith('data:image/png'));
+  await page.click('.nb-pages button:nth-child(2)');
+
   // A one-line note, matched to the company on the web.
   await page.fill('[data-test="quick-note"]', 'Netflix 15.49 today');
   await page.press('[data-test="quick-note"]', 'Enter');

@@ -19,6 +19,7 @@ On a phone you can add it to your home screen from the browser's share or menu b
 
 Highlights:
 
+- **Accounts linked to spending:** add your bank accounts, cards, cash and mobile money. Each entry can be linked to the account that paid ("lunch 12 with my Chase card" links itself; otherwise the AI on your device or the only account you have), and the account's balance goes down by that amount. Click a balance to correct it; upload your own icon for each account.
 - **Plain-language entry:** "spent 12.50 on lunch at Chipotle last friday" becomes a dated, categorised entry. Understands "a week ago", "in a month", "on the 3rd" and similar.
 - **Dictation:** speak an entry or a whole plan; text appears as you talk.
 - **Find any company:** a built-in directory of more than 300 brands across the US, Rwanda, Thailand and beyond, plus a live search of Wikidata for everything else. Logos come from each company's own site.

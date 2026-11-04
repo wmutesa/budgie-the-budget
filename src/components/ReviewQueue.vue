@@ -16,8 +16,9 @@ const today = iso(new Date());
 const yesterday = iso(new Date(Date.now() - 864e5));
 const dateChoice = d => (d.date === today ? 'today' : d.date === yesterday ? 'yesterday' : 'other');
 
+const accountOptions = computed(() => [{ value: '', label: 'No account' }, ...store.balances.map(a => ({ value: a.id, label: a.name }))]);
 const accept = d => {
-  store.transactions.unshift({ ...d, amount: Number(d.amount) });
+  store.transactions.unshift({ ...d, amount: Number(d.amount), accountId: d.accountId || null, addedAt: new Date().toISOString() });
   store.drafts = store.drafts.filter(x => x.id !== d.id);
 };
 const discard = d => { store.drafts = store.drafts.filter(x => x.id !== d.id); };
@@ -65,6 +66,7 @@ const sourceLabel = { receipt: 'Receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'E
         </div>
 
         <PickMenu v-model="d.category" :options="catOptions" label="Category" class="draft-cat" />
+        <PickMenu v-if="store.balances.length" :model-value="d.accountId || ''" :options="accountOptions" label="Paid with" class="draft-acct" data-test="draft-account" @update:model-value="v => (d.accountId = v || null)" />
 
         <div class="draft-date">
           <button class="seg-btn" :class="{ on: dateChoice(d) === 'today' }" @click="d.date = today">Today</button>

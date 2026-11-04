@@ -2,6 +2,7 @@
 import { computed, watch } from 'vue';
 import { store, thisMonth } from './store';
 import { convert } from './rates';
+import { worthUSD } from './accounts';
 
 const toUSD = t => (t.currency === 'USD' ? t.amount : convert(t.amount, t.currency, 'USD') ?? t.amount);
 
@@ -80,8 +81,9 @@ export const categorySpend = computed(() => Object.entries(spentByCategory.value
   .sort((a, b) => b[1] - a[1])
   .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100, color: store.budgets.find(b => b.name === name)?.color || '#a1a1aa' })));
 
-// Accounts you added, converted to USD, and your net worth.
-export const accountTotal = computed(() => store.balances.reduce((s, a) => s + (a.currency === 'USD' ? Number(a.balance) || 0 : convert(Number(a.balance) || 0, a.currency, 'USD') ?? 0), 0));
+// Your net worth from the accounts you track, in USD: current balances
+// (what you set plus linked entries since), minus what you owe on cards.
+export const accountTotal = computed(() => store.balances.reduce((s, a) => s + worthUSD(a), 0));
 
 // Keep one net-worth reading per day while you track accounts, for the chart.
 watch(accountTotal, total => {
