@@ -153,15 +153,10 @@ function signedOutLocally() {
 
 // ---------- start ----------
 export async function startAccount() {
-  if (location.pathname === '/invite' && location.hash.length > 1) {
-    const token = decodeURIComponent(location.hash.slice(1));
+  const fromUrl = inviteToken(location.href);
+  if (fromUrl) {
     history.replaceState(null, '', '/');
-    try {
-      const info = await api('/api/invite', { method: 'POST', body: { token } });
-      account.invite = { token, ...info };
-    } catch (e) {
-      account.invite = { token: null, error: e.message };
-    }
+    await openInvite(fromUrl).catch(() => {});
   }
   try {
     const { user } = await api('/api/me');
@@ -188,6 +183,37 @@ export async function startAccount() {
   }
 }
 let listening = false;
+
+// ---------- invites ----------
+// Finds the invite code in a link or pasted text: /invite#CODE, /invite/#CODE,
+// ?invite=CODE, #invite=CODE, or just the code itself.
+export function inviteToken(text) {
+  const s = String(text || '').trim();
+  if (!s) return null;
+  let url = null;
+  try { url = new URL(s, location.origin); } catch { /* not a link */ }
+  if (url && /^https?:/.test(s)) {
+    const q = url.searchParams.get('invite');
+    if (q) return q;
+    const h = decodeURIComponent(url.hash.replace(/^#/, ''));
+    if (h.startsWith('invite=')) return h.slice(7);
+    if (/^\/invite\/?$/.test(url.pathname) && h) return h;
+    return null;
+  }
+  if (location.href === s) return null;
+  return /^[A-Za-z0-9_-]{20,}$/.test(s) ? s : null;
+}
+
+// Check an invite code with the server and switch the sign-in screen to it.
+export async function openInvite(token) {
+  try {
+    const info = await api('/api/invite', { method: 'POST', body: { token } });
+    account.invite = { token, ...info };
+  } catch (e) {
+    account.invite = { token: null, error: e.message };
+    throw e;
+  }
+}
 
 // ---------- sign-in ----------
 export async function registerWithInvite() {

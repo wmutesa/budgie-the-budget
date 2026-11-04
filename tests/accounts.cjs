@@ -118,7 +118,11 @@ async function main() {
 
     // Alex joins with their own passkey and sees only their own data.
     const alex = await personPage(browser);
-    await alex.page.goto(inviteLink.replace(/^https?:\/\/[^/]+/, base));
+    // The link's code can be lost by apps that drop the part after #; pasting the link works.
+    await alex.page.goto(base);
+    await alex.page.click('[data-test="have-invite"]');
+    await alex.page.fill('[data-test="invite-input"]', inviteLink.replace(/^https?:\/\/[^/]+/, base));
+    await alex.page.click('[data-test="invite-use"]');
     await alex.page.waitForSelector('text=Welcome, Alex');
     await alex.page.click('[data-test="create-passkey"]');
     await alex.page.waitForSelector('[data-test="recovery-codes"]');

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { account, signIn, registerWithInvite, recoverWithCode, passkeyError, canUsePasskeys } from '../lib/account';
+import { account, signIn, registerWithInvite, recoverWithCode, openInvite, inviteToken, passkeyError, canUsePasskeys } from '../lib/account';
 import SignInBackdrop from './SignInBackdrop.vue';
 import PasskeyNote from './PasskeyNote.vue';
 
@@ -10,6 +10,15 @@ const busy = ref(false);
 const error = ref('');
 const supported = canUsePasskeys();
 const recovering = ref(false);
+const pasting = ref(false);
+const pasted = ref('');
+const useInvite = () => run(async () => {
+  const token = inviteToken(pasted.value);
+  if (!token) throw new Error('That does not look like a Budgie invite link. Copy the whole link, including everything after the # sign.');
+  await openInvite(token);
+  pasted.value = '';
+  pasting.value = false;
+});
 const code = ref('');
 const useCode = () => run(async () => { await recoverWithCode(code.value); code.value = ''; recovering.value = false; });
 
@@ -59,7 +68,17 @@ async function run(fn) {
         </button>
         <p class="si-tip">On someone else's computer? In the passkey prompt, choose <b>Use a phone or tablet</b> and scan the code with your phone.</p>
 
-        <button v-if="!recovering" class="si-link" type="button" data-test="lost-device" @click="recovering = true">Lost your device? Use a recovery code</button>
+        <button v-if="!pasting" class="si-link" type="button" data-test="have-invite" @click="pasting = true; recovering = false">Have an invite link? Paste it here</button>
+        <form v-else class="si-recover" @submit.prevent="useInvite">
+          <label class="si-k" for="inv-input">Invite link</label>
+          <div class="acct-link-row">
+            <input id="inv-input" v-model="pasted" class="field" placeholder="https://…/invite#…" autocomplete="off" spellcheck="false" data-test="invite-input" />
+            <button class="btn primary small" type="submit" data-test="invite-use" :disabled="busy || !pasted.trim()">Continue</button>
+          </div>
+          <button class="si-link" type="button" @click="pasting = false">Cancel</button>
+        </form>
+
+        <button v-if="!recovering" class="si-link" type="button" data-test="lost-device" @click="recovering = true; pasting = false">Lost your device? Use a recovery code</button>
         <form v-else class="si-recover" @submit.prevent="useCode">
           <label class="si-k" for="rc-input">Recovery code</label>
           <div class="acct-link-row">
