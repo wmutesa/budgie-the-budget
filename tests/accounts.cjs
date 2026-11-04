@@ -135,6 +135,10 @@ async function main() {
     const alexData = await getJSON(alex.page, '/api/data');
     assert.ok(!JSON.stringify(alexData.body).includes('Blue Bottle'), 'people do not see each other\'s data');
     assert.equal((await getJSON(alex.page, '/api/people')).status, 403, 'members cannot manage people');
+    const markets = await getJSON(alex.page, '/api/markets');
+    assert.equal(markets.status, 200, 'signed-in people get market data');
+    assert.ok(Array.isArray(markets.body.indexes) && Array.isArray(markets.body.news), 'market data has indexes and news, even when Yahoo cannot be reached');
+    assert.equal((await fetch(`${base}/api/markets`)).status, 401, 'market data is only for signed-in people');
 
     // An invite works only once.
     const late = await personPage(browser);

@@ -25,6 +25,7 @@ import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
+import MarketsCell from './components/MarketsCell.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
@@ -127,6 +128,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       <template v-else>
         <InsightsCell class="span-8" id="insights" />
         <OpportunitiesCell class="span-4" id="opportunities" />
+        <MarketsCell class="span-12" id="markets" />
         <ReportsView class="span-6" id="reports" />
         <TransactionsView class="span-6" id="activity" full fill title="All activity" />
       </template>

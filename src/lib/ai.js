@@ -23,6 +23,7 @@ const ROUTES = {
   receipt: ['ollama', 'small', 'medium'],
   advice: ['ollama', 'medium', 'small'],
   budget: ['ollama', 'medium', 'small'],
+  news: ['ollama', 'medium', 'small'],
 };
 
 const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '' }); // idle | loading | ready | error | skipped | waiting
@@ -33,7 +34,7 @@ export const ai = reactive({
   medium: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { receipt: '', advice: '', budget: '' }, // which model last did each task
+  used: { receipt: '', advice: '', budget: '', news: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -213,6 +214,16 @@ export async function aiDraftBudgets(input) {
   const out = firstJSON(reply);
   const list = Array.isArray(out?.budgets) ? out.budgets : null;
   return list ? list.map(b => ({ name: String(b.category || b.name || ''), budget: Number(b.amount ?? b.budget) })) : null;
+}
+
+// Two plain sentences on what today's market headlines mean for someone saving.
+export async function aiNewsBrief(headlines, situation) {
+  if (!headlines.length) return null;
+  const reply = await route('news', [
+    { role: 'system', content: 'You explain market news to a careful saver. In two short sentences, say what these headlines mean for someone building savings, using only the headlines and situation given. Do not recommend specific investments, do not predict prices, and do not invent numbers.' },
+    { role: 'user', content: `Situation: ${situation}\nHeadlines:\n${headlines.slice(0, 8).map(h => `- ${h}`).join('\n')}` },
+  ], { temperature: 0.2, max_tokens: 140 });
+  return reply ? reply.trim() : null;
 }
 
 // A short read on the month from the given facts. Returns null when no model is ready.

@@ -90,6 +90,12 @@ async function fakeApi(page, account = fakeAccount) {
       account.version += 1;
       return route.fulfill({ json: { version: account.version } });
     }
+    if (p === '/api/markets') return route.fulfill({ json: {
+      updatedAt: new Date().toISOString(), source: 'Yahoo Finance',
+      indexes: [{ symbol: '^GSPC', name: 'S&P 500', about: 'x', price: 6120.5, currency: 'USD', day: 0.8, month: 2.1, year: null, spark: [1, 2, 3, 2, 4] }, { symbol: '^TNX', name: '10-year Treasury yield', about: 'x', price: 4.12, currency: 'USD', day: -1.2, month: -0.5, year: null, spark: [3, 2, 1] }],
+      watch: [{ symbol: 'VTI', name: 'US stock market', about: 'x', price: 310, currency: 'USD', day: 0.5, month: 1.9, year: 14.2, spark: [1, 2] }, { symbol: 'BND', name: 'Bonds', about: 'x', price: 72, currency: 'USD', day: 0.1, month: 0.4, year: 3.1, spark: [1, 2] }],
+      news: [{ title: 'Stocks rise as the Fed holds rates', link: 'https://finance.yahoo.com/news/a.html', source: 'Reuters', date: new Date().toUTCString() }],
+    } });
     if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
     if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
     if (p === '/api/people') return route.fulfill({ json: { people: [{ id: 'u1', name: 'Willy', role: 'owner', last_seen: Date.now() }], invites: [] } });
@@ -204,6 +210,14 @@ async function run(url) {
   assert.ok(await page.locator('#activity .dc-col').nth(12).locator('.dc-tip').isVisible(), 'activity bars show a tooltip on hover');
   assert.ok((await page.locator('#reports .m-net.loss').count()) > 0 && (await page.locator('#reports .m-net.gain').count()) > 0, 'month by month marks gains and losses');
   assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
+  await page.waitForSelector('#markets .mk-tile');
+  const mk = await page.textContent('#markets');
+  assert.match(mk, /S&P 500[\s\S]*\+0\.8% today/, 'market indexes show today\'s change');
+  assert.match(mk, /4\.12%/, 'the Treasury yield shows as a percentage');
+  assert.match(mk, /US stock market[\s\S]*\+14\.2%[\s\S]*Bonds/, 'markets to watch are ranked by the past year');
+  assert.match(mk, /not financial advice/i, 'markets are labelled as information, not advice');
+  await page.click('#markets .mk-tabs button:has-text("News")');
+  assert.equal(await page.getAttribute('#markets .mk-news a', 'rel'), 'noopener noreferrer', 'news links open safely');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
   assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');

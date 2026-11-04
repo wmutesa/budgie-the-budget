@@ -14,7 +14,7 @@ On a phone you can add it to your home screen from the browser's share or menu b
 | --- | --- |
 | **Overview** | A written brief of your month, net worth, plan, cash flow, savings goals, live exchange rates, subscriptions, expense breakdown, accounts and wallets |
 | **Transactions** | Add spending by typing, speaking, scanning a receipt, uploading a PDF, or importing a CSV or Excel statement; review what was found; monthly budgets and recent activity |
-| **Reports** | What Budgie thinks about your month, action cards, savings and investing ideas for Chase and Bank of America, year in numbers, and the full ledger |
+| **Reports** | What Budgie thinks about your month, action cards, savings and investing ideas for Chase and Bank of America, markets and investment news from Yahoo Finance, year in numbers, and the full ledger |
 | **Playground** | Write or say messy notes and Budgie sorts them into a plan, with split comparisons, a what-if slider, a goal calculator and one-click budgets |
 
 Highlights:
@@ -39,6 +39,7 @@ Highlights:
 - Your data is stored in your account in Cloudflare D1, in a database only this app's Worker can reach, and a copy is kept in your browser so Budgie opens instantly and works offline. Changes made offline sync when you reconnect.
 - Signing out removes this device's copy, unless it holds changes that have not synced yet.
 - Sessions use a secure, HttpOnly cookie. Only hashes of session cookies and invite links are stored.
+- Market prices and headlines come from Yahoo Finance through Budgie's Worker (cached for 15 minutes); no personal data is sent with those requests.
 - Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files, Hugging Face and GitHub to download the in-browser model once if you turn it on, and Ollama on your own computer (`localhost`) if you run it.
 - Budgie starts empty. Every number comes from what you add: entries, imported statements, account balances, goals and subscriptions.
 - Export features are on the roadmap.

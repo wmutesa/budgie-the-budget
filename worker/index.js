@@ -86,6 +86,94 @@ async function countFailure(env, key) {
   ).bind(key, now()).run();
 }
 
+// ---------- markets and news (Yahoo Finance) ----------
+// Fetched here because Yahoo does not allow browsers to call it directly.
+// Cached for 15 minutes so Budgie asks Yahoo rarely.
+const MARKET_TTL = 15 * 60;
+const INDEXES = [
+  ['^GSPC', 'S&P 500', 'The 500 largest US companies'],
+  ['^IXIC', 'Nasdaq', 'US tech-heavy index'],
+  ['^DJI', 'Dow Jones', '30 large US companies'],
+  ['^TNX', '10-year Treasury yield', 'What the US government pays to borrow; moves mortgage and savings rates'],
+  ['GC=F', 'Gold', 'Often rises when markets are nervous'],
+  ['BTC-USD', 'Bitcoin', 'Very volatile'],
+];
+const WATCH = [
+  ['VTI', 'US stock market', 'One fund that owns almost every US company'],
+  ['VXUS', 'International stocks', 'Companies outside the US'],
+  ['EEM', 'Emerging markets', 'Faster-growing economies such as India, Brazil and Taiwan; higher risk'],
+  ['QQQ', 'Tech leaders', 'The 100 largest Nasdaq companies'],
+  ['VNQ', 'Real estate', 'Property companies that pay rent-based dividends'],
+  ['BND', 'Bonds', 'Steadier, lower growth; balances stocks'],
+];
+const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; Budgie/1.0)', Accept: 'application/json,text/xml;q=0.9,*/*;q=0.8' };
+
+async function yahooChart(symbol, range) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`;
+  const res = await fetch(url, { headers: YAHOO_HEADERS, cf: { cacheTtl: MARKET_TTL } });
+  if (!res.ok) throw new Error(`Yahoo ${res.status}`);
+  const r = (await res.json())?.chart?.result?.[0];
+  const closes = (r?.indicators?.quote?.[0]?.close || []).filter(v => typeof v === 'number');
+  if (!closes.length) throw new Error('no data');
+  const price = r.meta?.regularMarketPrice ?? closes[closes.length - 1];
+  const prev = r.meta?.chartPreviousClose ?? closes[0];
+  return { closes, price, prev, currency: r.meta?.currency || 'USD' };
+}
+const pctChange = (a, b) => (b ? Math.round(((a - b) / b) * 1000) / 10 : null);
+
+async function marketRow([symbol, name, about], withYear) {
+  try {
+    const month = await yahooChart(symbol, '1mo');
+    const year = withYear ? await yahooChart(symbol, '1y').catch(() => null) : null;
+    const c = month.closes;
+    const day = pctChange(month.price, c.length > 1 ? c[c.length - 2] : month.prev);
+    return {
+      symbol, name, about, price: Math.round(month.price * 100) / 100, currency: month.currency,
+      day, month: pctChange(month.price, c[0]), year: year ? pctChange(year.price, year.closes[0]) : null,
+      spark: c.slice(-22).map(v => Math.round(v * 100) / 100),
+    };
+  } catch { return null; }
+}
+
+function parseRss(xml) {
+  const out = [];
+  const tag = (s, t) => (s.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '';
+  const clean = s => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+  for (const item of xml.split('<item').slice(1)) {
+    const title = clean(tag(item, 'title'));
+    const link = clean(tag(item, 'link'));
+    if (!title || !/^https:\/\/[^\s]+$/.test(link)) continue;
+    out.push({ title: title.slice(0, 200), link, source: clean(tag(item, 'source')).slice(0, 60) || 'Yahoo Finance', date: clean(tag(item, 'pubDate')) });
+  }
+  return out;
+}
+
+async function yahooNews() {
+  const feeds = [
+    'https://finance.yahoo.com/news/rssindex',
+    'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC,%5EIXIC,VTI&region=US&lang=en-US',
+  ];
+  const seen = new Set();
+  const items = [];
+  for (const url of feeds) {
+    try {
+      const res = await fetch(url, { headers: YAHOO_HEADERS, cf: { cacheTtl: MARKET_TTL } });
+      if (!res.ok) continue;
+      for (const n of parseRss(await res.text())) if (!seen.has(n.title)) { seen.add(n.title); items.push(n); }
+    } catch { /* try the next feed */ }
+  }
+  return items.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)).slice(0, 12);
+}
+
+async function marketsPayload() {
+  const [indexes, watch, news] = await Promise.all([
+    Promise.all(INDEXES.map(r => marketRow(r, false))),
+    Promise.all(WATCH.map(r => marketRow(r, true))),
+    yahooNews(),
+  ]);
+  return { indexes: indexes.filter(Boolean), watch: watch.filter(Boolean), news, updatedAt: new Date().toISOString(), source: 'Yahoo Finance' };
+}
+
 // ---------- sessions ----------
 async function currentUser(request, env) {
   const token = readCookie(request, SESSION_COOKIE);
@@ -302,6 +390,20 @@ async function routes(request, env, url) {
       return json({ error: 'Changed on another device', data: row ? JSON.parse(row.data) : null, version: row?.version || 0 }, 409);
     }
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
+  }
+
+  // --- markets and news ---
+  if (path === '/api/markets' && method === 'GET') {
+    const cache = caches.default;
+    const key = new Request(`${url.origin}/__cache/markets-v1`);
+    const hit = await cache.match(key);
+    if (hit) return new Response(hit.body, { headers: { ...API_HEADERS } });
+    const payload = await marketsPayload();
+    const res = json(payload);
+    if (payload.indexes.length || payload.news.length) {
+      await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${MARKET_TTL}` } }));
+    }
+    return res;
   }
 
   // --- recovery codes ---
