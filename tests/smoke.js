@@ -53,6 +53,11 @@ async function run(url) {
   await page.press('#global-search input', 'Enter');
   assert.match(await page.textContent('#ledger-list'), /Trader Joe's/, 'global search finds a transaction');
 
+  await page.click('#fab-toggle');
+  assert.ok(await page.$('.fab.open'), 'bottom-right menu opens');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('.fab.open'), null, 'Escape closes the menu');
+
   await page.click('[data-action="theme"]');
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light', 'theme toggles to light');
   await page.click('[data-action="theme"]');

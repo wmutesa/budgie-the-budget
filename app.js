@@ -1182,6 +1182,20 @@ function onClick(e) {
   if (fn) fn(el.dataset.id, el);
 }
 
+function setupFab() {
+  const fab = $('#fab');
+  const btn = $('#fab-toggle');
+  const panel = $('#fab-panel');
+  const setOpen = open => {
+    fab.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+  };
+  btn.addEventListener('click', e => { e.stopPropagation(); setOpen(!fab.classList.contains('open')); });
+  panel.addEventListener('click', e => { if (e.target.closest('a,button')) setOpen(false); });
+  document.addEventListener('click', e => { if (!fab.contains(e.target)) setOpen(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+}
+
 function init() {
   document.addEventListener('click', onClick);
 
@@ -1237,6 +1251,9 @@ function init() {
     if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
   } catch (e) { /* storage blocked: keep the default theme */ }
   render();
+  setupFab();
+  // Entrance animation plays once; later re-renders stay still.
+  setTimeout(() => document.body.classList.add('ready'), 900);
   maybeNotify();
   testAI();
 }

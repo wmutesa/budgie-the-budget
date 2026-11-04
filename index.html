@@ -29,6 +29,25 @@
 
   <main id="view"></main>
 
+  <div class="fab" id="fab">
+    <nav class="fab-panel" id="fab-panel" aria-label="Quick menu">
+      <span class="fab-label">Jump to</span>
+      <a href="#overview">Overview</a><a href="#plan">Plan</a><a href="#accounts">Accounts</a>
+      <a href="#goals">Goals</a><a href="#ledger">Ledger</a><a href="#ask">Assistant</a><a href="#set">Settings</a>
+      <span class="fab-label">Do</span>
+      <button data-action="add-tx">Add entry</button>
+      <button data-action="add-goal">New goal</button>
+      <button data-action="add-sub">New subscription</button>
+      <button data-action="export-json">Export backup</button>
+      <button data-action="import-json">Import backup</button>
+      <button data-action="export-csv">Export CSV</button>
+      <button data-action="theme">Switch theme</button>
+    </nav>
+    <button class="fab-toggle" id="fab-toggle" aria-expanded="false" aria-controls="fab-panel">
+      <span class="fab-icon" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span>
+    </button>
+  </div>
+
   <dialog id="modal"><form id="modal-form" method="dialog"></form></dialog>
   <input type="file" id="import-file" accept="application/json,.json" hidden />
   <div class="toasts" id="toasts" aria-live="polite"></div>
