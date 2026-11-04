@@ -1403,3 +1403,8 @@ body:has(.overlay) .notice { display: none; }
 .span-3.accounts-side .acc-grid { grid-template-columns: 1fr; }
 .span-3.accounts-side .acc-form { grid-template-columns: 1fr; }
 @media (max-width: 1100px) { .span-3.accounts-side { grid-column: span 12; } .span-3.accounts-side .acc-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); } }
+/* The account button matches the notification bell: same size, outline and weight. */
+.acct-btn { width: 30px; height: 30px; border: 1px solid var(--line); }
+.acct-btn:hover, .acct-btn:focus-visible { border-color: #000; }
+.acct-initial { font-size: 12px; font-weight: 600; line-height: 1; }
+.acct-dot { width: 7px; height: 7px; right: -2px; top: -2px; }
