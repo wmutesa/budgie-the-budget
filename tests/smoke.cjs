@@ -38,6 +38,30 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+// A stand-in for the browser's speech recognition, so dictation can be tested.
+const FAKE_SPEECH = `// Fake speech recognition: streams words as interim results, then a final result on stop().
+window.__speechPhrase = window.__speechPhrase || 'twelve fifty for lunch at Chipotle yesterday';
+class FakeRec {
+  start() {
+    this.words = window.__speechPhrase.split(' ');
+    this.i = 0;
+    this.t = setInterval(() => {
+      this.i = Math.min(this.words.length, this.i + 1);
+      const text = this.words.slice(0, this.i).join(' ');
+      this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: false })] });
+    }, 120);
+  }
+  stop() {
+    clearInterval(this.t);
+    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: window.__speechPhrase }], { isFinal: true })] });
+    this.onend?.();
+  }
+  abort() { clearInterval(this.t); this.onend?.(); }
+}
+window.SpeechRecognition = FakeRec;
+window.webkitSpeechRecognition = FakeRec;
+`;
+
 async function fakeNetwork(page) {
   await page.route('**/open.er-api.com/**', route => route.fulfill({
     json: { result: 'success', time_last_update_utc: 'Wed, 04 Nov 2026 00:02:31 +0000', rates: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 151.3, CAD: 1.37, INR: 84.1, KES: 129.5, NGN: 1550, BDT: 122.2, RWF: 1450, THB: 33.8 } },
@@ -163,6 +187,21 @@ async function run(url) {
   assert.match(draftText, /Chipotle/, 'merchant comes from "at Chipotle"');
   assert.doesNotMatch(draftText, /friday/i, 'the date phrase is removed from the merchant');
   await page.click('[data-test="accept-all"]');
+
+  // Dictation: words stream into the bar, then become a draft.
+  const talk = await context.newPage();
+  await fakeNetwork(talk);
+  await talk.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = '12.50 for lunch at Chipotle yesterday';");
+  await talk.goto(url, { waitUntil: 'load' });
+  await talk.click('.nb-pages button:nth-child(2)');
+  await talk.click('.say-bar .mic-btn');
+  await talk.waitForSelector('.rec-strip');
+  await talk.waitForFunction(() => document.querySelector('.rec-text').textContent.includes('Chipotle'));
+  await talk.click('.rec-done');
+  await talk.waitForSelector('#review');
+  assert.match(await talk.textContent('.draft-card >> nth=0'), /Chipotle/, 'dictated words become a draft');
+  assert.equal(await talk.$('.rec-strip'), null, 'the recording strip closes when done');
+  await talk.close();
 
   // Rwandan francs in the live rates.
   await page.click('.nb-pages button:nth-child(1)');

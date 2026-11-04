@@ -5,6 +5,7 @@ import { captureFile, captureNote, enrich } from '../lib/capture';
 import { ai } from '../lib/ai';
 import { useDictation, canDictate } from '../lib/dictation';
 import MicButton from './MicButton.vue';
+import RecordingStrip from './RecordingStrip.vue';
 
 // Four ways in: camera, any file, a statement, or one line of text.
 const busy = ref('');
@@ -41,12 +42,14 @@ async function handle(list) {
 
 const onFiles = e => { handle([...e.target.files]); e.target.value = ''; };
 const onDrop = e => { dragging.value = false; handle([...e.dataTransfer.files]); };
+let before = '';
 const dict = useDictation({
   onText: t => { note.value = t; },
   onFinal: () => onNote(),
   onError: m => { message.value = m; },
+  onCancel: () => { note.value = before; },
 });
-const startNote = () => { message.value = 'Listening… say it like “twelve fifty for lunch at Chipotle yesterday”.'; dict.toggle(); };
+const startNote = () => { message.value = ''; before = note.value; dict.toggle(); };
 
 async function onNote() {
   const drafts = captureNote(note.value, store.base);
@@ -70,6 +73,8 @@ async function onNote() {
       <MicButton v-if="canDictate" :listening="dict.listening.value" @toggle="startNote" />
       <button class="say-add" type="submit" :disabled="!note.trim()">Add <span aria-hidden="true">↵</span></button>
     </form>
+    <RecordingStrip v-if="dict.listening.value" :elapsed="dict.elapsed.value" :transcript="dict.transcript.value"
+      hint="Say it like “12.50 for lunch at Chipotle yesterday”." stop-label="Add it" @stop="dict.stop()" @cancel="dict.cancel()" />
     <div class="ways">
       <button class="way" @click="camera.click()"><b>Scan receipt</b><span>Take a photo with your camera</span></button>
       <button class="way" @click="files.click()"><b>Upload</b><span>Receipt photo, PDF or invoice</span></button>

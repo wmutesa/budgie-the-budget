@@ -9,10 +9,20 @@ import { goals } from '../data/demo';
 // Where spare money could go, at the banks you use. Amounts come from your data;
 // rates are on each bank's own page because they change daily.
 const usd = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-const toggle = id => { store.banks = store.banks.includes(id) ? store.banks.filter(b => b !== id) : [...store.banks, id]; };
 const emergency = goals.find(g => /emergency/i.test(g.name)) || goals[0];
 const monthlySpend = computed(() => Math.max(pace.value.projected, 1));
 const cushionMonths = computed(() => (emergency ? emergency.saved / monthlySpend.value : 0));
+
+// One plain-language suggestion from your own numbers, shown above the ideas.
+const advice = computed(() => {
+  const months = cushionMonths.value;
+  const spare = Math.round(surplus.value / 10) * 10;
+  if (months < 1) return `Your cushion covers ${months.toFixed(1)} months of spending. Build it first: ${spare > 0 ? `moving ${usd(spare / 2)} a month into savings` : 'even a small automatic transfer'} gets you to a full month fastest.`;
+  if (months < 3) return `Your cushion covers ${months.toFixed(1)} months. Keep adding to savings until it reaches 3, then consider a CD for part of it.`;
+  return `Your cushion covers ${months.toFixed(1)} months, so investing a fixed amount each month is a reasonable next step.`;
+});
+const savingsLinks = computed(() => store.banks.filter(id => BANKS[id]).map(id => BANKS[id].products.find(p => p.kind === 'savings')).filter(Boolean));
+const openRates = () => savingsLinks.value.forEach(p => window.open(p.url, '_blank', 'noopener,noreferrer'));
 
 const ideas = computed(() => store.banks.filter(id => BANKS[id]).flatMap(id => {
   const bank = BANKS[id];
@@ -28,14 +38,14 @@ const ideas = computed(() => store.banks.filter(id => BANKS[id]).flatMap(id => {
 <template>
   <section class="card cell opps">
     <div class="cell-head"><p class="label">Savings and investing</p><span class="muted small">Your banks</span></div>
-    <div class="bank-toggles">
-      <button v-for="(b, id) in BANKS" :key="id" class="bank-chip" :class="{ on: store.banks.includes(id) }" @click="toggle(id)">
-        <img :src="logoUrl(b.domain)" :alt="`${b.name} logo`" width="18" height="18" />{{ b.name }}
-      </button>
+    <div class="opp-ai">
+      <span class="opp-ai-tag">Budgie suggests</span>
+      <p>{{ advice }}</p>
+      <button type="button" class="opp-ai-link" @click="openRates">Compare today's savings rates ↗</button>
     </div>
     <ul class="opp-list">
       <li v-for="o in ideas" :key="o.p.url" class="opp">
-        <img :src="logoUrl(o.bank.domain)" :alt="`${o.bank.name} logo`" width="22" height="22" />
+        <img :src="logoUrl(o.bank.domain)" :alt="`${o.bank.name} logo`" width="22" height="22" @error="e => (e.target.style.visibility = 'hidden')" />
         <div class="grow">
           <b>{{ o.title }}</b>
           <span class="muted small">{{ o.body }}</span>

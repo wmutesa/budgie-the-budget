@@ -8,6 +8,7 @@ import { logoUrl } from '../lib/brands';
 import { CATEGORIES } from '../lib/categorize';
 import PickMenu from './PickMenu.vue';
 import MicButton from './MicButton.vue';
+import RecordingStrip from './RecordingStrip.vue';
 import { useDictation, canDictate } from '../lib/dictation';
 
 // Playground: write or say anything, Budgie organises it into a plan you can shape.
@@ -31,6 +32,7 @@ const useExample = () => { plan.text = EXAMPLE; runOrganize(); };
 let baseText = '';
 const dict = useDictation({
   continuous: true,
+  onCancel: () => { plan.text = baseText; },
   onText: t => { plan.text = `${baseText}${t}`; },
   onFinal: () => { plan.text = `${plan.text.trim()}\n`; runOrganize(); },
 });
@@ -141,10 +143,11 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
       <textarea v-model="plan.text" class="scratch-pad" data-test="scratch" spellcheck="false"
         placeholder="salary 4700&#10;rent 1450, groceries maybe 400&#10;netflix 15.49, github 4&#10;save 3000 for japan by june" />
       <div v-if="canDictate" class="scratch-mic">
-        <span v-if="dict.listening.value" class="live-tag">Listening · speak one item at a time</span>
         <MicButton :listening="dict.listening.value" label="Dictate your plan" @toggle="toggleDictate" />
       </div>
     </div>
+    <RecordingStrip v-if="dict.listening.value" :elapsed="dict.elapsed.value" :transcript="dict.transcript.value"
+      hint="Say one item at a time, like “rent fourteen fifty”, then pause." stop-label="Done" @stop="dict.stop()" @cancel="dict.cancel()" />
 
     <div class="board">
       <div v-for="(items, g) in byGroup" :key="g" class="lane" :data-group="g">
