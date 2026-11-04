@@ -1,10 +1,10 @@
 /* Budgie web app: top tabs, a 12-column grid, sharp corners, green brand. */
 :root {
-  --bg: #0b0d0c; --surface: #121614; --surface-2: #1a201d; --line: #222a26;
-  --ink: #f2f6f3; --muted: #8a9a91;
-  --brand: #2bd17e; --lime: #a3e635; --amber: #f5b942; --coral: #ff6b5b; --sky: #60a5fa;
+  --bg: #f3f5f2; --surface: #ffffff; --surface-2: #eef2ee; --line: #d9e0da;
+  --ink: #0d1510; --muted: #5d6b63;
+  --brand: #16a34a; --lime: #65a30d; --amber: #b45309; --coral: #dc2626; --sky: #2563eb;
   --sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 * { box-sizing: border-box; border-radius: 0; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
@@ -36,7 +36,7 @@ h1 { margin: 2px 0 0; font-size: 28px; letter-spacing: -.02em; }
 .btn { background: var(--surface); border: 1px solid var(--line); padding: 8px 14px; font-weight: 600; }
 .btn:hover { border-color: var(--ink); }
 .btn.primary { background: var(--brand); border-color: var(--brand); color: #04140b; }
-.btn.primary:hover { background: #3be08c; }
+.btn.primary:hover { background: #15803d; }
 .btn.small { padding: 4px 10px; font-size: 12px; }
 
 .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
@@ -50,12 +50,12 @@ h3 { margin: 0; font-size: 15px; }
 .big.sm { font-size: 28px; }
 .amount { font-size: 26px; font-weight: 700; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); } .small { font-size: 12px; }
-.chip { display: inline-block; padding: 2px 7px; background: rgba(43, 209, 126, .15); color: var(--brand); font-weight: 700; font-size: 12px; }
+.chip { display: inline-block; padding: 2px 7px; background: rgba(22, 163, 74, .12); color: var(--brand); font-weight: 700; font-size: 12px; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .in { color: var(--brand); } .out { color: var(--coral); }
 
 /* Balance hero: the green card from the reference */
-.hero { background: linear-gradient(135deg, #0a7a4a, #2bd17e 60%, #a3e635); color: #04140b; border: 0; }
+.hero { background: linear-gradient(135deg, #15803d, #22c55e 60%, #84cc16); color: #04140b; border: 0; }
 .hero .label, .hero .small, .hero .hero-foot span { color: rgba(4, 20, 11, .7); }
 .hero .chip { background: #04140b; color: #d9ffe9; }
 .hero-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 18px; font-size: 12px; }
@@ -101,7 +101,7 @@ h3 { margin: 0; font-size: 15px; }
 .pill { font-size: 11px; padding: 2px 8px; border: 1px solid var(--brand); color: var(--brand); }
 
 /* Goals: dark panel */
-.dark { background: #0a0f0d; }
+.dark { background: var(--surface-2); }
 .goals { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
 .goal-top { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .bar { height: 8px; background: var(--surface-2); position: relative; overflow: hidden; }
@@ -112,7 +112,7 @@ h3 { margin: 0; font-size: 15px; }
 .table th, .table td { padding: 10px 8px; border-bottom: 1px solid var(--line); text-align: left; }
 .table th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .status { font-size: 11px; padding: 2px 7px; font-weight: 700; }
-.status.success, .status.active { color: var(--brand); background: rgba(43,209,126,.12); }
+.status.success, .status.active { color: var(--brand); background: rgba(22,163,74,.12); }
 .status.pending, .status.scheduled { color: var(--amber); background: rgba(245,185,66,.12); }
 .status.inactive { color: var(--coral); background: rgba(255,107,91,.12); }
 
