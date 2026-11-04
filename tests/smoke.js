@@ -69,7 +69,7 @@ async function run(url) {
   await page.click('[data-action="add-tx"]');
   await page.fill('#modal-form input[name="amount"]', '42.5');
   await page.fill('#modal-form input[name="merchant"]', 'Trader Joe\'s');
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(1200);
   assert.match(await page.textContent('#suggest'), /Filled in|suggest|AI/, 'auto-fill explains its suggestion');
   await page.click('#modal-form button[type="submit"]');
   assert.match(await page.textContent('#ledger-list'), /Trader Joe's/, 'a new entry appears in the ledger');

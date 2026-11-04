@@ -5,10 +5,10 @@
 const STORE_KEY = 'ledgerline.v1'; // kept so saved data still loads after the rename
 
 const PRESETS = [
-  ['Housing', '#c9a77c'], ['Food & Dining', '#e39a6b'], ['Transport', '#9db4c0'],
-  ['Clothing', '#d88fb0'], ['Electronics & Tools', '#7fb0ff'], ['Software & Subscriptions', '#b59cff'],
-  ['Daily Essentials', '#8fd1a6'], ['College', '#ffd166'], ['Health', '#6fd3c4'],
-  ['Entertainment', '#f08a7e'], ['Other', '#8a8374'],
+  ['Housing', '#a3e635'], ['Food & Dining', '#f5b942'], ['Transport', '#60a5fa'],
+  ['Clothing', '#f472b6'], ['Electronics & Tools', '#818cf8'], ['Software & Subscriptions', '#a78bfa'],
+  ['Daily Essentials', '#2bd17e'], ['College', '#fde047'], ['Health', '#2dd4bf'],
+  ['Entertainment', '#ff6b5b'], ['Other', '#8a919c'],
 ];
 
 const CYCLE = { weekly: 'Weekly', monthly: 'Monthly', quarterly: 'Quarterly', yearly: 'Yearly' };
@@ -106,6 +106,7 @@ function defaultState() {
     subscriptions: [],
     dismissed: {},
     notifiedOn: '',
+    demo: false,
   };
 }
 
@@ -431,7 +432,7 @@ function settingsHTML() {
     </div>
     <div class="set-col">
       <span class="kicker">Local AI</span>
-      <p class="muted small">Runs on this computer through Ollama, which is free and private. Install from ollama.com, then run <code>ollama pull llama3.2</code>.</p>
+      <p class="muted small">Ollama is the default engine. It runs on this computer, is free, and keeps your data here. Run <code>scripts/ollama-setup.sh</code> once; Budgie then connects by itself.</p>
       <label class="chk"><input type="checkbox" ${s.aiEnabled ? 'checked' : ''} data-change="setting" data-id="aiEnabled"><span>Use the local AI when it is running</span></label>
       <label class="fld"><span>Endpoint</span><input value="${esc(s.aiEndpoint)}" data-change="setting" data-id="aiEndpoint"></label>
       <label class="fld"><span>Model</span><input value="${esc(s.aiModel)}" data-change="setting" data-id="aiModel"></label>
@@ -451,6 +452,16 @@ function settingsHTML() {
       </div>
     </div>
   </div>`;
+}
+
+function briefHTML() {
+  const ins = insights();
+  const lead = ui.aiSummary || (ins[0] ? ins[0].text : 'Add a few entries and your brief appears here.');
+  const source = ui.aiSummary ? 'Ollama brief' : 'Rules brief';
+  return `<section class="cell c12 brief" aria-label="Brief">
+    <div class="brief-main"><span class="brief-tag">${esc(source)}</span><p>${esc(lead)}</p></div>
+    <div class="brief-chips">${ins.slice(ui.aiSummary ? 0 : 1, ui.aiSummary ? 3 : 4).map(i => `<span class="ins-chip ${i.tone}">${esc(i.text)}</span>`).join('')}</div>
+  </section>`;
 }
 
 function pageHTML() {
@@ -494,10 +505,17 @@ function pageHTML() {
   const primary = goals.find(g => g.kind === 'college') || goals[0];
 
   return `
+  ${briefHTML()}
   <div class="grid">
-    <section class="cell c5 nw" id="overview">
+    <section class="cell c5 nw hero" id="overview">
       <div class="cell-head"><span class="kicker">Net worth</span><div class="seg" role="group" aria-label="Chart range">${seg}</div></div>
       <div class="nw-row"><span class="nw-val">${money(nw)}</span>${chip(nwChange, true)}<span class="muted small">${span}</span></div>
+      <div class="quick">
+        <button class="q q-in" data-action="add-type" data-id="income"><i>+</i>Income</button>
+        <button class="q q-out" data-action="add-type" data-id="expense"><i>−</i>Spend</button>
+        <button class="q q-move" data-action="add-type" data-id="transfer"><i>⇄</i>Move money</button>
+        <button class="q q-goal" data-action="add-goal"><i>◎</i>Goal</button>
+      </div>
       ${sparkline(series)}
       <div class="axis"><span>${fmtDate(shiftDate(today(), -(days - 1)))}</span><span>${fmtDate(today())}</span></div>
     </section>
@@ -541,7 +559,7 @@ function pageHTML() {
       <div class="acct-list">${state.accounts.length ? state.accounts.map(accountRow).join('') : emptyState('No accounts yet', 'Add Chase Checking and your savings to begin.')}</div>
     </section>
 
-    <section class="cell c4 gauge-cell" id="goals">
+    <section class="cell c4 gauge-cell dark" id="goals">
       <div class="cell-head"><span class="kicker">Goals</span><button class="ghost tiny" data-action="add-goal">+ Goal</button></div>
       ${primary ? `<div class="gauge-wrap">${gauge(goalSaved(primary) / Math.max(1, primary.target) * 100)}<div class="gauge-val"><b>${money(goalSaved(primary))}</b><span>of ${money(primary.target)}</span></div></div>` : emptyState('No goals yet', 'Create a College Fund to see progress here.')}
       <div class="goal-list">${goals.map(goalCell).join('')}</div>
@@ -577,6 +595,8 @@ function pageHTML() {
 function render() {
   $('#eyebrow').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
   $('#top-actions').innerHTML = topActions();
+  const dp = $('#demo-pill');
+  if (dp) dp.hidden = !state.demo;
   $('#view').innerHTML = pageHTML();
   document.title = 'Budgie';
   updateAIPill();
@@ -1034,17 +1054,28 @@ function aiStatusLine() {
 
 async function testAI() {
   const result = $('#ai-test-result');
-  if (result) result.textContent = 'Checking…';
+  if (result) result.textContent = 'Connecting to Ollama…';
   ui.ai = { ok: false, error: 'checking', models: [] };
   updateAIPill();
   const r = await LocalAI.ping(state.settings.aiEndpoint);
   ui.ai = { ok: r.ok, error: r.ok ? '' : r.error, models: r.models || [] };
-  const want = state.settings.aiModel.trim();
-  const installed = r.ok && r.models.some(n => n === want || n === `${want}:latest` || n.startsWith(`${want}:`));
   let msg;
-  if (!r.ok) msg = `Not reachable (${r.error}). Is Ollama running? Start it with "ollama serve".`;
-  else if (!installed) msg = `Connected, but the model "${want}" is not installed. Run: ollama pull ${want}`;
-  else msg = `Connected. "${want}" is ready for auto-fill and summaries.`;
+  if (!r.ok) {
+    msg = `Ollama is not running on this computer (${r.error}). Start it with "ollama serve", or run scripts/ollama-setup.sh once.`;
+  } else {
+    const want = state.settings.aiModel.trim();
+    const has = n => r.models.some(m => m === n || m === `${n}:latest` || m.startsWith(`${n}:`));
+    if (!has(want) && r.models.length) {
+      // Connect without asking the user: use the first model they already have installed.
+      state.settings.aiModel = r.models[0];
+      save();
+      msg = `Connected. Using "${r.models[0]}", the model already installed on this computer.`;
+    } else if (!has(want)) {
+      msg = `Connected, but no model is installed yet. Run: ollama pull ${want}`;
+    } else {
+      msg = `Connected. "${want}" is running for suggestions, the brief and summaries.`;
+    }
+  }
   render();
   const after = $('#ai-test-result');
   if (after) after.textContent = msg;
@@ -1123,6 +1154,7 @@ function demoState() {
       else s.transactions.push({ ...base, type: 'expense', amount: t.a, accountId: chk, categoryId: cat(t.c) });
     }
   }
+  s.demo = true;
   return s;
 }
 
@@ -1212,6 +1244,7 @@ const ACTIONS = {
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('ledgerline.theme', next); } catch (e) { /* storage blocked: theme still switches */ }
   },
+  'add-type': id => txForm({ type: id }),
   'chip-filter': (field, el) => { ui.f[field] = el.dataset.value; render(); },
   'setting': (name, el) => { state.settings[name] = el.dataset.value; commit(); },
   'use-estimate': (value) => { state.settings.monthlyIncome = Math.round(Number(value)); commit(); toast('Income set from your last three months', 'good'); },
@@ -1222,6 +1255,12 @@ const ACTIONS = {
     state = demoState();
     commit();
     toast('Demo data loaded. Edit or erase it when you are ready.', 'good');
+  },
+  'clear-demo': () => {
+    if (!confirm('Erase the demo data? This clears everything in this browser.')) return;
+    state = defaultState();
+    commit();
+    toast('Demo data cleared. Start with your own accounts.', 'good');
   },
   'reset': () => {
     if (!confirm('Erase all Budgie data in this browser? Export a backup first.')) return;
@@ -1330,6 +1369,14 @@ function init() {
     const saved = localStorage.getItem('ledgerline.theme');
     if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
   } catch (e) { /* storage blocked: keep the default theme */ }
+  // First visit: show demo data so the whole app can be explored right away.
+  let hasSaved = false;
+  try { hasSaved = localStorage.getItem(STORE_KEY) !== null; } catch (e) { /* storage blocked */ }
+  if (!hasSaved) {
+    state = demoState();
+    save();
+    setTimeout(() => toast('Showing demo data so you can explore. Clear it from the top bar anytime.', 'info'), 600);
+  }
   render();
   setupFab();
   // Entrance animation plays once; later re-renders stay still.

@@ -84,3 +84,27 @@ Notes for testing:
 - Data stays in each visitor's browser. The deployed site stores nothing on Cloudflare.
 - The deployed site cannot reach a local AI, because Ollama runs on your computer. The Assistant falls back to built-in rules there. To test the local AI, use `python3 -m http.server 8080` (see above) or `npm run dev`.
 - For a custom domain, add it in the Cloudflare dashboard under Workers & Pages, then Budgie, then Settings, then Domains & Routes.
+
+## Ollama: the default AI engine
+
+Budgie uses Ollama for suggestions, the overview brief, and summaries. It runs on your computer, so your data never leaves it.
+
+One-time setup:
+
+```bash
+./scripts/ollama-setup.sh                                    # installs Ollama and downloads llama3.2
+./scripts/ollama-setup.sh llama3.2 https://budgie.<your-subdomain>.workers.dev   # also allows the hosted page
+```
+
+Then start Ollama with the origin of the page you use:
+
+```bash
+OLLAMA_ORIGINS="https://budgie.<your-subdomain>.workers.dev" ollama serve   # hosted page
+ollama serve                                                                 # local page
+```
+
+Budgie connects by itself on load. If Ollama has a different model installed, it uses that one automatically. Without Ollama, the app still works with its built-in rules.
+
+## Demo data
+
+The first visit loads demo data so you can explore every section. The purple "Demo data · clear" button in the top bar removes it.

@@ -387,3 +387,68 @@ table.data tbody tr:hover { background: var(--surface-2); }
 @media (max-width: 720px) {
   .report-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- Palette, hero, brief, quick actions ---------- */
+:root {
+  --brand: #2bd17e;
+  --lime: #a3e635;
+  --amber: #f5b942;
+  --coral: #ff6b5b;
+  --violet: #a78bfa;
+  --sky: #60a5fa;
+}
+button.primary { background: var(--brand); border-color: var(--brand); color: #04140b; }
+button.primary:hover { background: #3be08c; border-color: #3be08c; }
+.jumps a:hover { color: var(--brand); }
+.pick-chip.on { background: var(--brand); border-color: var(--brand); color: #04140b; }
+
+/* Net worth as a green hero card */
+.hero {
+  background: linear-gradient(135deg, #0a7a4a 0%, #2bd17e 58%, #a3e635 100%);
+  color: #04140b;
+}
+.hero .kicker, .hero .muted, .hero .axis { color: rgba(4, 20, 11, 0.7); }
+.hero .nw-val { color: #04140b; }
+.hero .seg button { color: rgba(4, 20, 11, 0.7); }
+.hero .seg button.on { background: #04140b; color: #d9ffe9; }
+.hero .chip.up { color: #04140b; border-color: #04140b; }
+.hero .chip.down { color: #5a0d05; border-color: #5a0d05; }
+.hero .spark polyline { stroke: #04140b; }
+.hero .spark polygon { fill: rgba(4, 20, 11, 0.12); }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 4px; }
+.q { display: flex; align-items: center; gap: 6px; justify-content: center; padding: 8px 6px; font-size: 11.5px; font-weight: 700; background: rgba(4, 20, 11, 0.14); border-color: transparent; color: #04140b; }
+.q i { font-style: normal; font-size: 13px; line-height: 1; }
+.q:hover { background: rgba(4, 20, 11, 0.26); border-color: transparent; }
+
+/* Goals as a dark panel with a lime gauge (reference: dark savings goals card) */
+.dark { background: #0c100e; }
+.dark .kicker, .dark .muted, .dark .small, .dark .goal-c .muted { color: #8aa398; }
+.dark h3, .dark .goal-num b, .dark .gauge-val b { color: #f2f8f4; }
+.dark .g-track { stroke: #1c2722; }
+.dark .g-fill { stroke: var(--lime); }
+.dark .gauge-val span { color: #8aa398; }
+.dark .goal-c { border-color: #1c2722; }
+.dark .bar { background: #1c2722; }
+.dark .bar i { background: var(--lime); }
+.dark .tag { border-color: #2a3a33; color: #b9d4c6; }
+.dark button.ghost { color: #d9e8df; border-color: #2a3a33; }
+.dark button.primary { background: var(--lime); border-color: var(--lime); }
+
+/* AI brief strip */
+.brief {
+  display: grid; grid-template-columns: 1fr; gap: 10px;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.14), rgba(43, 209, 126, 0.10));
+  border-bottom: 1px solid var(--line);
+}
+.brief-main { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.brief-main p { margin: 0; font-size: 14px; line-height: 1.5; font-weight: 500; }
+.brief-tag { font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--violet); border: 1px solid var(--violet); padding: 2px 7px; }
+.brief-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.ins-chip { font-size: 11.5px; padding: 3px 8px; border: 1px solid var(--line); background: var(--surface); }
+.ins-chip.good { border-color: var(--brand); color: var(--brand); }
+.ins-chip.warn { border-color: var(--amber); color: var(--amber); }
+.ins-chip.bad { border-color: var(--coral); color: var(--coral); }
+.ins-chip.info { border-color: var(--sky); color: var(--sky); }
+
+/* Demo data pill */
+.demo-pill { font-size: 11px; padding: 3px 8px; background: var(--violet); color: #100a1f; border: 0; font-weight: 700; }
