@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { budgets, goals } from '../data/demo';
+import { goals } from '../data/demo';
 import { store, monthly } from '../lib/store';
 import { convert } from '../lib/rates';
 const income = ref(6400);
 const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-const cats = computed(() => budgets.reduce((s, b) => s + b.budget, 0));
+const cats = computed(() => store.budgets.reduce((s, b) => s + b.budget, 0));
 const subs = computed(() => store.subscriptions.reduce((t, x) => t + (convert(monthly(x), x.currency, 'USD') ?? 0), 0));
 const need = goals.reduce((s, g) => s + (g.target - g.saved) / 12, 0);
 const left = computed(() => income.value - cats.value - subs.value - need);

@@ -1,7 +1,7 @@
 // App state that belongs to the user: base currency, tracked subscriptions,
 // and the search text. Saved in this browser only.
 import { reactive, watch } from 'vue';
-import { sampleTransactions } from '../data/demo';
+import { sampleTransactions, budgets as defaultBudgets } from '../data/demo';
 
 const KEY = 'budgie.v2';
 
@@ -16,11 +16,14 @@ export const store = reactive({
   subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
   transactions: Array.isArray(saved.transactions) ? saved.transactions : sampleTransactions(),
   drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
+  budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
+  dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
+  banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
   query: '',
 });
 
 watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts }),
+  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks }),
   value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
   { deep: true },
 );

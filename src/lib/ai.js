@@ -42,3 +42,26 @@ export async function aiReadReceipt(text) {
     return out && typeof out.total === 'number' ? out : null;
   } catch { return null; }
 }
+
+// Ask the local model for a short read on the month. Returns null when unavailable.
+export async function aiAdvise(facts) {
+  if (ai.status !== 'ollama') return null;
+  try {
+    const res = await fetch(`${OLLAMA}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({
+        model: ai.model,
+        stream: false,
+        options: { temperature: 0.2 },
+        messages: [
+          { role: 'system', content: 'You are a careful budgeting assistant. In three short sentences, say how the month is going and the single most useful next step. Use only the facts given. No made-up numbers, no bank rates.' },
+          { role: 'user', content: facts.join('\n') },
+        ],
+      }),
+    });
+    const j = await res.json();
+    return (j.message?.content || '').trim() || null;
+  } catch { return null; }
+}

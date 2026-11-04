@@ -87,21 +87,35 @@ async function run(url) {
   const csv = 'Date,Description,Amount\n2026-11-02,Trader Joe\'s,-54.20\n2026-11-03,Uber,-18.75\n2026-11-03,Payroll,2350.00\n';
   await page.setInputFiles('[data-test="file-input"]', { name: 'statement.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   await page.waitForSelector('#review');
-  assert.equal(await page.locator('.draft').count(), 3, 'three statement rows wait for review');
+  assert.equal(await page.locator('.draft-card').count(), 3, 'three statement rows wait for review');
   assert.match(await page.textContent('#review'), /Transport/, 'Uber is categorised as transport');
 
   // A one-line note, matched to the company on the web.
   await page.fill('[data-test="quick-note"]', 'Netflix 15.49 today');
   await page.press('[data-test="quick-note"]', 'Enter');
-  await page.waitForFunction(() => document.querySelectorAll('.draft').length === 4);
+  await page.waitForFunction(() => document.querySelectorAll('.draft-card').length === 4);
   assert.match(await page.textContent('#review'), /netflix\.com/, 'the note is matched to netflix.com');
+
+  // The custom category picker changes a draft without a native dropdown.
+  await page.click('.draft-card >> nth=0 >> .draft-cat .pick-btn');
+  await page.click('.pick-pop .pick-opt:has-text("Shopping")');
+  assert.match(await page.textContent('.draft-card >> nth=0'), /Shopping/, 'category picker sets the category');
 
   await page.click('[data-test="accept-all"]');
   assert.equal(await page.$('#review'), null, 'review queue clears after accepting');
-  assert.match(await page.textContent('#ledger'), /Uber/, 'imported rows reach the ledger');
+  assert.match(await page.textContent('#ledger'), /Uber|Netflix/, 'accepted items reach recent activity');
   assert.match(await page.textContent('#budgets'), /Transport/, 'budgets update');
-  await page.click('.chip-btn:has-text("Imported")');
-  assert.match(await page.textContent('#ledger'), /Payroll/, 'imported filter shows statement rows');
+  const [hb, hl] = await Promise.all([page.locator('#budgets').boundingBox(), page.locator('#ledger').boundingBox()]);
+  assert.ok(Math.abs(hb.height - hl.height) < 2 && Math.abs((hb.y + hb.height) - (hl.y + hl.height)) < 2, 'budgets and recent activity share a bottom line');
+
+  // Reports: advice, bank opportunities and the full ledger.
+  await page.click('.nav-pages button:nth-child(3)');
+  assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
+  assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
+  assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
+  assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');
+  await page.click('#activity .chip-btn:has-text("Imported")');
+  assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
   await page.click('.nav-pages button:nth-child(1)');
 
   const mobile = await context.newPage();

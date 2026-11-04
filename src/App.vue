@@ -20,12 +20,14 @@ import CaptureCell from './components/CaptureCell.vue';
 import ReviewQueue from './components/ReviewQueue.vue';
 import SpendSummary from './components/SpendSummary.vue';
 import KpiStrip from './components/KpiStrip.vue';
+import InsightsCell from './components/InsightsCell.vue';
+import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
 
-// Two pages. Overview holds the dashboard and reports; Transactions holds budgets and the ledger.
-const tabs = ['Overview', 'Transactions'];
+// Three pages: Overview (the dashboard), Transactions (capture, review, budgets), Reports (analysis, advice, full ledger).
+const tabs = ['Overview', 'Transactions', 'Reports'];
 const active = ref('Overview');
 const searching = ref(false);
 const seed = ref('');
@@ -38,8 +40,11 @@ onMounted(() => {
   loadRates(store.base);
   detectAI();
   timer = setInterval(() => loadRates(store.base, { force: true }), 30 * 60 * 1000);
+  document.addEventListener('visibilitychange', onVisible);
 });
-onUnmounted(() => clearInterval(timer));
+// Coming back to the tab refreshes rates if they are older than an hour.
+const onVisible = () => { if (document.visibilityState === 'visible') loadRates(store.base); };
+onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); });
 </script>
 
 <template>
@@ -76,15 +81,20 @@ onUnmounted(() => clearInterval(timer));
         <AccountCards class="span-8" id="accounts" />
         <SignalsCell class="span-4" />
         <WalletCards class="span-12" />
-        <ReportsView class="span-12" id="reports" />
       </template>
-      <template v-else>
+      <template v-else-if="active === 'Transactions'">
         <KpiStrip />
         <CaptureCell class="span-8" id="capture" />
         <SpendSummary class="span-4" />
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
-        <TransactionsView class="span-8" id="ledger" />
+        <TransactionsView class="span-8" id="ledger" :limit="8" />
+      </template>
+      <template v-else>
+        <InsightsCell class="span-8" id="insights" />
+        <OpportunitiesCell class="span-4" id="opportunities" />
+        <ReportsView class="span-12" id="reports" />
+        <TransactionsView class="span-12" id="activity" full title="All activity" />
       </template>
     </main>
 

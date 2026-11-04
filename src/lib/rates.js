@@ -1,7 +1,11 @@
 // Live exchange rates. Tries ExchangeRate-API's open endpoint first (160+
 // currencies, refreshed daily), then Frankfurter (European Central Bank rates).
 // The last good response is cached so the app still converts when offline.
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
+
+// A clock that ticks every 30 seconds so relative times stay current.
+export const now = ref(Date.now());
+if (typeof window !== 'undefined') setInterval(() => { now.value = Date.now(); }, 30000);
 
 const CACHE_KEY = 'budgie.rates';
 const MAX_AGE_MS = 60 * 60 * 1000;
@@ -71,7 +75,8 @@ export function convert(amount, from, to = rates.base) {
 }
 
 export function ratesLabel() {
-  const t = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  const mins = rates.fetchedAt ? Math.max(0, Math.round((now.value - rates.fetchedAt) / 60000)) : null;
+  const t = mins === null ? '' : mins < 1 ? 'just now' : `${mins} min ago`;
   switch (rates.status) {
     case 'loading': return 'Fetching live rates…';
     case 'live': return `Live · ${t} · ${rates.source}`;
