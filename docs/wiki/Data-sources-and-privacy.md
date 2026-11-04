@@ -14,7 +14,7 @@ In your account, in Budgie's Cloudflare D1 database, with a copy in your browser
 | Google favicon service | Company logos |
 | Google Fonts | Fonts |
 | jsDelivr | Files for reading receipt photos |
-| Ollama on localhost | Optional local AI |
+| Cloudflare Workers AI (through Budgie's Worker) | Reading receipts and writing suggestions with an open model |
 
 The site's Content Security Policy blocks every other destination.
 

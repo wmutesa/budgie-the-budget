@@ -14,6 +14,10 @@ const MAX_DATA_BYTES = 1_500_000;
 const RECOVERY_CODES = 8;
 const RECOVERY_LINK_MS = 15 * 60 * 1000;
 const MAX_FAILED_RECOVERIES = 10; // per network address per hour
+// Workers AI: an open model (Meta's Llama, the family Ollama runs) on Cloudflare.
+const AI_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const AI_NAME = 'Llama 3.1';
+const AI_PER_HOUR = 60; // requests per person per hour
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -72,10 +76,57 @@ async function issueRecoveryCodes(env, userId) {
   return codes;
 }
 
-// A simple per-address limit on failed attempts.
-async function tooManyAttempts(env, key) {
+// A simple per-key hourly limit, used for failed recoveries and AI requests.
+async function tooManyAttempts(env, key, max = MAX_FAILED_RECOVERIES) {
   const row = await env.DB.prepare('SELECT count, window_start FROM attempts WHERE key = ?').bind(key).first();
-  return Boolean(row && now() - row.window_start < 3600e3 && row.count >= MAX_FAILED_RECOVERIES);
+  return Boolean(row && now() - row.window_start < 3600e3 && row.count >= max);
+}
+
+// The first {...} in a model reply, parsed; null if there is none.
+function firstJSON(text) {
+  const s = String(text || '');
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try { return JSON.parse(s.slice(start, end + 1)); } catch { return null; }
+}
+
+async function runAI(env, task, input) {
+  const clean = v => String(v || '').replace(/[\u0000-\u001f]+/g, ' ').slice(0, 4000);
+  if (task === 'receipt') {
+    const categories = Array.isArray(input.categories) ? input.categories.slice(0, 30).map(clean) : [];
+    const out = await env.AI.run(AI_MODEL, {
+      max_tokens: 200,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: `Read receipt text. Reply with JSON only: {"merchant": string, "date": "YYYY-MM-DD" or null, "total": number, "currency": ISO 4217 code, "category": one of ${JSON.stringify(categories)}}. Use only facts in the text.` },
+        { role: 'user', content: clean(input.text) },
+      ],
+    });
+    const j = firstJSON(out?.response);
+    if (!j || typeof j.total !== 'number') return null;
+    return {
+      merchant: String(j.merchant || '').slice(0, 80),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(j.date || '') ? j.date : null,
+      total: j.total,
+      currency: /^[A-Z]{3}$/.test(j.currency || '') ? j.currency : null,
+      category: categories.includes(j.category) ? j.category : null,
+    };
+  }
+  if (task === 'advice') {
+    const facts = (Array.isArray(input.facts) ? input.facts : []).slice(0, 20).map(clean);
+    if (!facts.length) return null;
+    const out = await env.AI.run(AI_MODEL, {
+      max_tokens: 160,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: 'You are a careful budgeting assistant. In three short sentences, say how the month is going and the single most useful next step. Use only the facts given. No made-up numbers, no bank rates.' },
+        { role: 'user', content: facts.join('\n') },
+      ],
+    });
+    return String(out?.response || '').trim().slice(0, 600) || null;
+  }
+  return null;
 }
 async function countFailure(env, key) {
   await env.DB.prepare(
@@ -302,6 +353,24 @@ async function routes(request, env, url) {
       return json({ error: 'Changed on another device', data: row ? JSON.parse(row.data) : null, version: row?.version || 0 }, 409);
     }
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
+  }
+
+  // --- AI (Workers AI) ---
+  if (path === '/api/ai' && method === 'GET') {
+    return json({ available: Boolean(env.AI) && env.AI_DISABLED !== '1', model: AI_MODEL, name: AI_NAME });
+  }
+  if (path === '/api/ai' && method === 'POST') {
+    if (!env.AI || env.AI_DISABLED === '1') return json({ result: null });
+    const key = `ai:${user.id}`;
+    if (await tooManyAttempts(env, key, AI_PER_HOUR)) return fail(429, 'AI is resting for a bit. Budgie keeps working with its built-in rules.');
+    await countFailure(env, key); // counts every request toward the hourly limit
+    const input = await body(request);
+    try {
+      return json({ result: await runAI(env, input.task, input) });
+    } catch (e) {
+      console.error('AI error', e?.message);
+      return json({ result: null });
+    }
   }
 
   // --- recovery codes ---

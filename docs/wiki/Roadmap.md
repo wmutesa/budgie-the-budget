@@ -4,4 +4,4 @@
 - Connect real bank accounts
 - Recurring transactions detected from imports
 - More banks in the savings and investing ideas
-- Mobile and desktop apps that match the web app
+- Offline support for adding entries with no connection (Budgie stays a web app; no separate desktop or phone apps are planned)

@@ -24,5 +24,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Workers AI, for reading receipts and writing suggestions.
+  "ai": { "binding": "AI" },
   "observability": { "enabled": true }
 }
