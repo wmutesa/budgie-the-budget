@@ -31,10 +31,10 @@ export const cashFlow = [
 ];
 
 export const spending = [
-  { name: 'House rent', amount: 2000, color: '#a3e635' },
-  { name: 'Food & dining', amount: 1500, color: '#f5b942' },
-  { name: 'Transport', amount: 640, color: '#60a5fa' },
-  { name: 'Others', amount: 800, color: '#8a919c' },
+  { name: 'House rent', amount: 2000, color: '#7c3aed' },
+  { name: 'Food & dining', amount: 1500, color: '#16a34a' },
+  { name: 'Transport', amount: 640, color: '#2563eb' },
+  { name: 'Others', amount: 800, color: '#db2777' },
 ];
 
 export const bills = [
@@ -52,7 +52,7 @@ export const transactions = [
 ];
 
 export const goals = [
-  { name: 'Emergency fund', saved: 7200, target: 10000, color: '#a3e635' },
-  { name: 'Europe vacation', saved: 1400, target: 5000, color: '#f5b942' },
-  { name: 'Tesla Model 3', saved: 13500, target: 30000, color: '#60a5fa' },
+  { name: 'Emergency fund', saved: 7200, target: 10000, color: '#db2777' },
+  { name: 'Europe vacation', saved: 1400, target: 5000, color: '#16a34a' },
+  { name: 'Tesla Model 3', saved: 13500, target: 30000, color: '#2563eb' },
 ];
