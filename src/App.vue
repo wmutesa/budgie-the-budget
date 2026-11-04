@@ -23,7 +23,7 @@ import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
-import AiNotices from './components/AiNotices.vue';
+import NoticeBell from './components/NoticeBell.vue';
 import MarketsCell from './components/MarketsCell.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
@@ -95,6 +95,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
           <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
+          <NoticeBell />
           <AccountMenu @tour="touring = true" />
         </div>
       </header>
@@ -130,7 +131,6 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       </template>
     </main>
 
-    <AiNotices :paused="touring || searching" />
     <SubscriptionSearch v-if="searching" :seed="seed" @close="searching = false" />
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>

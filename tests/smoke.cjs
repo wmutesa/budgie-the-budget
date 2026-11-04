@@ -219,12 +219,20 @@ async function run(url) {
   // AI everywhere: short notes next to sections and suggestions in the corner.
   assert.match(await page.textContent('[data-test="hint-ledger"]'), /purchases? this week/, 'recent activity has an AI note');
   assert.match(await page.textContent('[data-test="hint-budgets"]'), /budget|on track|%/, 'budgets have an AI note');
-  await page.waitForSelector('[data-test="notice"]');
-  const firstNotice = await page.textContent('[data-test="notice"] b');
-  await page.click('[data-test="notice-dismiss"]');
-  await page.waitForTimeout(300);
-  const after = await page.$('[data-test="notice"] b');
-  assert.ok(!after || (await after.textContent()) !== firstNotice, 'a dismissed suggestion does not come back');
+  // Notifications live behind the bell in the top bar.
+  assert.ok(Number(await page.textContent('[data-test="bell-count"]')) > 0, 'the bell shows how many notifications are new');
+  await page.click('[data-test="bell"]');
+  const items = page.locator('[data-test="bell-item"]');
+  const before = await items.count();
+  assert.ok(before > 0, 'the dropdown lists the notifications');
+  await items.first().hover();
+  await page.waitForTimeout(200);
+  assert.equal(await page.textContent('[data-test="bell-tip"]'), await items.first().locator('.bell-body').textContent(), 'each notification has a tooltip with the full message');
+  assert.equal(await page.$('[data-test="bell-count"]'), null, 'opening the bell marks them as seen');
+  await items.first().locator('button:has-text("Dismiss")').click();
+  assert.equal(await items.count(), before - 1, 'a dismissed notification goes away');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('[data-test="bell-pop"]'), null, 'Escape closes the dropdown');
   assert.ok(await page.$('#accounts'), 'accounts live on the Transactions page');
 
   // Markets: news and savings ideas use the whole page.
