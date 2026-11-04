@@ -17,15 +17,6 @@ const GOAL_KINDS = [['college', 'College'], ['savings', 'Savings'], ['emergency'
 const LEVEL_RANK = { bad: 0, warn: 1, info: 2 };
 const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'NGN', 'KES', 'INR', 'JPY'];
 
-const QUICK = [
-  'How much can I spend this week?',
-  'Am I over budget anywhere?',
-  'What renews soon?',
-  'When will my college fund be ready?',
-  'Give me a savings plan',
-  'Can I afford $300?',
-];
-
 const SYSTEM = `You are Budgie's private budgeting assistant. Everything runs on the user's machine.
 Answer ONLY from the JSON snapshot provided. Be concise, concrete and kind. When you compare numbers, show the arithmetic in one line.
 Name risks plainly. Never invent accounts, balances or transactions. If something is missing from the snapshot, say what to add in the app.
@@ -147,7 +138,9 @@ const ui = {
   month: thisMonth(),
   f: { q: '', type: '', cat: '', acc: '', month: thisMonth() },
   range: 30,
-  chat: [],
+  aiCache: {},
+  aiSummary: '',
+  aiSummaryKey: '',
   ai: { ok: false, error: 'checking', models: [] },
 };
 
@@ -418,15 +411,12 @@ function goalCell(g) {
   </article>`;
 }
 
-function chatLog() {
-  if (!ui.chat.length) {
-    return `<div class="msg assistant"><p>I read your balances, budgets, goals and subscriptions from this browser only. Ask anything about your money.</p></div>`;
-  }
-  return ui.chat.map(m => `<div class="msg ${m.role}"><p>${esc(m.text).replace(/\n/g, '<br>')}</p>${m.note ? `<small>${esc(m.note)}</small>` : ''}</div>`).join('');
-}
-
 function flow(label, value, change, goodWhenUp) {
   return `<div class="flow-row"><span class="muted">${esc(label)}</span><b>${value}</b>${chip(change, goodWhenUp)}</div>`;
+}
+
+function chipRow(field, items, cur) {
+  return `<div class="pick">${items.map(([v, l]) => `<button type="button" class="pick-chip ${String(v) === String(cur ?? '') ? 'on' : ''}" data-action="chip-filter" data-id="${field}" data-value="${esc(v)}">${esc(l)}</button>`).join('')}</div>`;
 }
 
 function settingsHTML() {
@@ -434,7 +424,7 @@ function settingsHTML() {
   return `<div class="set-grid">
     <div class="set-col">
       <span class="kicker">Preferences</span>
-      <label class="fld"><span>Currency</span><select data-change="setting" data-id="currency">${opts(CURRENCIES.map(c => [c, c]), s.currency)}</select></label>
+      <div class="field"><span>Currency</span>${chipRow('currency', CURRENCIES.map(c => [c, c]), s.currency).replace(/data-action="chip-filter"/g, 'data-action="setting"').replace(/data-id="currency"/g, 'data-id="currency"')}</div>
       <label class="fld"><span>Low-balance floor</span><input type="number" min="0" step="50" value="${s.lowBalance}" data-change="setting" data-id="lowBalance"></label>
       <label class="fld"><span>Monthly income (after tax)</span><input type="number" min="0" step="50" value="${s.monthlyIncome || ''}" data-change="setting" data-id="monthlyIncome"></label>
       <label class="chk"><input type="checkbox" ${s.notifyBrowser ? 'checked' : ''} data-change="setting" data-id="notifyBrowser"><span>Browser notifications for renewals and overdrafts</span></label>
@@ -532,6 +522,7 @@ function pageHTML() {
         <li><span>Goals needed / mo</span><b>${money(p.goals)}</b></li>
         <li class="total"><span>Unassigned</span><b class="${p.left < 0 ? 'bad' : 'good'}">${p.income ? money(p.left) : '—'}</b></li>
       </ul>
+      ${!p.income && incomeEstimate() ? `<button class="ghost tiny" data-action="use-estimate" data-id="${incomeEstimate()}">Use ${money(incomeEstimate())} estimated from your history</button>` : ''}
       <p class="muted small">Lower a category budget that duplicates a subscription so it isn't counted twice.</p>
     </section>
 
@@ -564,22 +555,17 @@ function pageHTML() {
 
     <section class="cell c12" id="ledger">
       <div class="cell-head"><span class="kicker">Ledger</span><button class="ghost tiny" data-action="export-csv">Export CSV</button></div>
-      <div class="filters">
-        <input type="search" placeholder="Search merchant or note" value="${esc(ui.f.q)}" data-input="q" aria-label="Search ledger">
-        <select data-change="filter" data-id="type" aria-label="Type">${opts([['', 'All types'], ['expense', 'Spending'], ['income', 'Income'], ['transfer', 'Transfers'], ['adjust', 'Balance updates']], ui.f.type)}</select>
-        <select data-change="filter" data-id="cat" aria-label="Category">${opts([['', 'All categories'], ...state.categories.map(c => [c.id, c.name])], ui.f.cat)}</select>
-        <select data-change="filter" data-id="acc" aria-label="Account">${opts([['', 'All accounts'], ...state.accounts.map(a => [a.id, a.name])], ui.f.acc)}</select>
-        <select data-change="filter" data-id="month" aria-label="Month">${opts([['', 'All months'], ...monthsWithData().map(x => [x, monthName(x)])], ui.f.month)}</select>
+      <div class="filters-chips">
+        ${chipRow('type', [['', 'All'], ['expense', 'Spending'], ['income', 'Income'], ['transfer', 'Transfers'], ['adjust', 'Updates']], ui.f.type)}
+        ${chipRow('acc', [['', 'All accounts'], ...state.accounts.map(x => [x.id, x.name])], ui.f.acc)}
+        ${chipRow('cat', [['', 'All categories'], ...state.categories.map(x => [x.id, x.name])], ui.f.cat)}
+        ${chipRow('month', [['', 'All time'], ...monthsWithData().slice(0, 6).map(x => [x, monthName(x)])], ui.f.month)}
       </div>
+      <input class="ledger-search" type="search" placeholder="Search merchant or note" value="${esc(ui.f.q)}" data-input="q" aria-label="Search ledger">
       <div id="ledger-list">${ledgerList()}</div>
     </section>
 
-    <section class="cell c12" id="ask">
-      <div class="cell-head"><span class="kicker">Assistant</span><span class="chat-status ${ui.ai.ok && state.settings.aiEnabled ? 'on' : ''}"><span class="dot"></span>${!state.settings.aiEnabled ? 'Local AI off · built-in rules' : ui.ai.ok ? `Local ${esc(state.settings.aiModel)} ready` : ui.ai.error === 'checking' ? 'Checking local model…' : `Local AI not reached (${esc(ui.ai.error)}) · built-in rules`}</span></div>
-      <div class="log" id="chat-log">${chatLog()}</div>
-      <div class="chips">${QUICK.map(q => `<button class="chip-btn ghost" data-action="ask" data-id="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-      <form id="chat-form" class="chatform" autocomplete="off"><input name="q" placeholder="Ask about your money…" aria-label="Ask a question"><button class="primary" type="submit">Ask</button></form>
-    </section>
+    <section class="cell c12 reports" id="reports">${reportsHTML()}</section>
   </div>
 
   <details id="set" class="settings">
@@ -604,6 +590,7 @@ function topActions() {
 function commit() {
   save();
   render();
+  scheduleSummary();
 }
 
 function updateAIPill() {
@@ -619,12 +606,20 @@ function updateAIPill() {
 
 /* ---------- Forms ---------- */
 
+function chipsHTML(f) {
+  const cur = String(f.value ?? '');
+  return `<input type="hidden" name="${f.name}" value="${esc(cur)}">
+    <div class="pick" role="group" aria-label="${esc(f.label)}">${f.options.map(([v, l]) => `<button type="button" class="pick-chip ${String(v) === cur ? 'on' : ''}" data-chip="${f.name}" data-value="${esc(v)}" aria-pressed="${String(v) === cur}">${esc(l)}</button>`).join('')}</div>`;
+}
+
 function fieldHTML(f) {
   const show = f.show ? `data-show="${f.show}"` : '';
-  let input;
+  if (f.type === 'hint') return `<p class="hint" id="${f.id}" ${show}></p>`;
   if (f.type === 'select') {
-    input = `<select name="${f.name}">${opts(f.options, f.value)}</select>`;
-  } else if (f.type === 'textarea') {
+    return `<div class="field" ${show}><span>${esc(f.label)}</span>${chipsHTML(f)}</div>`;
+  }
+  let input;
+  if (f.type === 'textarea') {
     input = `<textarea name="${f.name}" rows="2" placeholder="${esc(f.placeholder || '')}">${esc(f.value)}</textarea>`;
   } else {
     input = `<input name="${f.name}" type="${f.type || 'text'}" value="${esc(f.value ?? '')}"
@@ -634,7 +629,18 @@ function fieldHTML(f) {
   return `<label class="field" ${show}><span>${esc(f.label)}</span>${input}</label>`;
 }
 
-function openForm(title, fields, onSave) {
+function setChip(form, name, value) {
+  const input = form.elements[name];
+  if (!input) return;
+  input.value = value;
+  form.querySelectorAll(`[data-chip="${name}"]`).forEach(b => {
+    const on = b.dataset.value === String(value);
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
+function openForm(title, fields, onSave, extra = {}) {
   const dlg = $('#modal');
   const form = $('#modal-form');
   form.innerHTML = `
@@ -645,8 +651,16 @@ function openForm(title, fields, onSave) {
     const type = form.elements.type?.value;
     form.querySelectorAll('[data-show]').forEach(el => { el.hidden = el.dataset.show !== type; });
   };
-  form.oninput = sync;
+  form.oninput = e => { sync(); extra.onInput?.(form, e); };
   form.onchange = sync;
+  form.onclick = e => {
+    const chip = e.target.closest('[data-chip]');
+    if (!chip) return;
+    setChip(form, chip.dataset.chip, chip.dataset.value);
+    extra.onPick?.(chip.dataset.chip, chip.dataset.value);
+    sync();
+    extra.onInput?.(form, e);
+  };
   sync();
   form.onsubmit = e => {
     e.preventDefault();
@@ -655,25 +669,88 @@ function openForm(title, fields, onSave) {
     if (onSave(d) !== false) dlg.close();
   };
   dlg.showModal();
-  setTimeout(() => form.querySelector('input:not([type=hidden]),select,textarea')?.focus(), 30);
+  setTimeout(() => form.querySelector('input:not([type=hidden]),textarea')?.focus(), 30);
+}
+
+/* Learn from history: the category and account used most often for the same merchant. */
+function learnedFor(name) {
+  const key = name.trim().toLowerCase();
+  const hits = state.transactions.filter(t => t.type === 'expense' && (t.merchant || '').trim().toLowerCase() === key);
+  if (!hits.length) return null;
+  const top = field => {
+    const count = {};
+    hits.forEach(t => { if (t[field]) count[t[field]] = (count[t[field]] || 0) + 1; });
+    const best = Object.entries(count).sort((a, b) => b[1] - a[1])[0];
+    return best ? best[0] : null;
+  };
+  return { categoryId: top('categoryId'), accountId: top('accountId'), count: hits.length };
+}
+
+/* Background AI: ask the local model which category a merchant belongs to. Cached per name. */
+async function aiCategory(name) {
+  const key = name.trim().toLowerCase();
+  if (key in ui.aiCache) return ui.aiCache[key];
+  if (!state.settings.aiEnabled || !ui.ai.ok) return null;
+  const list = state.categories.map(c => c.name).join(', ');
+  try {
+    const reply = await LocalAI.chat({
+      endpoint: state.settings.aiEndpoint,
+      model: state.settings.aiModel,
+      system: `You label personal expenses. Reply with exactly one category name from this list and nothing else: ${list}.`,
+      messages: [{ role: 'user', content: name }],
+    });
+    const hit = state.categories.find(c => reply.toLowerCase().includes(c.name.toLowerCase()));
+    ui.aiCache[key] = hit ? hit.id : null;
+  } catch (e) {
+    return null; // failures are not cached, so the next keystroke can retry
+  }
+  return ui.aiCache[key];
+}
+
+function autoFill(form, st) {
+  const name = form.elements.merchant.value.trim();
+  const hint = form.querySelector('#suggest');
+  clearTimeout(st.timer);
+  if (name.length < 3) { hint.textContent = ''; return; }
+  st.timer = setTimeout(async () => {
+    const seq = ++st.seq;
+    const h = learnedFor(name);
+    if (h) {
+      if (!st.picked.has('categoryId') && h.categoryId) setChip(form, 'categoryId', h.categoryId);
+      if (!st.picked.has('accountId') && h.accountId) setChip(form, 'accountId', h.accountId);
+      hint.textContent = `Filled in from ${h.count} earlier ${h.count === 1 ? 'entry' : 'entries'} with this name. Tap any chip to change it.`;
+      return;
+    }
+    hint.textContent = state.settings.aiEnabled && ui.ai.ok ? 'Local AI is suggesting a category…' : '';
+    const cat = await aiCategory(name);
+    if (seq !== st.seq || !form.isConnected) return;
+    if (cat && !st.picked.has('categoryId')) {
+      setChip(form, 'categoryId', cat);
+      hint.textContent = `Suggested by local AI: ${catName(cat)}. Tap a category to change it.`;
+    } else {
+      hint.textContent = '';
+    }
+  }, 500);
 }
 
 function txForm(t = {}) {
-  if (!state.accounts.length) { toast('Add an account first, from Overview.', 'warn'); return; }
+  if (!state.accounts.length) { toast('Add an account first, from the top bar.', 'warn'); return; }
   const isNew = !t.id;
   const targets = [
     ...state.accounts.map(a => [`acc:${a.id}`, `Account · ${a.name}`]),
     ...state.goals.map(g => [`goal:${g.id}`, `Goal · ${g.name}`]),
   ];
   const targetVal = t.toAccountId ? `acc:${t.toAccountId}` : t.toGoalId ? `goal:${t.toGoalId}` : (targets[0]?.[0] || '');
+  const st = { picked: new Set(), seq: 0, timer: null };
   openForm(isNew ? 'New entry' : 'Edit entry', [
     { name: 'type', label: 'What happened', type: 'select', options: [['expense', 'Spending'], ['income', 'Income'], ['transfer', 'Transfer or save']], value: t.type || 'expense' },
     { name: 'amount', label: 'Amount', type: 'number', step: '0.01', min: '0.01', required: true, value: t.amount ?? '' },
-    { name: 'date', label: 'Date', type: 'date', required: true, value: t.date || today() },
-    { name: 'accountId', label: 'From account', type: 'select', options: state.accounts.map(a => [a.id, a.name]), value: t.accountId || state.accounts[0].id },
+    { name: 'merchant', label: 'Merchant or source', value: t.merchant || '', placeholder: 'Start typing. Suggestions fill in the rest.' },
+    { type: 'hint', id: 'suggest' },
     { name: 'categoryId', label: 'Category', type: 'select', options: state.categories.map(c => [c.id, c.name]), value: t.categoryId || catIdByName('Food & Dining'), show: 'expense' },
+    { name: 'accountId', label: 'From account', type: 'select', options: state.accounts.map(a => [a.id, a.name]), value: t.accountId || state.accounts[0].id },
     { name: 'target', label: 'Send to', type: 'select', options: targets, value: targetVal, show: 'transfer' },
-    { name: 'merchant', label: 'Merchant or source', value: t.merchant || '', placeholder: 'e.g. Uniqlo, Payroll' },
+    { name: 'date', label: 'Date', type: 'date', required: true, value: t.date || today() },
     { name: 'note', label: 'Note', type: 'textarea', value: t.note || '' },
   ], d => {
     const amount = round2(Math.abs(d.amount));
@@ -695,6 +772,9 @@ function txForm(t = {}) {
     else state.transactions[state.transactions.findIndex(x => x.id === t.id)] = tx;
     commit();
     toast(isNew ? 'Entry added' : 'Entry updated', 'good');
+  }, {
+    onPick: name => { if (name !== 'type') st.picked.add(name); },
+    onInput: (form) => autoFill(form, st),
   });
 }
 
@@ -802,150 +882,154 @@ function catForm() {
   });
 }
 
-/* ---------- Assistant ---------- */
+/* ---------- Reports and background AI ---------- */
+
+const SUMMARY_SYSTEM = 'You write a short plain-language summary of personal finance facts. Two sentences at most. State only what the facts say. No advice, no lists.';
 
 function briefing() {
   const m = thisMonth();
   const ms = monthSummary(m);
-  const p = plan();
   return JSON.stringify({
     currency: state.settings.currency,
     today: today(),
-    accounts: state.accounts.map(a => ({ name: a.name, type: a.type, balance: acctBalance(a) })),
     netWorth: round2(sum(state.accounts, acctBalance) + sum(state.goals, goalSaved)),
-    thisMonth: {
-      month: m, income: ms.income, spent: ms.expense, savedToGoals: ms.saved,
-      spentByCategory: Object.fromEntries(Object.entries(ms.byCat).map(([k, v]) => [catName(k), v])),
-    },
-    budgets: state.categories.filter(c => c.budget > 0).map(c => ({ category: c.name, monthlyBudget: c.budget, spent: ms.byCat[c.id] || 0 })),
-    plan: p,
-    goals: state.goals.map(g => ({ name: g.name, kind: g.kind, target: g.target, saved: goalSaved(g), deadline: g.deadline || null, monthlyNeeded: neededMonthly(g), recentMonthlyPace: round2(recentMonthly(g)) })),
-    subscriptions: state.subscriptions.map(s => ({ name: s.name, monthlyCost: round2(monthlyEq(s)), nextRenewal: s.nextDate })),
-    recentTransactions: [...state.transactions].sort(byDate).slice(0, 15).map(t => ({
-      date: t.date, type: t.type, amount: t.amount,
-      category: t.type === 'expense' ? catName(t.categoryId) : undefined,
-      merchant: t.merchant || undefined,
-    })),
+    thisMonth: { income: ms.income, spent: ms.expense, savedToGoals: ms.saved },
+    subscriptionsPerMonth: round2(sum(state.subscriptions, monthlyEq)),
   });
 }
 
-function answerOffline(q) {
-  const s = q.toLowerCase();
-  if (!state.accounts.length) return 'Add your accounts first (Overview, then + Account). Then I can answer balance and spending questions.';
-  const m = thisMonth();
-  const ms = monthSummary(m);
-  const p = plan();
-  const day = new Date().getDate();
-  const checking = sum(state.accounts.filter(a => a.type === 'checking'), acctBalance);
-  const dueSoon = sum(state.subscriptions.filter(x => daysBetween(today(), x.nextDate) <= 30), x => x.amount);
-  const amountMatch = q.match(/(\d[\d,]*(?:\.\d+)?)/);
-
-  if (s.includes('afford') && amountMatch) {
-    const cost = Number(amountMatch[1].replace(/,/g, ''));
-    const after = round2(checking - dueSoon - cost);
-    const verdict = after < 0
-      ? 'That would overdraw checking, so I would wait.'
-      : after < state.settings.lowBalance
-        ? `That would drop checking under your ${money(state.settings.lowBalance)} floor. Risky right now.`
-        : 'That fits, though check it against the category budget too.';
-    return `Checking: ${money(checking)}. Subscriptions due in the next 30 days: ${money(dueSoon)}. After buying ${money(cost)}: ${money(after)}.\n${verdict}`;
-  }
-  if (s.includes('subscri') || s.includes('renew')) {
-    if (!state.subscriptions.length) return 'No subscriptions tracked yet. Add them in the Subscriptions view.';
-    const lines = state.subscriptions.map(x => `${x.name}: ${money(x.amount)} ${CYCLE[x.cycle].toLowerCase()}, renews ${fmtDate(x.nextDate)}.`);
-    const mo = sum(state.subscriptions, monthlyEq);
-    return [...lines, `Total: ${money(mo)} a month, about ${money(mo * 12)} a year.`].join('\n');
-  }
-  if (s.includes('goal') || s.includes('college') || s.includes('fund')) {
-    if (!state.goals.length) return 'No goals yet. Add a College Fund in the Goals view.';
-    return state.goals.map(g => {
-      const saved = goalSaved(g);
-      const pct = g.target > 0 ? Math.round(saved / g.target * 100) : 0;
-      const pace = recentMonthly(g);
-      const need = neededMonthly(g);
-      const parts = [`${g.name}: ${money(saved)} of ${money(g.target)} (${pct}%).`];
-      if (need > 0) parts.push(`It needs ${money(need)} a month to finish by ${fmtDate(g.deadline)}.`);
-      if (pace > 0 && g.target > saved) parts.push(`At your recent ${money(pace)} a month, about ${Math.ceil((g.target - saved) / pace)} months to go.`);
-      else if (saved < g.target) parts.push('No recent contributions, so there is no pace yet.');
-      return parts.join(' ');
-    }).join('\n');
-  }
-  if (s.includes('over') || s.includes('budget')) {
-    if (!state.categories.some(c => c.budget > 0)) return 'No category budgets set yet. Set them in Budgets & plan.';
-    const over = state.categories.filter(c => c.budget > 0 && (ms.byCat[c.id] || 0) > c.budget);
-    const near = state.categories.filter(c => c.budget > 0 && (ms.byCat[c.id] || 0) >= c.budget * 0.8 && (ms.byCat[c.id] || 0) <= c.budget);
-    if (!over.length && !near.length) return 'Nothing is over budget or close to it this month. Good shape.';
-    return [
-      ...over.map(c => `${c.name} is over by ${money((ms.byCat[c.id] || 0) - c.budget)}.`),
-      ...near.map(c => `${c.name} is at ${Math.round((ms.byCat[c.id] || 0) / c.budget * 100)}%.`),
-    ].join('\n');
-  }
-  if (s.includes('spend') || s.includes('spent') || s.includes('week')) {
-    const left = sum(state.categories.filter(c => c.budget > 0), c => Math.max(0, c.budget - (ms.byCat[c.id] || 0)));
-    const daysLeft = daysInMonth(m) - day + 1;
-    const top = Object.entries(ms.byCat).sort((a, b) => b[1] - a[1])[0];
-    let out = `You have spent ${money(ms.expense)} in ${monthName(m)}.`;
-    if (top) out += ` The biggest category is ${catName(top[0])} at ${money(top[1])}.`;
-    out += left > 0
-      ? `\nBudget room left this month: ${money(left)} across ${daysLeft} days, about ${money(left / daysLeft * 7)} a week.`
-      : '\nSet category budgets to get a weekly spending number.';
-    return out;
-  }
-  if (s.includes('save') || s.includes('plan')) {
-    if (!p.income) return 'Set your monthly income in Budgets & plan first, then I can split it for you.';
-    const advice = p.left > 0
-      ? `You have ${money(p.left)} unassigned. Put it toward the goal with the nearest date, or keep it as a buffer.`
-      : p.left < 0
-        ? `You are ${money(-p.left)} over. Trim the biggest budget or push a goal's date out.`
-        : 'Every dollar is assigned.';
-    return `Income ${money(p.income)}: budgets ${money(p.budgets)}, subscriptions ${money(p.subs)}, goal savings ${money(p.goals)}.\n${advice}`;
-  }
-  if (s.includes('balance') || s.includes('have') || s.includes('account')) {
-    return state.accounts.map(a => `${a.name}: ${money(acctBalance(a))}`).join('\n')
-      + `\nTotal in accounts: ${money(sum(state.accounts, acctBalance))}.`;
-  }
-  return 'Offline rules can answer: balances, what you spent, budgets, subscriptions, goals, and "Can I afford $X?". Start a local model in Settings for open questions.';
+function incomeEstimate() {
+  const months = [0, 1, 2].map(i => monthSummary(shiftMonth(thisMonth(), -i)).income);
+  const total = sum(months.map(v => ({ v })), x => x.v);
+  return total > 0 ? Math.round(total / 3) : 0;
 }
 
-async function askAssistant(question) {
-  const q = String(question || '').trim();
-  if (!q) return;
-  ui.chat.push({ role: 'user', text: q });
-  const pending = { role: 'assistant', text: 'Thinking…', pending: true };
-  ui.chat.push(pending);
-  refreshLog();
-
-  let reply;
-  let note = '';
-  if (state.settings.aiEnabled) {
-    try {
-      const history = ui.chat.filter(m => !m.pending).slice(-8).map(m => ({ role: m.role, content: m.text }));
-      reply = await LocalAI.chat({
-        endpoint: state.settings.aiEndpoint,
-        model: state.settings.aiModel,
-        system: `${SYSTEM}\n\nSnapshot:\n${briefing()}`,
-        messages: history,
-      });
-      ui.ai = { ok: true, error: '', models: ui.ai.models };
-    } catch (e) {
-      ui.ai = { ok: false, error: e.name === 'AbortError' ? 'timed out' : (e.message || 'unreachable'), models: [] };
-      reply = answerOffline(q);
-      note = 'Local AI did not respond, so this came from built-in rules.';
-    }
-  } else {
-    reply = answerOffline(q);
-    note = 'Built-in rules (local AI is turned off).';
-  }
-  Object.assign(pending, { text: reply, note, pending: false });
-  refreshLog();
-  updateAIPill();
+function monthRows() {
+  return [5, 4, 3, 2, 1, 0].map(i => {
+    const m = shiftMonth(ui.month, -i);
+    const ms = monthSummary(m);
+    return { m, income: ms.income, expense: ms.expense, saved: round2(ms.income - ms.expense) };
+  });
 }
 
-function refreshLog() {
-  const el = $('#chat-log');
-  if (!el) return;
-  el.innerHTML = chatLog();
-  el.scrollTop = el.scrollHeight;
+function categoryTrend() {
+  const cur = monthSummary(ui.month).byCat;
+  const prev = monthSummary(shiftMonth(ui.month, -1)).byCat;
+  const avg = {};
+  [1, 2, 3].forEach(i => {
+    const by = monthSummary(shiftMonth(ui.month, -i)).byCat;
+    Object.entries(by).forEach(([k, v]) => { avg[k] = (avg[k] || 0) + v / 3; });
+  });
+  return state.categories
+    .map(c => ({ c, now: cur[c.id] || 0, before: prev[c.id] || 0, avg: avg[c.id] || 0 }))
+    .filter(x => x.now || x.before || x.avg)
+    .sort((a, b) => b.now - a.now);
+}
+
+function topMerchants() {
+  const since = monthsAgoISO(3);
+  const by = {};
+  state.transactions.filter(t => t.type === 'expense' && t.date >= since).forEach(t => {
+    const k = (t.merchant || catName(t.categoryId)).trim();
+    by[k] = by[k] || { name: k, total: 0, count: 0, color: catColor(t.categoryId) };
+    by[k].total += t.amount;
+    by[k].count += 1;
+  });
+  return Object.values(by).map(x => ({ ...x, total: round2(x.total) })).sort((a, b) => b.total - a.total).slice(0, 6);
+}
+
+function insights() {
+  const out = [];
+  const recent = [2, 1, 0].map(i => monthSummary(shiftMonth(ui.month, -i)));
+  const inc = sum(recent, x => x.income), exp = sum(recent, x => x.expense);
+  if (inc > 0) out.push({ tone: exp <= inc ? 'good' : 'bad', text: `You kept ${Math.round((inc - exp) / inc * 100)}% of income over the last three months.` });
+  const trend = categoryTrend().filter(x => x.before > 0 && x.now > 0);
+  const mover = trend.sort((a, b) => Math.abs(b.now - b.before) - Math.abs(a.now - a.before))[0];
+  if (mover) {
+    const pct = Math.round((mover.now - mover.before) / mover.before * 100);
+    out.push({ tone: pct > 0 ? 'warn' : 'good', text: `${mover.c.name} is ${pct >= 0 ? 'up' : 'down'} ${Math.abs(pct)}% on last month (${money(mover.before)} → ${money(mover.now)}).` });
+  }
+  const mo = sum(state.subscriptions, monthlyEq);
+  const share = inc > 0 ? Math.round(mo / (inc / 3) * 100) : null;
+  if (mo > 0) out.push({ tone: 'info', text: `Subscriptions cost ${money(mo)} a month${share !== null ? `, about ${share}% of your average income` : ''}.` });
+  const soon = state.subscriptions.filter(s => { const d = daysBetween(today(), s.nextDate); return d >= 0 && d <= 7; });
+  if (soon.length) out.push({ tone: 'warn', text: `${soon.length} renewal${soon.length === 1 ? '' : 's'} due in the next 7 days: ${soon.map(s => s.name).join(', ')}.` });
+  const g = state.goals.find(x => x.kind === 'college') || state.goals[0];
+  if (g && g.target > goalSaved(g)) {
+    const pace = recentMonthly(g);
+    out.push({ tone: pace > 0 ? 'good' : 'warn', text: pace > 0 ? `${g.name} grows by ${money(pace)} a month; about ${Math.ceil((g.target - goalSaved(g)) / pace)} months to go.` : `${g.name} has no contributions in the last three months.` });
+  }
+  return out;
+}
+
+async function refreshAISummary() {
+  if (!state.settings.aiEnabled || !ui.ai.ok) return;
+  const facts = insights().map(i => i.text).join('\n') + '\n' + briefing();
+  const key = today() + facts.length + facts.slice(0, 80);
+  if (key === ui.aiSummaryKey) return;
+  try {
+    const text = await LocalAI.chat({
+      endpoint: state.settings.aiEndpoint,
+      model: state.settings.aiModel,
+      system: SUMMARY_SYSTEM,
+      messages: [{ role: 'user', content: facts }],
+    });
+    ui.aiSummary = text;
+    ui.aiSummaryKey = key;
+    render();
+  } catch (e) { /* the rule summary stays on screen */ }
+}
+
+let summaryTimer = null;
+function scheduleSummary() {
+  clearTimeout(summaryTimer);
+  summaryTimer = setTimeout(refreshAISummary, 1500);
+}
+
+function reportsHTML() {
+  const rows = monthRows();
+  const maxV = Math.max(1, ...rows.map(r => Math.max(r.income, r.expense)));
+  const bars = rows.map(r => `<div class="mcol-wrap" title="${monthName(r.m)}: in ${money(r.income)}, out ${money(r.expense)}">
+      <div class="mcol"><i class="in" style="height:${(r.income / maxV * 100).toFixed(1)}%"></i><i class="out" style="height:${(r.expense / maxV * 100).toFixed(1)}%"></i></div>
+      <span>${monthShort(r.m)}</span><b class="${r.saved >= 0 ? 'good' : 'bad'}">${money(r.saved)}</b>
+    </div>`).join('');
+  const trend = categoryTrend();
+  const merch = topMerchants();
+  const merchMax = merch[0]?.total || 1;
+  const ins = insights();
+  const summary = ui.aiSummary
+    ? `<p class="summary-text"><span class="tag">Local AI</span> ${esc(ui.aiSummary)}</p>`
+    : ins.length ? `<p class="summary-text"><span class="tag">Summary</span> ${esc(ins[0].text)}</p>` : '';
+  return `
+    <div class="cell-head"><span class="kicker">Reports · ${monthName(ui.month)}</span><span class="muted small">Analysis runs on this device</span></div>
+    ${summary}
+    <div class="report-grid">
+      <div class="rep-col">
+        <span class="kicker">Last six months</span>
+        <div class="mbars">${bars}</div>
+      </div>
+      <div class="rep-col">
+        <span class="kicker">Insights</span>
+        <ul class="insights">${ins.map(i => `<li class="ins ${i.tone}">${esc(i.text)}</li>`).join('') || '<li class="muted small">Add a few entries and insights appear here.</li>'}</ul>
+      </div>
+      <div class="rep-col">
+        <span class="kicker">Top merchants · 90 days</span>
+        ${merch.length ? merch.map(m => `<div class="brow2"><span>${esc(m.name)} <span class="muted small">×${m.count}</span></span><div class="bar"><i style="width:${(m.total / merchMax * 100).toFixed(1)}%;background:${m.color}"></i></div><b>${money(m.total)}</b></div>`).join('') : '<p class="muted small">No spending in the last 90 days.</p>'}
+      </div>
+    </div>
+    <span class="kicker">Category data · ${monthName(ui.month)}</span>
+    <div class="table-wrap"><table class="data">
+      <thead><tr><th>Category</th><th class="num">This month</th><th class="num">Last month</th><th class="num">Change</th><th class="num">3-month average</th></tr></thead>
+      <tbody>${trend.map(x => {
+        const ch = x.before > 0 ? (x.now - x.before) / x.before * 100 : null;
+        return `<tr><td><i class="dot" style="background:${x.c.color}"></i> ${esc(x.c.name)}</td><td class="num">${money(x.now)}</td><td class="num">${money(x.before)}</td><td class="num ${ch === null ? '' : ch > 0 ? 'bad' : 'good'}">${ch === null ? '—' : `${ch > 0 ? '+' : ''}${ch.toFixed(0)}%`}</td><td class="num">${money(x.avg)}</td></tr>`;
+      }).join('') || '<tr><td colspan="5" class="muted">No category spending yet.</td></tr>'}</tbody>
+    </table></div>`;
+}
+
+function aiStatusLine() {
+  if (!state.settings.aiEnabled) return 'Local AI off · rules only';
+  return ui.ai.ok ? `Local ${state.settings.aiModel} · auto-fill and summaries` : ui.ai.error === 'checking' ? 'Checking local model…' : 'Local AI not reached · rules only';
 }
 
 async function testAI() {
@@ -960,10 +1044,11 @@ async function testAI() {
   let msg;
   if (!r.ok) msg = `Not reachable (${r.error}). Is Ollama running? Start it with "ollama serve".`;
   else if (!installed) msg = `Connected, but the model "${want}" is not installed. Run: ollama pull ${want}`;
-  else msg = `Connected. "${want}" is ready.`;
+  else msg = `Connected. "${want}" is ready for auto-fill and summaries.`;
   render();
   const after = $('#ai-test-result');
   if (after) after.textContent = msg;
+  refreshAISummary();
 }
 
 /* ---------- Notifications ---------- */
@@ -1127,8 +1212,9 @@ const ACTIONS = {
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('ledgerline.theme', next); } catch (e) { /* storage blocked: theme still switches */ }
   },
-  'ask': id => askAssistant(id),
-  'clear-chat': () => { ui.chat = []; render(); },
+  'chip-filter': (field, el) => { ui.f[field] = el.dataset.value; render(); },
+  'setting': (name, el) => { state.settings[name] = el.dataset.value; commit(); },
+  'use-estimate': (value) => { state.settings.monthlyIncome = Math.round(Number(value)); commit(); toast('Income set from your last three months', 'good'); },
   'ai-test': () => testAI(),
   'notify-enable': () => enableNotifications(),
   'seed-demo': () => {
@@ -1220,12 +1306,6 @@ function init() {
       render();
       return;
     }
-    if (e.target.id !== 'chat-form') return;
-    e.preventDefault();
-    const input = e.target.elements.q;
-    const q = input.value;
-    input.value = '';
-    askAssistant(q);
   });
 
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') e.target.close(); });

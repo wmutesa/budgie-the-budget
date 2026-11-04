@@ -41,7 +41,7 @@ async function run(url) {
   await page.evaluate(() => { document.getElementById('set').open = true; });
   await page.click('[data-action="seed-demo"]');
 
-  for (const id of ['overview', 'plan', 'accounts', 'goals', 'ledger', 'ask', 'set']) {
+  for (const id of ['overview', 'plan', 'accounts', 'goals', 'ledger', 'reports', 'set']) {
     assert.ok(await page.$(`#${id}`), `section #${id} renders`);
   }
   assert.match(await page.textContent('#overview'), /Net worth/, 'overview shows net worth');
@@ -62,12 +62,17 @@ async function run(url) {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light', 'theme toggles to light');
   await page.click('[data-action="theme"]');
 
+  assert.ok(await page.$('#reports .insights'), 'reports show insights');
   await page.fill('[data-input="q"]', ''); // clear the search left by the step above
+  await page.click('.filters-chips .pick-chip >> nth=1'); // filter to spending, then back to all
+  await page.click('.filters-chips .pick-chip >> nth=0');
   await page.click('[data-action="add-tx"]');
   await page.fill('#modal-form input[name="amount"]', '42.5');
-  await page.fill('#modal-form input[name="merchant"]', 'Smoke test store');
+  await page.fill('#modal-form input[name="merchant"]', 'Trader Joe\'s');
+  await page.waitForTimeout(700);
+  assert.match(await page.textContent('#suggest'), /Filled in|suggest|AI/, 'auto-fill explains its suggestion');
   await page.click('#modal-form button[type="submit"]');
-  assert.match(await page.textContent('#ledger-list'), /Smoke test store/, 'a new entry appears in the ledger');
+  assert.match(await page.textContent('#ledger-list'), /Trader Joe's/, 'a new entry appears in the ledger');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
