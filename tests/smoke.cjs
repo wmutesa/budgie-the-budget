@@ -73,6 +73,7 @@ function testEntries() {
     [0, 'Trader Joe’s', -86.4, 'Food & dining'], [1, 'Metro top-up', -64, 'Transport'], [2, 'Rent share', -1450, 'Housing'],
     [2, 'Uniqlo', -118, 'Shopping'], [3, 'Payroll · Employer', 2350, 'Income'], [4, 'Chipotle', -42.1, 'Food & dining'],
     [5, 'Pharmacy', -57.3, 'Health'], [6, 'Cinema', -28, 'Entertainment'], [8, 'Amazon', -168, 'Shopping'], [9, 'Groceries', -64.9, 'Food & dining'],
+    [3, 'Planet Fitness', -25, 'Health'], [33, 'Planet Fitness', -25, 'Health'],
   ].map(([n, merchant, amount, category], i) => ({ id: `t${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'csv', domain: '', logo: null }));
 }
 const fakeAccount = { data: { guide: { done: true }, transactions: testEntries(),
@@ -133,7 +134,7 @@ async function run(url) {
   assert.match(await page.textContent('.nav-bar .brand-word'), /BUDGIE/, 'navigation renders inside the grid');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   assert.match(await page.textContent('.lede'), /You hold[\s\S]*spent/, 'the brief renders from your entries');
-  for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
+  for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Upcoming payments', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
   }
 
@@ -235,6 +236,15 @@ async function run(url) {
   assert.equal(await page.$('[data-test="bell-pop"]'), null, 'Escape closes the dropdown');
   assert.ok(await page.$('#accounts'), 'accounts live on the Transactions page');
 
+  // Repeating payments: found in the activity and tracked as a subscription in one click.
+  await page.waitForSelector('#recurring');
+  assert.match(await page.textContent('#recurring'), /Planet Fitness[\s\S]*2 times over 2 months/, 'a monthly payment is spotted');
+  await page.click('[data-test="track-recurring"]');
+  assert.equal(await page.$('#recurring'), null, 'once tracked, it is no longer suggested');
+  const [csvFile] = await Promise.all([page.waitForEvent('download'), page.click('[data-test="export-csv"]')]);
+  assert.match(csvFile.suggestedFilename(), /^budgie-entries-\d{4}-\d{2}-\d{2}\.csv$/, 'entries export as a CSV file');
+  assert.match(require('node:fs').readFileSync(await csvFile.path(), 'utf8'), /^Date,Merchant,Amount,Currency,Category,Account,Source\n[\s\S]*Planet Fitness/, 'the CSV has a header and the entries');
+
   // Markets: news and savings ideas use the whole page.
   await page.click('.nb-pages button:nth-child(3)');
   assert.match(await page.textContent('.nb-pages button:nth-child(3)'), /Markets/, 'the third page is called Markets');
@@ -249,6 +259,9 @@ async function run(url) {
   assert.match(mk, /not financial advice/i, 'markets are labelled as information, not advice');
   assert.ok(await page.isVisible('#markets .mk-news a'), 'news shows beside markets to watch, without tabs');
   assert.equal(await page.getAttribute('#markets .mk-news a', 'rel'), 'noopener noreferrer', 'news links open safely');
+  assert.equal(await page.textContent('[data-test="growth-total"]'), '$31,056', 'the growth calculator works out $200 a month for 10 years at 5%');
+  await page.click('[data-test="growth"] .chip-btn:has-text("Bold")');
+  assert.notEqual(await page.textContent('[data-test="growth-total"]'), '$31,056', 'a bolder return changes the estimate');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
 
@@ -260,6 +273,12 @@ async function run(url) {
   assert.match(await page.textContent('.lane[data-group="Wants"]'), /Netflix/, 'Netflix lands in wants');
   assert.match(await page.textContent('.lane[data-group="Goals"]'), /Laptop/i, 'the laptop goal lands in goals');
   assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'income is picked up from the notes');
+  // Scenarios: save this plan, change it, then open the saved one again.
+  await page.fill('[data-test="scenario-name"]', 'Current job');
+  await page.click('[data-test="save-scenario"]');
+  await page.fill('[data-test="plan-income"]', '9000');
+  await page.click('[data-test="load-scenario"]');
+  assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'opening a saved scenario brings its plan back');
   await page.click('[data-test="apply-plan"]');
   await page.click('.nb-pages button:nth-child(2)');
   assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
@@ -363,6 +382,8 @@ async function run(url) {
   const vp = guide.viewportSize();
   assert.ok(Math.abs(sheet.x - 75) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card leaves 75px on every side (${JSON.stringify(sheet)})`);
   assert.equal(await guide.locator('[data-test="account"]').evaluate(e => getComputedStyle(e).borderRadius), '50%', 'the account button is round');
+  const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
+  assert.match(dl.suggestedFilename(), /^budgie-data-.*\.json$/, 'you can download a copy of your data');
   // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
   await guide.waitForSelector('[data-test="ai-panel"]');
   const aiText = await guide.textContent('[data-test="ai-panel"]');

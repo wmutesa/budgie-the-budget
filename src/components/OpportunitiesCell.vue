@@ -1,4 +1,5 @@
 <script setup>
+import GrowthCalc from './GrowthCalc.vue';
 import { computed } from 'vue';
 import { BANKS } from '../data/banks';
 import { store } from '../lib/store';
@@ -45,6 +46,8 @@ const ideas = computed(() => store.banks.filter(id => BANKS[id]).flatMap(id => {
       <p>{{ advice }}</p>
       <button type="button" class="opp-ai-link" @click="openRates">Compare today's savings rates ↗</button>
     </div>
+    <GrowthCalc />
+
     <div class="opp-banks">
       <div v-for="g in byBank" :key="g.bank.domain" class="opp-bank">
         <p class="opp-bank-head">

@@ -31,6 +31,8 @@ function fromSaved(saved = {}) {
     plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
     logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
     guide: saved.guide && typeof saved.guide === 'object' ? saved.guide : { done: false },
+    // Playground plans saved under a name: { id, name, savedAt, plan }.
+    planScenarios: Array.isArray(saved.planScenarios) ? saved.planScenarios.slice(0, 12) : [],
     // Notifications already shown in the bell's dropdown.
     seenNotices: Array.isArray(saved.seenNotices) ? saved.seenNotices.slice(-200) : [],
     // Accounts you track by hand: { id, name, kind, balance, currency }.

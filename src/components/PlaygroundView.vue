@@ -1,4 +1,5 @@
 <script setup>
+import { newId } from '../lib/store';
 import { colorFor } from '../lib/budgets';
 import { ref, computed, watch, onMounted } from 'vue';
 import { store } from '../lib/store';
@@ -99,6 +100,27 @@ const splitParts = computed(() => [
   { key: 'goals', label: 'Goals', v: totals.value.Goals || 0 },
   { key: 'left', label: totals.value.left >= 0 ? 'Unassigned' : 'Over', v: Math.abs(totals.value.left || 0) },
 ]);
+// Scenarios: save this plan under a name, and switch between saved plans.
+const scenarioName = ref('');
+const copy = v => JSON.parse(JSON.stringify(v));
+function saveScenario() {
+  const name = scenarioName.value.trim() || `Plan ${store.planScenarios.length + 1}`;
+  const existing = store.planScenarios.find(s => s.name.toLowerCase() === name.toLowerCase());
+  const entry = { id: existing?.id || newId(), name: name.slice(0, 40), savedAt: new Date().toISOString(), plan: copy({ text: plan.text, income: plan.income, items: plan.items }) };
+  store.planScenarios = existing ? store.planScenarios.map(s => (s.id === existing.id ? entry : s)) : [entry, ...store.planScenarios].slice(0, 12);
+  scenarioName.value = '';
+}
+function loadScenario(s) {
+  const p = copy(s.plan);
+  plan.auto = false; // keep the saved items exactly as they were
+  Object.assign(plan, { text: p.text, income: p.income, items: p.items });
+}
+function dropScenario(s) { store.planScenarios = store.planScenarios.filter(x => x.id !== s.id); }
+const scenarioTotals = s => {
+  const items = s.plan.items || [];
+  const planned = items.reduce((t, i) => t + (Number(i.monthly) || 0), 0);
+  return { planned, left: (Number(s.plan.income) || 0) - planned };
+};
 const tips = computed(() => {
   const out = [];
   const t = totals.value;
@@ -243,6 +265,20 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
       <div class="chips"><button v-for="m in [3, 6, 12, 24]" :key="m" class="chip-btn" :class="{ on: goalMonths === m }" @click="goalMonths = m">{{ m }} mo</button></div>
       <div class="row-line"><span class="small">{{ goalTarget ? `${usd(goalTarget / goalMonths)} a month` : 'Pick a target' }}</span><button class="btn small" @click="addGoal">Add goal</button></div>
     </div>
+
+    <p class="kicker">Scenarios</p>
+    <form class="pg-scen-form" @submit.prevent="saveScenario">
+      <input v-model="scenarioName" class="field" placeholder="Name this plan, e.g. New job" aria-label="Scenario name" maxlength="40" data-test="scenario-name" />
+      <button class="btn small" type="submit" :disabled="!plan.items.length" data-test="save-scenario">Save</button>
+    </form>
+    <ul v-if="store.planScenarios.length" class="pg-scen">
+      <li v-for="s in store.planScenarios" :key="s.id">
+        <span><b>{{ s.name }}</b><span class="muted small">{{ usd(scenarioTotals(s).planned) }} planned · {{ scenarioTotals(s).left >= 0 ? `${usd(scenarioTotals(s).left)} left` : `${usd(-scenarioTotals(s).left)} over` }}</span></span>
+        <button class="btn small" type="button" data-test="load-scenario" @click="loadScenario(s)">Open</button>
+        <button class="icon-x" type="button" :aria-label="`Delete ${s.name}`" @click="dropScenario(s)">×</button>
+      </li>
+    </ul>
+    <p v-else class="muted small">Save different versions of your plan and switch between them to compare.</p>
 
     <button class="btn primary apply-btn" data-test="apply-plan" :disabled="!plan.items.length" @click="applyPlan">Use this plan for my budgets</button>
     <p v-if="applied" class="status-line done">{{ applied }}</p>

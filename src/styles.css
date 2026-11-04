@@ -1468,3 +1468,45 @@ body:has(.overlay) .notice { display: none; }
 .mk-col { align-content: start; }
 .fit-page .mk-col { grid-template-rows: none; }
 .mk-watch li { padding: 10px 0; }
+
+/* ---------------- Upcoming payments ---------------- */
+.upcoming { display: grid; gap: 10px; align-content: start; }
+.up-days { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
+.up-day { display: grid; justify-items: center; gap: 3px; font-size: 9.5px; color: #a1a1aa; }
+.up-day i { width: 100%; height: 6px; background: #f4f4f5; }
+.up-day.has i { background: #a78bfa; } .up-day.has { color: #4c1d95; font-weight: 700; }
+.up-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.up-list li { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f4f4f5; font-size: 12.5px; }
+.up-when { font-size: 11px; font-weight: 700; color: #6d28d9; }
+.up-name { display: grid; min-width: 0; } .up-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.up-amt { font-variant-numeric: tabular-nums; }
+
+/* ---------------- Repeating payments ---------------- */
+.recurring { display: grid; gap: 10px; }
+.rec-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 8px; }
+.rec-list li { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); font-size: 13px; }
+.rec-list li .btn { grid-column: 1 / -1; justify-self: start; }
+.rec-name { display: grid; gap: 1px; }
+.tx-head-right { display: inline-flex; gap: 10px; align-items: center; }
+
+/* ---------------- Growth calculator ---------------- */
+.growth { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); background: #fcfcfd; }
+.growth .kicker { margin: 0; }
+.gr-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gr-inputs label { display: grid; gap: 3px; } .gr-inputs .field { width: 100%; }
+.gr-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.gr-bars { display: flex; align-items: end; gap: 3px; height: 70px; }
+.gr-col { flex: 1; height: 100%; display: flex; align-items: end; }
+.gr-grow { display: flex; align-items: end; width: 100%; background: #bbf7d0; }
+.gr-put { display: block; width: 100%; background: #c4b5fd; }
+.gr-result { margin: 0; font-size: 13px; } .gr-result b { font-family: var(--display); font-size: 18px; }
+.growth .meta { margin: 0; }
+
+/* ---------------- Scenarios ---------------- */
+.pg-scen-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.pg-scen-form .field { width: 100%; }
+.pg-scen { list-style: none; margin: 0; padding: 0; display: grid; }
+.pg-scen li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid #f4f4f5; font-size: 12.5px; }
+.pg-scen li > span { display: grid; gap: 1px; }
+.gr-key { margin: 0; display: flex; align-items: center; gap: 6px; }
+.gr-key i { width: 8px; height: 8px; display: inline-block; } .gr-put-key { background: #c4b5fd; } .gr-grow-key { background: #bbf7d0; margin-left: 8px; }

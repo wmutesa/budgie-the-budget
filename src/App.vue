@@ -10,7 +10,6 @@ import RatesCell from './components/RatesCell.vue';
 import SubscriptionsCell from './components/SubscriptionsCell.vue';
 import ExpenseStripes from './components/ExpenseStripes.vue';
 import AccountCards from './components/AccountCards.vue';
-import SignalsCell from './components/SignalsCell.vue';
 import WalletCards from './components/WalletCards.vue';
 import BudgetsView from './components/BudgetsView.vue';
 import TransactionsView from './components/TransactionsView.vue';
@@ -24,6 +23,8 @@ import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
 import NoticeBell from './components/NoticeBell.vue';
+import UpcomingCell from './components/UpcomingCell.vue';
+import RecurringCell from './components/RecurringCell.vue';
 import MarketsCell from './components/MarketsCell.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
@@ -111,7 +112,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <SubscriptionsCell class="span-8" id="subscriptions" @add="openSearch" />
         <ExpenseStripes class="span-4" />
         <WalletCards class="span-8" />
-        <SignalsCell class="span-4" />
+        <UpcomingCell class="span-4" id="upcoming" />
       </template>
       <template v-else-if="active === 'Transactions'">
         <KpiStrip />
@@ -121,6 +122,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
         <TransactionsView class="span-8" id="ledger" :limit="40" fill />
+        <RecurringCell class="span-12" id="recurring" />
       </template>
       <template v-else-if="active === 'Playground'">
         <PlaygroundView />

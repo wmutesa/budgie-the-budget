@@ -21,6 +21,8 @@ Highlights:
 
 - **Accounts linked to spending:** add your bank accounts, cards, cash and mobile money. Each entry can be linked to the account that paid ("lunch 12 with my Chase card" links itself; otherwise the AI on your device or the only account you have), and the account's balance goes down by that amount. Click a balance to correct it; upload your own icon for each account.
 - **AI everywhere:** short notes from Budgie next to each section, and suggestions as notifications in the corner, each with a one-click action where it helps.
+- **Plan ahead:** upcoming payments for the next two weeks, repeating payments spotted in your activity (track them as subscriptions in one click), a growth calculator for regular saving, and saved Playground scenarios to compare plans.
+- **Your data, yours:** export entries as CSV, or download a full copy from the account menu.
 - **Plain-language entry:** "spent 12.50 on lunch at Chipotle last friday" becomes a dated, categorised entry. Understands "a week ago", "in a month", "on the 3rd" and similar.
 - **Dictation:** speak an entry or a whole plan; text appears as you talk.
 - **Find any company:** a built-in directory of more than 300 brands across the US, Rwanda, Thailand and beyond, plus a live search of Wikidata for everything else. Logos come from each company's own site.

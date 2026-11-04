@@ -63,6 +63,19 @@ const money = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD
 const fmt = (n, c) => (n < 0 ? '−' : '+') + new Intl.NumberFormat('en-US', { style: 'currency', currency: c || 'USD' }).format(Math.abs(n));
 const day = iso => new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const remove = id => { store.transactions = store.transactions.filter(t => t.id !== id); };
+// Download the entries shown as a CSV file (opens in Excel, Numbers or Sheets).
+function exportCSV() {
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const account = id => store.balances.find(a => a.id === id)?.name || '';
+  const lines = [['Date', 'Merchant', 'Amount', 'Currency', 'Category', 'Account', 'Source'].join(',')]
+    .concat([...store.transactions].sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      .map(t => [t.date, t.merchant, t.amount, t.currency, t.category, account(t.accountId), t.source].map(esc).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = `budgie-entries-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 const accountOptions = computed(() => [{ value: '', label: 'No account' }, ...store.balances.map(a => ({ value: a.id, label: a.name }))]);
 const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'Excel', quick: 'note' };
 </script>
@@ -71,7 +84,10 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
   <section class="card cell ledger" :class="{ 'ledger-full': full, 'ledger-fill': fill }">
     <div class="cell-head">
       <p class="label">{{ title }}</p>
-      <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>
+      <span class="tx-head-right">
+        <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>
+        <button v-if="store.transactions.length" class="btn small" type="button" data-test="export-csv" title="Download all entries as a CSV file" @click="exportCSV">Export CSV</button>
+      </span>
     </div>
     <AiHint for="ledger" />
     <div v-if="full" class="act-summary">

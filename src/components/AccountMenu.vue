@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import PasskeyNote from './PasskeyNote.vue';
+import { snapshot } from '../lib/store';
 import QrCode from './QrCode.vue';
 import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
@@ -83,6 +84,15 @@ const dropPerson = p => act(async () => {
 async function copy() {
   try { await navigator.clipboard.writeText(link.value.url); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* select it by hand */ }
 }
+// A full copy of your Budgie data, as a file you keep.
+function downloadData() {
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), app: 'Budgie', user: account.user?.name, data: snapshot() }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `budgie-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 const leave = () => act(async () => { await signOut(); open.value = false; });
 const emit = defineEmits(['tour']);
 const tour = () => { open.value = false; emit('tour'); };
@@ -159,6 +169,11 @@ const tour = () => { open.value = false; emit('tour'); };
             <input v-model="inviteName" class="field" placeholder="Name of the person to invite" aria-label="Name of the person to invite" maxlength="60" />
             <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()">Create invite link</button>
           </form>
+        </section>
+
+        <section class="acct-sec">
+          <div class="acct-sec-head"><p class="kicker">Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData">Download a copy</button></div>
+          <p class="small muted">Everything you have added, as one file: entries, budgets, accounts, goals, subscriptions and plans.</p>
         </section>
 
         <!-- Below People: its progress updates must not shift the lists above. -->
