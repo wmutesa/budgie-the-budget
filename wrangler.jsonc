@@ -1,7 +1,7 @@
 {
-  // Ledgerline is a static site: Cloudflare serves the files in this folder.
+  // Budgie is a static site: Cloudflare serves the files in this folder.
   // No Worker code runs and no user data leaves the browser.
-  "name": "ledgerline",
+  "name": "budgie",
   "compatibility_date": "2026-11-01",
   "assets": {
     "directory": "./",

@@ -1,4 +1,4 @@
-// Smoke test for Ledgerline. Serves the app from this folder, loads demo data,
+// Smoke test for Budgie. Serves the app from this folder, loads demo data,
 // visits every section, exercises search, the theme toggle, and adding an entry,
 // then fails if the page throws or an assertion breaks.
 //
@@ -38,17 +38,14 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // The local AI server is not running in CI, so "failed to load resource" is expected.
-  await page.click('.nav-item[data-view="settings"]');
+  await page.evaluate(() => { document.getElementById('set').open = true; });
   await page.click('[data-action="seed-demo"]');
 
-  for (const view of ['overview', 'ledger', 'budgets', 'goals', 'subs', 'assistant', 'settings']) {
-    await page.click(`.nav-item[data-view="${view}"]`);
-    const title = await page.textContent('#title');
-    assert.ok(title.trim().length > 0, `view ${view} renders a title`);
+  for (const id of ['overview', 'plan', 'accounts', 'goals', 'ledger', 'ask', 'set']) {
+    assert.ok(await page.$(`#${id}`), `section #${id} renders`);
   }
+  assert.match(await page.textContent('#overview'), /Net worth/, 'overview shows net worth');
 
-  await page.click('.nav-item[data-view="overview"]');
-  assert.match(await page.textContent('.stat-row'), /Net worth/, 'overview shows stat cards');
   await page.click('[data-action="range"][data-id="365"]');
   assert.equal((await page.textContent('.seg .on')).trim(), '1Y', 'range toggle switches to 1Y');
 
@@ -60,13 +57,12 @@ async function run(url) {
   assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light', 'theme toggles to light');
   await page.click('[data-action="theme"]');
 
-  await page.click('.nav-item[data-view="ledger"]');
   await page.fill('[data-input="q"]', ''); // clear the search left by the step above
   await page.click('[data-action="add-tx"]');
   await page.fill('#modal-form input[name="amount"]', '42.5');
   await page.fill('#modal-form input[name="merchant"]', 'Smoke test store');
   await page.click('#modal-form button[type="submit"]');
-  assert.match(await page.textContent('#view'), /Smoke test store/, 'a new entry appears in the ledger');
+  assert.match(await page.textContent('#ledger-list'), /Smoke test store/, 'a new entry appears in the ledger');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));

@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement to Ledgerline
+about: Suggest an improvement to Budgie
 labels: enhancement
 ---
 

@@ -4,34 +4,31 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark light" />
-  <title>Ledgerline · Local budget</title>
+  <title>Budgie · Local budget</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="shell">
-    <aside class="rail">
-      <div class="brand"><span class="mark">L</span><div><b>Ledgerline</b><small>Personal finance</small></div></div>
-      <nav id="nav" aria-label="Sections"></nav>
-      <div class="rail-foot"><span id="ai-pill" class="pill">AI · checking</span></div>
-    </aside>
-    <main>
-      <header class="topbar">
-        <div class="title-block">
-          <p class="eyebrow" id="eyebrow"></p>
-          <h1 id="title"></h1>
-        </div>
-        <div class="topbar-right">
-          <form id="global-search" class="search" role="search">
-            <span aria-hidden="true">⌕</span>
-            <input name="q" type="search" placeholder="Search transactions and notes" aria-label="Search transactions" />
-          </form>
-          <button class="icon-btn" data-action="theme" title="Switch light and dark" aria-label="Switch light and dark theme">◐</button>
-          <div class="top-actions" id="top-actions"></div>
-        </div>
-      </header>
-      <div id="view"></div>
-    </main>
-  </div>
+  <header class="masthead">
+    <div class="wordmark-line">
+      <span class="wordmark">Budgie</span>
+      <span class="eyebrow" id="eyebrow"></span>
+    </div>
+    <nav class="jumps" aria-label="Jump to section">
+      <a href="#overview">Overview</a><a href="#plan">Plan</a><a href="#accounts">Accounts</a>
+      <a href="#goals">Goals</a><a href="#ledger">Ledger</a><a href="#ask">Assistant</a><a href="#set">Settings</a>
+    </nav>
+    <div class="tools">
+      <form id="global-search" class="search" role="search">
+        <input name="q" type="search" placeholder="Search transactions" aria-label="Search transactions" />
+      </form>
+      <span id="ai-pill" class="pill">AI · checking</span>
+      <button class="ghost tiny" data-action="theme" title="Switch light and dark" aria-label="Switch light and dark theme">Theme</button>
+      <div class="top-actions" id="top-actions"></div>
+    </div>
+  </header>
+
+  <main id="view"></main>
+
   <dialog id="modal"><form id="modal-form" method="dialog"></form></dialog>
   <input type="file" id="import-file" accept="application/json,.json" hidden />
   <div class="toasts" id="toasts" aria-live="polite"></div>

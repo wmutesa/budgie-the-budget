@@ -1,4 +1,4 @@
-# Ledgerline
+# Budgie
 
 A local, private budgeting app. Plain HTML, CSS, and JavaScript: no build step, no accounts, no cloud. Your data stays in your browser, and the optional AI assistant runs on your own computer through Ollama, so it costs nothing per question.
 
@@ -20,7 +20,7 @@ Opening `index.html` directly (`file://`) also works for everything except the l
 1. Install Ollama from https://ollama.com.
 2. Download a model: `ollama pull llama3.2`
 3. Make sure the server is running: `ollama serve` (the desktop app starts it for you).
-4. In Ledgerline, open **Settings → Local AI** and press **Test connection**.
+4. In Budgie, open **Settings → Local AI** and press **Test connection**.
 
 If the Assistant can't reach Ollama, it falls back to built-in rules. Those answer balances, spending, budgets, subscriptions, goals, and "Can I afford $X?" without any model.
 
@@ -44,7 +44,7 @@ If the Assistant can't reach Ollama, it falls back to built-in rules. Those answ
 
 ## How the numbers work
 
-- **Account balance** = starting balance + income − spending ± transfers. Use the ✎ on an account to set today's balance. Ledgerline logs the difference as a balance update, so the history stays honest.
+- **Account balance** = starting balance + income − spending ± transfers. Use the ✎ on an account to set today's balance. Budgie logs the difference as a balance update, so the history stays honest.
 - **Transfer or save** moves money from an account to another account or to a goal. Money in a goal counts toward that goal and leaves the source account.
 - **Net worth** = accounts + goals. Moving money between your own holdings does not change it.
 - **Plan** = income − category budgets − subscriptions (monthly equivalent) − the monthly amount each goal needs. Subscriptions are their own line, so lower a category budget that duplicates one.
@@ -58,7 +58,7 @@ If the Assistant can't reach Ollama, it falls back to built-in rules. Those answ
 
 ## Cloudflare test deployment
 
-Ledgerline is static files, so it deploys as Cloudflare Workers static assets. `wrangler.jsonc` serves this folder, and `.assetsignore` keeps the repository files private.
+Budgie is static files, so it deploys as Cloudflare Workers static assets. `wrangler.jsonc` serves this folder, and `.assetsignore` keeps the repository files private.
 
 One-time setup, on your machine:
 
@@ -76,11 +76,11 @@ npm run dev        # http://127.0.0.1:8787
 Publish a test deployment:
 
 ```bash
-npm run deploy     # prints a https://ledgerline.<your-subdomain>.workers.dev URL
+npm run deploy     # prints a https://budgie.<your-subdomain>.workers.dev URL
 ```
 
 Notes for testing:
 
 - Data stays in each visitor's browser. The deployed site stores nothing on Cloudflare.
 - The deployed site cannot reach a local AI, because Ollama runs on your computer. The Assistant falls back to built-in rules there. To test the local AI, use `python3 -m http.server 8080` (see above) or `npm run dev`.
-- For a custom domain, add it in the Cloudflare dashboard under Workers & Pages, then Ledgerline, then Settings, then Domains & Routes.
+- For a custom domain, add it in the Cloudflare dashboard under Workers & Pages, then Budgie, then Settings, then Domains & Routes.

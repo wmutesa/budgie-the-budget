@@ -1,8 +1,8 @@
 {
-  "name": "ledgerline",
+  "name": "budgie",
   "version": "0.1.0",
   "private": true,
-  "description": "Ledgerline local-first budgeting app, deployed as Cloudflare static assets",
+  "description": "Budgie local-first budgeting app, deployed as Cloudflare static assets",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
