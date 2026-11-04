@@ -159,6 +159,7 @@ const tour = () => { open.value = false; emit('tour'); };
           </form>
         </section>
 
+        <!-- Below People: its progress updates must not shift the lists above. -->
         <AIPanel />
 
         <PasskeyNote :owner="isOwner" />

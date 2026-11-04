@@ -2,7 +2,7 @@
 import { ref } from 'vue';
 import { store, newId } from '../lib/store';
 import { captureFile, captureNote, enrich } from '../lib/capture';
-import { ai } from '../lib/ai';
+import { ai, labelFor } from '../lib/ai';
 import { useDictation, canDictate } from '../lib/dictation';
 import MicButton from './MicButton.vue';
 
@@ -71,7 +71,7 @@ async function onNote() {
   <section class="card cell capture" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave="dragging = false" @drop.prevent="onDrop">
     <div class="cell-head">
       <p class="label">Add spending</p>
-      <span class="muted small">Reader · {{ ai.label }}</span>
+      <span class="muted small">Reader · {{ labelFor('receipt') }}</span>
     </div>
     <form class="say-bar" :class="{ live: dict.listening.value }" @submit.prevent="dict.listening.value ? dict.stop() : onNote()">
       <span v-if="!dict.listening.value" class="say-icon" aria-hidden="true">+</span>

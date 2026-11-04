@@ -312,11 +312,17 @@ async function run(url) {
   await guide.click('[data-test="account"]');
   // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
   await guide.waitForSelector('[data-test="ai-panel"]');
-  assert.match(await guide.textContent('[data-test="ai-panel"]'), /Built-in rules/, 'without a model, Budgie says it uses its rules');
-  if (await guide.$('[data-test="ai-on"]')) {
-    await guide.click('[data-test="ai-on"]');
-    await guide.waitForFunction(() => /could not start|cannot run AI|Downloading/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
-  }
+  const aiText = await guide.textContent('[data-test="ai-panel"]');
+  assert.match(aiText, /On/, 'AI is on by default');
+  assert.match(aiText, /Qwen 2\.5[\s\S]*Llama 3\.2/, 'both browser models are listed');
+  assert.match(aiText, /best for receipts[\s\S]*best for writing/, 'each model has its job');
+  // Here the models cannot download, so Budgie must fall back without breaking.
+  await guide.waitForFunction(() => /Not available|Downloading|Waiting|cannot run/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
+  guide.once('dialog', d => d.accept());
+  await guide.click('[data-test="ai-toggle"]');
+  await guide.waitForFunction(() => /AI is off on this device/.test(document.querySelector('[data-test="ai-panel"]').textContent));
+  assert.equal(await guide.evaluate(() => localStorage.getItem('budgie.ai')), 'off', 'turning AI off is remembered on this device');
+  await guide.click('[data-test="ai-toggle"]');
   await guide.click('[data-test="replay-guide"]');
   await guide.waitForSelector('[data-test="guide"]');
   await guide.click('[data-test="guide-skip"]');

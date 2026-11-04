@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { store } from '../lib/store';
 import { organize, parseChunk, GROUPS, EXAMPLE } from '../lib/plan';
-import { ai, aiAdvise } from '../lib/ai';
+import { ai, aiAdvise, labelFor } from '../lib/ai';
 import { monthTotals } from '../lib/ledger';
 import { logoUrl } from '../lib/brands';
 import { CATEGORIES } from '../lib/categorize';
@@ -218,7 +218,7 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
   </section>
 
   <section class="card cell span-12 tips-cell">
-    <div class="cell-head"><p class="label">Suggestions while you plan</p><span class="muted small">{{ ai.label }}</span></div>
+    <div class="cell-head"><p class="label">Suggestions while you plan</p><span class="muted small">{{ labelFor('advice') }}</span></div>
     <p v-if="aiNote" class="think">{{ aiNote }}</p>
     <div class="tip-row">
       <article v-for="(t, n) in tips" :key="n" class="insight" :class="t.tone">
