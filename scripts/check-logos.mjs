@@ -47,6 +47,20 @@ await Promise.all(Array.from({ length: 8 }, async () => {
   while (queue.length) { const c = queue.shift(); state[c.domain] = await check(c); }
 }));
 
+// Google sometimes answers 404 for a site it does have; check misses again before reporting them.
+for (const c of companies.filter(c => state[c.domain] === null)) {
+  await new Promise(r => setTimeout(r, 1500));
+  state[c.domain] = await check(c);
+}
+// An icon whose bytes changed but which was present both times is a real update;
+// a logo that is missing now but was present last run is only reported after a second miss.
+for (const c of companies) {
+  if (state[c.domain] === null && previous[c.domain] && previous[`miss:${c.domain}`] !== true) {
+    state[c.domain] = previous[c.domain];
+    state[`miss:${c.domain}`] = true;
+  }
+}
+
 const first = Object.keys(previous).length === 0;
 const list = kind => companies.filter(c => {
   const now = state[c.domain], was = previous[c.domain];
