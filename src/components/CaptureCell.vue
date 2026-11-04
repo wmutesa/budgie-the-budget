@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { matchAccount, stripPayment, guessAccount, accountForFile } from '../lib/accounts';
 import { ref } from 'vue';
 import { store, newId } from '../lib/store';
@@ -78,6 +79,7 @@ async function onNote() {
       <p class="label">Add spending</p>
       <span class="muted small">Reader · {{ labelFor('receipt') }}</span>
     </div>
+    <AiHint for="capture" />
     <form class="say-bar" :class="{ live: dict.listening.value }" @submit.prevent="dict.listening.value ? dict.stop() : onNote()">
       <span v-if="!dict.listening.value" class="say-icon" aria-hidden="true">+</span>
       <span v-else class="say-rec" role="status" aria-live="polite">

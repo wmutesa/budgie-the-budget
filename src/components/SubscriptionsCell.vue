@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { computed, ref } from 'vue';
 import { store, monthly, daysUntil, fixLogo } from '../lib/store';
 import LogoFix from './LogoFix.vue';
@@ -25,6 +26,7 @@ const hiddenTotal = computed(() => items.value.slice(LIMIT).reduce((s, x) => s +
       <div><p class="label">Subscriptions</p><p class="big sm">{{ fmt(total, store.base) }} <span class="muted small">a month</span></p></div>
       <button class="btn primary small" data-test="add-sub" @click="emit('add', '')">+ Add from the web</button>
     </div>
+    <AiHint for="subscriptions" />
     <div v-if="!items.length" class="empty">
       <p>Search any service by name. Budgie finds it on the web, adds its logo and site, and tracks the cost in your currency.</p>
       <div class="chips"><button v-for="i in ideas" :key="i" class="chip-btn" @click="emit('add', i)">{{ i }}</button></div>

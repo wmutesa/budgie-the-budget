@@ -95,6 +95,8 @@ const tour = () => { open.value = false; emit('tour'); };
       <i class="acct-dot" :class="account.sync" aria-hidden="true" />
     </button>
 
+    <!-- On <body>, so the top bar's blur does not trap the full-window backdrop. -->
+    <Teleport to="body">
     <div v-if="open" class="overlay" @click.self="open = false">
       <div class="sheet acct-sheet" role="dialog" aria-label="Account">
         <div class="cell-head">
@@ -170,5 +172,6 @@ const tour = () => { open.value = false; emit('tour'); };
         </div>
       </div>
     </div>
+    </Teleport>
   </span>
 </template>

@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref, computed, watch } from 'vue';
 import { budgetRows } from '../lib/ledger';
 import { store } from '../lib/store';
@@ -57,6 +58,7 @@ function setIncome() {
       <p class="label">Monthly budgets</p>
       <span class="muted small" data-test="budgets-by">{{ madeBy }}</span>
     </div>
+    <AiHint for="budgets" />
 
     <template v-if="budgetRows.length">
       <ul class="budget-fill">

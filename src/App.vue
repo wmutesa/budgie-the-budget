@@ -12,7 +12,6 @@ import ExpenseStripes from './components/ExpenseStripes.vue';
 import AccountCards from './components/AccountCards.vue';
 import SignalsCell from './components/SignalsCell.vue';
 import WalletCards from './components/WalletCards.vue';
-import ReportsView from './components/ReportsView.vue';
 import BudgetsView from './components/BudgetsView.vue';
 import TransactionsView from './components/TransactionsView.vue';
 import SubscriptionSearch from './components/SubscriptionSearch.vue';
@@ -20,11 +19,11 @@ import CaptureCell from './components/CaptureCell.vue';
 import ReviewQueue from './components/ReviewQueue.vue';
 import SpendSummary from './components/SpendSummary.vue';
 import KpiStrip from './components/KpiStrip.vue';
-import InsightsCell from './components/InsightsCell.vue';
 import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
+import AiNotices from './components/AiNotices.vue';
 import MarketsCell from './components/MarketsCell.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
@@ -34,8 +33,8 @@ import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
 
-// Four pages: Overview (dashboard), Transactions (capture, review, budgets), Reports (analysis, advice, full ledger), Playground (build a plan).
-const tabs = ['Overview', 'Transactions', 'Reports', 'Playground'];
+// Four pages: Overview (dashboard), Transactions (capture, review, budgets, accounts), Markets (news and savings ideas), Playground (build a plan).
+const tabs = ['Overview', 'Transactions', 'Markets', 'Playground'];
 const active = ref('Overview');
 const searching = ref(false);
 const seed = ref('');
@@ -110,9 +109,8 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <RatesCell class="span-4" id="rates" />
         <SubscriptionsCell class="span-8" id="subscriptions" @add="openSearch" />
         <ExpenseStripes class="span-4" />
-        <AccountCards class="span-8" id="accounts" />
+        <WalletCards class="span-8" />
         <SignalsCell class="span-4" />
-        <WalletCards class="span-12" />
       </template>
       <template v-else-if="active === 'Transactions'">
         <KpiStrip />
@@ -121,19 +119,18 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
         <TransactionsView class="span-8" id="ledger" :limit="40" fill />
+        <AccountCards class="span-12" id="accounts" />
       </template>
       <template v-else-if="active === 'Playground'">
         <PlaygroundView />
       </template>
       <template v-else>
-        <InsightsCell class="span-8" id="insights" />
+        <MarketsCell class="span-8" id="markets" />
         <OpportunitiesCell class="span-4" id="opportunities" />
-        <MarketsCell class="span-12" id="markets" />
-        <ReportsView class="span-6" id="reports" />
-        <TransactionsView class="span-6" id="activity" full fill title="All activity" />
       </template>
     </main>
 
+    <AiNotices :paused="touring || searching" />
     <SubscriptionSearch v-if="searching" :seed="seed" @close="searching = false" />
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>

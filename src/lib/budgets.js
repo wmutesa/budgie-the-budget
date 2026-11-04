@@ -22,7 +22,9 @@ export function budgetInputs() {
   const since = new Date(); since.setDate(1); since.setMonth(since.getMonth() - 3);
   const from = since.toISOString().slice(0, 10);
   const recent = store.transactions.filter(t => String(t.date) >= from);
-  const months = Math.max(1, new Set(recent.map(t => String(t.date).slice(0, 7))).size);
+  // Average over the time your entries actually cover (at least a month), not calendar months.
+  const earliest = recent.reduce((m, t) => (String(t.date) < m ? String(t.date) : m), new Date().toISOString().slice(0, 10));
+  const months = Math.max(1, (Date.now() - Date.parse(`${earliest}T00:00:00`)) / (30.4 * 864e5));
   const spend = {};
   recent.filter(t => t.amount < 0).forEach(t => { spend[t.category || 'Other'] = (spend[t.category || 'Other'] || 0) - toUSD(t); });
   Object.keys(spend).forEach(k => { spend[k] = Math.round(spend[k] / months); });

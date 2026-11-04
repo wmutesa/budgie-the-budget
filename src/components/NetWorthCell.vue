@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { accountTotal } from '../lib/ledger';
@@ -30,6 +31,7 @@ const change = computed(() => (points.value.length > 1 ? points.value[points.val
         <button v-for="[n, l] in ranges" :key="n" :class="{ on: range === n }" @click="range = n">{{ l }}</button>
       </div>
     </div>
+    <AiHint for="networth" />
     <template v-if="store.balances.length">
       <p class="big">{{ fmt(accountTotal) }}
         <span v-if="change !== null" class="muted small">{{ change >= 0 ? '+' : '−' }}{{ fmt(Math.abs(change)) }} over {{ range === 365 ? 'a year' : range === 90 ? '3 months' : 'a month' }}</span>

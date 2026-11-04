@@ -33,11 +33,12 @@ const toggle = () => {
         </li>
       </ul>
       <p v-if="ai.note" class="small ai-note">{{ ai.note }}</p>
+      <p v-if="ai.small.state === 'error' && ai.small.error" class="ai-error small" role="status" data-test="ai-error">{{ ai.small.error }}{{ /built-in rules/.test(ai.small.error) ? '' : ' Budgie keeps working with its built-in rules.' }}</p>
+      <p v-else-if="ai.medium.state === 'error' && ai.medium.error" class="ai-error small" role="status">Llama 3.2: {{ ai.medium.error }}</p>
       <button v-if="supported && (ai.small.state === 'waiting' || ai.small.state === 'error' || ai.medium.state === 'skipped' || ai.medium.state === 'error')" class="btn small" type="button" data-test="ai-download" @click="startBrowserModels({ force: true })">
-        {{ ai.small.state === 'ready' ? 'Download Llama 3.2 too' : 'Download now' }}
+        {{ ai.small.state === 'error' ? 'Try again' : ai.small.state === 'ready' ? 'Download Llama 3.2 too' : 'Download now' }}
       </button>
       <p v-if="!supported" class="muted small">This browser cannot run models on the device. Budgie uses its built-in rules, or Ollama if it runs on this computer.</p>
-      <p v-else-if="ai.small.state === 'error' && ai.small.error" class="muted small">{{ ai.small.error }}</p>
     </template>
     <p v-else class="small">AI is off on this device. Budgie uses its built-in rules. Turn it back on to download the models again.</p>
   </section>

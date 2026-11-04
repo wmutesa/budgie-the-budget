@@ -193,12 +193,10 @@ async function run(url) {
   assert.match(await sg.locator('[data-test="draft-account"]').textContent(), /Chase checking/, 'the note links the entry to the Chase account');
   assert.doesNotMatch(await sg.locator('.draft-name').textContent(), /chase/i, 'the payment method is not taken for the shop');
   await sg.locator('.round-btn.ok').click();
-  await page.click('.nb-pages button:nth-child(1)');
   assert.match(await page.textContent('[data-test="accounts"]'), /\$2,488\.00/, 'the Chase balance drops by the amount spent');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-test="accounts"] .acc-icon >> nth=0')]);
   await chooser.setFiles({ name: 'chase.png', mimeType: 'image/png', buffer: PNG });
   await page.waitForFunction(() => document.querySelector('[data-test="accounts"] .acc-icon img')?.src.startsWith('data:image/png'));
-  await page.click('.nb-pages button:nth-child(2)');
 
   // A one-line note, matched to the company on the web.
   await page.fill('[data-test="quick-note"]', 'Netflix 15.49 today');
@@ -218,13 +216,23 @@ async function run(url) {
   const [hb, hl] = await Promise.all([page.locator('#budgets').boundingBox(), page.locator('#ledger').boundingBox()]);
   assert.ok(Math.abs(hb.height - hl.height) < 2 && Math.abs((hb.y + hb.height) - (hl.y + hl.height)) < 2, 'budgets and recent activity share a bottom line');
 
-  // Reports: advice, bank opportunities and the full ledger.
+  // AI everywhere: short notes next to sections and suggestions in the corner.
+  assert.match(await page.textContent('[data-test="hint-ledger"]'), /purchases? this week/, 'recent activity has an AI note');
+  assert.match(await page.textContent('[data-test="hint-budgets"]'), /budget|on track|%/, 'budgets have an AI note');
+  await page.waitForSelector('[data-test="notice"]');
+  const firstNotice = await page.textContent('[data-test="notice"] b');
+  await page.click('[data-test="notice-dismiss"]');
+  await page.waitForTimeout(300);
+  const after = await page.$('[data-test="notice"] b');
+  assert.ok(!after || (await after.textContent()) !== firstNotice, 'a dismissed suggestion does not come back');
+  assert.ok(await page.$('#accounts'), 'accounts live on the Transactions page');
+
+  // Markets: news and savings ideas use the whole page.
   await page.click('.nb-pages button:nth-child(3)');
-  await page.locator('#activity .dc-col').nth(12).hover();
-  await page.waitForTimeout(250);
-  assert.ok(await page.locator('#activity .dc-col').nth(12).locator('.dc-tip').isVisible(), 'activity bars show a tooltip on hover');
-  assert.ok((await page.locator('#reports .m-net.loss').count()) > 0 && (await page.locator('#reports .m-net.gain').count()) > 0, 'month by month marks gains and losses');
-  assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
+  assert.match(await page.textContent('.nb-pages button:nth-child(3)'), /Markets/, 'the third page is called Markets');
+  assert.equal(await page.$('#activity'), null, 'All activity is gone from this page');
+  assert.equal(await page.$('#reports'), null, 'Year in numbers is gone from this page');
+  assert.equal(await page.$('.insight'), null, 'the old "What Budgie thinks" card is gone');
   await page.waitForSelector('#markets .mk-tile');
   const mk = await page.textContent('#markets');
   assert.match(mk, /S&P 500[\s\S]*\+0\.8% today/, 'market indexes show today\'s change');
@@ -235,12 +243,6 @@ async function run(url) {
   assert.equal(await page.getAttribute('#markets .mk-news a', 'rel'), 'noopener noreferrer', 'news links open safely');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
-  assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');
-  const [rb, ab] = await Promise.all([page.locator('#reports').boundingBox(), page.locator('#activity').boundingBox()]);
-  assert.ok(Math.abs(rb.y - ab.y) < 2, 'year in numbers and all activity sit side by side');
-  assert.ok(Math.abs((rb.y + rb.height) - (ab.y + ab.height)) < 2, 'year in numbers and all activity share a bottom line');
-  await page.click('#activity .chip-btn:has-text("Imported")');
-  assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
 
   // Playground: messy notes become an organised plan, then budgets.
   await page.click('.nb-pages button:nth-child(4)');
@@ -323,6 +325,7 @@ async function run(url) {
   const body = await guide.textContent('body');
   assert.doesNotMatch(body, /Trader Joe|sample data|Sample balances|Investment portfolio/i, 'a new account has no sample data');
   assert.ok((await guide.locator('.empty-note').count()) >= 4, 'empty cards explain what to add');
+  await guide.click('.nb-pages button:nth-child(2)');
   await guide.click('[data-test="add-account"]');
   await guide.fill('.acc-form input[aria-label="Account name"]', 'Bank of Kigali');
   await guide.fill('.acc-form input[aria-label="Balance today"]', '250000');
@@ -330,6 +333,7 @@ async function run(url) {
   await guide.click('.pick-pop .pick-opt:has-text("RWF")');
   await guide.click('.acc-form button[type="submit"]');
   assert.match(await guide.textContent('[data-test="accounts"]'), /Bank of Kigali[\s\S]*RWF/, 'you can add your own account');
+  await guide.click('.nb-pages button:nth-child(1)');
   await guide.click('[data-test="add-goal"]');
   await guide.fill('.goal-form input[aria-label="Goal name"]', 'Emergency fund');
   await guide.fill('.goal-form input[aria-label="Target"]', '5000');
@@ -347,6 +351,10 @@ async function run(url) {
   await guide.waitForTimeout(800);
   assert.equal(await guide.$('[data-test="guide"]'), null, 'the guide does not come back');
   await guide.click('[data-test="account"]');
+  const sheet = await guide.locator('.acct-sheet').boundingBox();
+  const vp = guide.viewportSize();
+  assert.ok(Math.abs(sheet.x - 150) < 2 && Math.abs(sheet.y - 150) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 150) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 150) < 2, `the settings card leaves 150px on every side (${JSON.stringify(sheet)})`);
+  assert.equal(await guide.locator('[data-test="account"]').evaluate(e => getComputedStyle(e).borderRadius), '50%', 'the account button is round');
   // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
   await guide.waitForSelector('[data-test="ai-panel"]');
   const aiText = await guide.textContent('[data-test="ai-panel"]');

@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { store, newId } from '../lib/store';
 import { GOAL_COLORS } from '../data/defaults';
@@ -28,6 +29,7 @@ function remove(g) { if (confirm(`Remove the goal "${g.name}"?`)) store.goals = 
 <template>
   <section class="card cell goal-card" data-test="goals">
     <div class="cell-head"><p class="label">Savings goals</p><span class="tag-light">{{ store.goals.length }} {{ store.goals.length === 1 ? 'goal' : 'goals' }}</span></div>
+    <AiHint for="goals" />
 
     <div v-if="main" class="gauge-wrap">
       <svg viewBox="0 0 220 124" class="gauge" aria-hidden="true">

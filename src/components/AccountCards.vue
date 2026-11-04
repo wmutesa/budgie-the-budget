@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref } from 'vue';
 import { store, newId } from '../lib/store';
 import { convert } from '../lib/rates';
@@ -74,6 +75,7 @@ function remove(a) {
       <p class="label">Accounts</p>
       <span class="muted small">{{ store.balances.length ? `${fmt(accountTotal)} in all` : 'Bank, cash, cards, mobile money' }}</span>
     </div>
+    <AiHint for="accounts" />
 
     <input ref="fileInput" type="file" accept="image/*" hidden data-test="account-icon-input" @change="onIcon" />
     <p v-if="!store.balances.length && !adding" class="empty-note">Add the accounts you want to track, such as your bank account, cards, cash or mobile money, with what is in them today. Spending you link to an account is taken off its balance, for example "lunch 12 with my Chase card". Click a balance to correct it, or an icon to upload your own.</p>

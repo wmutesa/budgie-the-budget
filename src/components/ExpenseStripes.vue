@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { computed } from 'vue';
 import { categorySpend } from '../lib/ledger';
 
@@ -12,6 +13,7 @@ const pct = s => Math.round((s.amount / (total.value || 1)) * 100);
 <template>
   <section class="card cell">
     <div class="cell-head"><p class="label">Expense breakdown</p><span class="muted small">{{ fmt(total) }} this month</span></div>
+    <AiHint for="breakdown" />
     <template v-if="categorySpend.length">
       <div class="eb-stack" aria-hidden="true">
         <i v-for="(s, i) in categorySpend" :key="s.name" :style="{ flex: s.amount, background: tints[i % tints.length] }"><span>{{ pct(s) }}%</span></i>

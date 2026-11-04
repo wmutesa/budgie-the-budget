@@ -13,13 +13,14 @@ On a phone you can add it to your home screen from the browser's share or menu b
 | Page | What it is for |
 | --- | --- |
 | **Overview** | A written brief of your month, net worth, plan, cash flow, savings goals, live exchange rates, subscriptions, expense breakdown, accounts and wallets |
-| **Transactions** | Add spending by typing, speaking, scanning a receipt, uploading a PDF, or importing a CSV or Excel statement; review what was found; monthly budgets and recent activity |
-| **Reports** | What Budgie thinks about your month, action cards, savings and investing ideas for Chase and Bank of America, markets and investment news from Yahoo Finance, year in numbers, and the full ledger |
+| **Transactions** | Add spending by typing, speaking, scanning a receipt, uploading a PDF, or importing a CSV or Excel statement; review what was found; AI-drafted monthly budgets, recent activity and your accounts |
+| **Markets** | Markets and investment news from Yahoo Finance, markets to watch, and savings and investing ideas for your banks |
 | **Playground** | Write or say messy notes and Budgie sorts them into a plan, with split comparisons, a what-if slider, a goal calculator and one-click budgets |
 
 Highlights:
 
 - **Accounts linked to spending:** add your bank accounts, cards, cash and mobile money. Each entry can be linked to the account that paid ("lunch 12 with my Chase card" links itself; otherwise the AI on your device or the only account you have), and the account's balance goes down by that amount. Click a balance to correct it; upload your own icon for each account.
+- **AI everywhere:** short notes from Budgie next to each section, and suggestions as notifications in the corner, each with a one-click action where it helps.
 - **Plain-language entry:** "spent 12.50 on lunch at Chipotle last friday" becomes a dated, categorised entry. Understands "a week ago", "in a month", "on the 3rd" and similar.
 - **Dictation:** speak an entry or a whole plan; text appears as you talk.
 - **Find any company:** a built-in directory of more than 300 brands across the US, Rwanda, Thailand and beyond, plus a live search of Wikidata for everything else. Logos come from each company's own site.

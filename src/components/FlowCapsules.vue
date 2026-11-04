@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { cashFlow, activeMonths, firstMonth } from '../lib/ledger';
 
@@ -16,6 +17,7 @@ const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD',
       <div><p class="label">Cash flow · since {{ since }}</p><p class="big sm">{{ fmt(total) }} <span class="muted small">kept</span></p></div>
       <div class="legend-inline"><span><i class="sw stripe-violet" />Income</span><span><i class="sw solid-violet" />Spending</span></div>
     </div>
+    <AiHint for="cashflow" />
     <div v-if="activeMonths.length" class="caps" @mouseleave="hover = null">
       <div v-for="(d, i) in cashFlow" :key="d.key" class="cap-col" :class="{ active: hover === i }" @mouseenter="hover = i">
         <div class="cap-up"><i :style="{ height: (d.income / max) * 100 + '%' }" /></div>

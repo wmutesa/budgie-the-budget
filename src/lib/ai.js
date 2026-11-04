@@ -14,10 +14,15 @@ import { CATEGORIES } from './categorize';
 const OLLAMA = 'http://localhost:11434';
 const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
 
+// Each model comes in two builds: a lighter one for graphics chips with
+// half-precision maths (most Chrome and Edge devices) and one for the rest
+// (often Safari).
 export const MODELS = {
-  small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', good: 'receipts' },
-  medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', good: 'writing' },
+  small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', mb: 450, good: 'receipts' },
+  medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', id32: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', mb: 1300, good: 'writing' },
 };
+const FAIL_KEY = 'budgie.aiFailed'; // when the last automatic start failed, to avoid retrying on every visit
+const STALL_MS = 90 * 1000;          // give up if a download makes no progress for this long
 // For each task, which models to try, in order.
 const ROUTES = {
   receipt: ['ollama', 'small', 'medium'],
@@ -93,31 +98,91 @@ async function ollamaChat(messages, { json = false, temperature = 0 } = {}) {
 }
 
 // ---------- In-browser models ----------
+// Can this device run a model? Checks the graphics chip, half-precision support and storage.
+let gpuInfo = null;
+async function checkDevice() {
+  if (gpuInfo) return gpuInfo;
+  if (!browserAISupported()) return (gpuInfo = { ok: false, why: 'This browser cannot run AI on the device. Use an up-to-date Chrome, Edge or Safari on a recent device.' });
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) return (gpuInfo = { ok: false, why: 'This device did not offer its graphics chip to the browser, so the AI cannot run here. Budgie uses its built-in rules.' });
+    gpuInfo = { ok: true, f16: adapter.features.has('shader-f16') };
+  } catch {
+    return (gpuInfo = { ok: false, why: 'The graphics chip could not be reached, so the AI cannot run here.' });
+  }
+  try {
+    const { quota = 0, usage = 0 } = await navigator.storage?.estimate?.() || {};
+    gpuInfo.freeMB = quota ? Math.round((quota - usage) / 1048576) : null;
+  } catch { gpuInfo.freeMB = null; }
+  return gpuInfo;
+}
+const modelId = (key, info) => (info?.f16 ? MODELS[key].id : MODELS[key].id32);
+
+// Plain words for what went wrong.
+function explain(e) {
+  const m = String(e?.message || e || '');
+  if (/shader-f16|f16/i.test(m)) return 'This graphics chip does not support the faster model build.';
+  if (/quota|storage|QuotaExceeded/i.test(m)) return 'Not enough free storage in this browser for the model. Free up space, then try again.';
+  if (/network|fetch|Failed to fetch|Load failed|NetworkError/i.test(m)) return 'The model could not download. Check your connection, then try again.';
+  if (/memory|out of memory|allocation/i.test(m)) return 'This device ran out of memory loading the model.';
+  if (/stalled/i.test(m)) return 'The download stopped making progress. Try again on a steadier connection.';
+  return `The AI could not start (${m.slice(0, 120) || 'unknown reason'}).`;
+}
+
 export function loadModel(key) {
-  if (!browserAISupported()) { Object.assign(ai[key], { state: 'error', error: 'This browser cannot run AI on the device.' }); return Promise.resolve(false); }
   if (engines[key]) return Promise.resolve(true);
   if (loading[key]) return loading[key];
-  Object.assign(ai[key], { state: 'loading', progress: 0, text: 'Starting…', error: '' });
+  Object.assign(ai[key], { state: 'loading', progress: 0, text: 'Checking this device…', error: '' });
   loading[key] = (async () => {
+    let worker = null;
+    let stall = null;
     try {
+      const info = await checkDevice();
+      if (!info.ok) throw Object.assign(new Error(info.why), { plain: true });
+      if (info.freeMB !== null && info.freeMB < MODELS[key].mb) throw Object.assign(new Error(`Not enough free storage in this browser for ${MODELS[key].name} (needs about ${MODELS[key].mb} MB).`), { plain: true });
       const webllm = await import('@mlc-ai/web-llm');
-      engines[key] = await webllm.CreateWebWorkerMLCEngine(
-        new Worker(new URL('./llm.worker.js', import.meta.url), { type: 'module' }),
-        MODELS[key].id,
-        { initProgressCallback: p => Object.assign(ai[key], { progress: Math.round((p.progress || 0) * 100), text: p.text || '' }) },
-      );
+      worker = new Worker(new URL('./llm.worker.js', import.meta.url), { type: 'module' });
+      // Stop if the download makes no progress for a while, or the worker crashes.
+      let last = Date.now();
+      const watchdog = new Promise((_, reject) => {
+        stall = setInterval(() => { if (Date.now() - last > STALL_MS) reject(new Error('stalled')); }, 5000);
+        worker.addEventListener('error', ev => { ev.preventDefault?.(); reject(new Error(ev.message || 'the AI worker stopped')); });
+      });
+      const engine = webllm.CreateWebWorkerMLCEngine(worker, modelId(key, info), {
+        initProgressCallback: p => { last = Date.now(); Object.assign(ai[key], { progress: Math.round((p.progress || 0) * 100), text: p.text || '' }); },
+      });
+      engines[key] = await Promise.race([engine, watchdog]);
       Object.assign(ai[key], { state: 'ready', progress: 100, text: '' });
+      write(FAIL_KEY, null);
       return true;
     } catch (e) {
       engines[key] = null;
-      Object.assign(ai[key], { state: 'error', error: String(e?.message || e).slice(0, 200) });
+      try { worker?.terminate(); } catch { /* already gone */ }
+      Object.assign(ai[key], { state: 'error', error: e?.plain ? e.message : explain(e) });
+      if (key === 'small') write(FAIL_KEY, String(Date.now()));
       return false;
     } finally {
+      clearInterval(stall);
       loading[key] = null;
       refreshLabel();
     }
   })();
   return loading[key];
+}
+
+// Errors from inside the AI library must never break the page.
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', ev => {
+    const m = String(ev.reason?.message || ev.reason || '');
+    if (/webgpu|gpu|mlc|tvm|shader|wasm|model|adapter|device lost/i.test(m)) {
+      ev.preventDefault();
+      for (const key of ['small', 'medium']) if (ai[key].state === 'loading' || ai[key].state === 'ready') {
+        engines[key] = null;
+        Object.assign(ai[key], { state: 'error', error: explain(ev.reason) });
+      }
+      refreshLabel();
+    }
+  });
 }
 
 async function browserChat(key, messages, { temperature = 0, max_tokens = 200 } = {}) {
@@ -128,8 +193,12 @@ async function browserChat(key, messages, { temperature = 0, max_tokens = 200 } 
 // Download and start the browser models in the background.
 export async function startBrowserModels({ force = false } = {}) {
   if (!ai.enabled) return;
-  if (!browserAISupported()) {
-    Object.assign(ai.small, { state: 'error', error: 'This browser cannot run AI on the device, so Budgie uses its built-in rules.' });
+  const info = await checkDevice();
+  if (!info.ok) { Object.assign(ai.small, { state: 'error', error: info.why }); Object.assign(ai.medium, { state: 'skipped', error: '' }); refreshLabel(); return; }
+  // After a failed automatic start, wait a day before trying again on its own.
+  const failed = Number(read(FAIL_KEY)) || 0;
+  if (!force && failed && Date.now() - failed < 864e5) {
+    if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'error', error: 'The AI did not start last time. Use Try again to retry now.' });
     return;
   }
   if (!force && meteredConnection()) {

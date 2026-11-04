@@ -1,5 +1,7 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { facts } from '../lib/advice';
+import { ai, aiAdvise } from '../lib/ai';
 import { store, monthly } from '../lib/store';
 import { convert, ratesLabel } from '../lib/rates';
 import { monthTotals, accountTotal } from '../lib/ledger';
@@ -13,6 +15,14 @@ const month = new Date().toLocaleDateString('en-US', { month: 'long' });
 const weekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 const hour = new Date().getHours();
 const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening';
+const said = ref('');
+let lastFacts = '';
+watch([facts, () => ai.ready], async () => {
+  const key = facts.value.join('|') + ai.ready;
+  if (key === lastFacts || !ai.ready || !store.transactions.length) return;
+  lastFacts = key;
+  said.value = (await aiAdvise(facts.value)) || '';
+}, { immediate: true });
 const empty = computed(() => !store.transactions.length && !store.balances.length && !store.subscriptions.length);
 </script>
 
@@ -33,6 +43,7 @@ const empty = computed(() => !store.transactions.length && !store.balances.lengt
       <template v-else>Nothing recorded for {{ month }} yet. </template>
       <template v-if="store.subscriptions.length">Subscriptions take <mark class="m-amber">{{ fmt(subsMonthly, store.base) }}</mark> a month.</template>
     </p>
+    <p v-if="said && !empty" class="ai-hint ai-brief" data-test="ai-brief"><span class="ai-spark" aria-hidden="true">✦</span>{{ said }} <span class="muted small">· {{ ai.used.advice }}</span></p>
     <p class="meta">
       <span>Rates · {{ ratesLabel() || 'not loaded' }}</span>
       <span>{{ store.transactions.length }} {{ store.transactions.length === 1 ? 'entry' : 'entries' }}</span>

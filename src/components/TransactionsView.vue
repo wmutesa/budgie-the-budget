@@ -1,4 +1,5 @@
 <script setup>
+import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { CATEGORIES } from '../lib/categorize';
@@ -72,6 +73,7 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
       <p class="label">{{ title }}</p>
       <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>
     </div>
+    <AiHint for="ledger" />
     <div v-if="full" class="act-summary">
       <div class="act-totals">
         <div class="at in-tint"><span class="small">Income shown</span><b>{{ money(totalsShown.income) }}</b></div>
