@@ -20,6 +20,7 @@ const fmt = n => (n < 0 ? '−' : '+') + Math.abs(n).toLocaleString('en-US', { s
 
 <template>
   <section class="card wide">
+    <div class="card-head"><p class="label">Recent activity</p></div>
     <div class="toolbar">
       <div class="chips">
         <button v-for="f in filters" :key="f" class="chip-btn" :class="{ on: filter === f }" @click="filter = f">{{ f }}</button>

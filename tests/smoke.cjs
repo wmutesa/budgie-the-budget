@@ -33,7 +33,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   assert.match(await page.textContent('h1'), /Financial overview/, 'heading renders');
-  for (const label of ['Cash flow', 'Spending overview', 'My wallets', 'Upcoming bills', 'Savings goals', 'Recent activity']) {
+  for (const label of ['Cash flow', 'Spending overview', 'My wallets', 'Upcoming bills', 'Savings goals']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
   }
   assert.equal(await page.locator('.bar-col').count(), 12, 'cash flow shows twelve months');
@@ -45,14 +45,13 @@ async function run(url) {
   assert.match(await page.textContent('.tip').catch(() => ''), /Expense|/, 'switching to Expense keeps the chart working');
 
   await page.click('.tabs button:nth-child(2)');
-  assert.ok(await page.$('.toolbar'), 'transactions tab shows its toolbar');
+  assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
+  assert.ok(await page.$('.toolbar'), 'transactions page shows the ledger toolbar');
+  assert.match(await page.textContent('body'), /Recent activity/, 'transactions page lists activity');
   await page.click('.chip-btn >> nth=1');
   assert.ok((await page.locator('.table tbody tr').count()) > 0, 'income filter keeps rows');
-  await page.click('.tabs button:nth-child(3)');
-  assert.match(await page.textContent('body'), /Monthly budgets/, 'budgets tab renders');
-  await page.click('.tabs button:nth-child(4)');
-  assert.match(await page.textContent('body'), /Top merchants/, 'reports tab renders');
   await page.click('.tabs button:nth-child(1)');
+  assert.match(await page.textContent('body'), /Top merchants/, 'overview page includes the reports');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));

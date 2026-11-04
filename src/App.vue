@@ -12,8 +12,8 @@ import TransactionsView from './components/TransactionsView.vue';
 import BudgetsView from './components/BudgetsView.vue';
 import ReportsView from './components/ReportsView.vue';
 
-// Top navigation, no sidebar. Each tab shows a different set of panels.
-const tabs = ['Overview', 'Transactions', 'Budgets', 'Reports'];
+// Two pages. Overview holds the dashboard and reports; Transactions holds budgets and the ledger.
+const tabs = ['Overview', 'Transactions'];
 const active = ref('Overview');
 const period = ref('This month');
 </script>
@@ -59,17 +59,14 @@ const period = ref('This month');
           <WalletCards class="span-4" />
           <BillsList class="span-4" />
           <GoalsPanel class="span-4 dark" />
-          <TransactionsTable class="span-8" />
+          <ReportsView class="wide" />
         </div>
       </template>
-      <template v-else-if="active === 'Transactions'">
-        <TransactionsView />
-      </template>
-      <template v-else-if="active === 'Budgets'">
-        <BudgetsView />
-      </template>
       <template v-else>
-        <ReportsView />
+        <div class="stack">
+          <BudgetsView />
+          <TransactionsView />
+        </div>
       </template>
     </main>
   </div>

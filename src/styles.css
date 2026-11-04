@@ -304,3 +304,7 @@ button, input, select { font-size: 12px; }
   .budget-row { grid-template-columns: 1fr; }
   .budget-num { text-align: left; }
 }
+
+/* Two pages: the Transactions page stacks budgets above the ledger */
+.stack { display: grid; gap: 14px; }
+.grid > .wide { grid-column: 1 / -1; }
