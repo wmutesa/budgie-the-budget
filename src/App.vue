@@ -11,6 +11,10 @@ import WalletCards from './components/WalletCards.vue';
 import TransactionsView from './components/TransactionsView.vue';
 import BudgetsView from './components/BudgetsView.vue';
 import ReportsView from './components/ReportsView.vue';
+import NetWorthCell from './components/NetWorthCell.vue';
+import MonthCell from './components/MonthCell.vue';
+import PlanCell from './components/PlanCell.vue';
+import SignalsCell from './components/SignalsCell.vue';
 
 // Two pages. Overview holds the dashboard and reports; Transactions holds budgets and the ledger.
 const tabs = ['Overview', 'Transactions'];
@@ -21,45 +25,40 @@ const period = ref('This month');
 <template>
   <div class="app">
     <header class="top">
-      <div class="brand"><span class="mark">B</span>Budgie</div>
-      <nav class="tabs" aria-label="Sections">
-        <button v-for="t in tabs" :key="t" :class="{ on: active === t }" @click="active = t">{{ t }}</button>
+      <div class="brand-line">
+        <span class="brand-word">BUDGIE</span>
+        <span class="muted small">Wednesday, Nov 4, 2026</span>
+      </div>
+      <nav class="pages" aria-label="Pages">
+        <button v-for="t in tabs" :key="t" :class="{ on: active === t }" @click="active = t">{{ t.toUpperCase() }}</button>
       </nav>
       <div class="tools">
         <label class="search">
-          <span aria-hidden="true">⌕</span>
           <input type="search" placeholder="Search transactions" aria-label="Search transactions" />
         </label>
-        <select v-model="period" class="period" aria-label="Period">
-          <option>This month</option><option>This year</option>
-        </select>
-        <span class="avatar">W</span>
+        <span class="ai-pill">AI · local ready</span>
+        <div class="monthnav" aria-label="Month">
+          <button aria-label="Previous month">‹</button><span>November 2026</span><button aria-label="Next month">›</button>
+        </div>
+        <button class="btn">+ Account</button>
+        <button class="btn primary">+ Entry</button>
       </div>
     </header>
 
     <main class="page">
-      <div class="heading">
-        <div>
-          <p class="eyebrow">Welcome back</p>
-          <h1>Financial overview</h1>
-        </div>
-        <div class="actions">
-          <button class="btn primary">Receive money</button>
-          <button class="btn">Send money</button>
-          <button class="btn">Payment request</button>
-        </div>
-      </div>
-
       <template v-if="active === 'Overview'">
-        <div class="grid">
-          <BalanceCard class="span-4" />
-          <AccountCards class="span-8" />
+        <div class="grid hl">
+          <NetWorthCell class="span-5" id="overview" />
+          <MonthCell class="span-3" />
+          <PlanCell class="span-4" id="plan" />
           <CashFlowChart class="span-8" />
-          <SpendingCard class="span-4" />
+          <SignalsCell class="span-4" />
+          <AccountCards class="span-8" id="accounts" />
+          <GoalsPanel class="span-4 dark" id="goals" />
           <WalletCards class="span-4" />
           <BillsList class="span-4" />
-          <GoalsPanel class="span-4 dark" />
-          <ReportsView class="wide" />
+          <SpendingCard class="span-4" />
+          <ReportsView class="span-12" id="reports" />
         </div>
       </template>
       <template v-else>
