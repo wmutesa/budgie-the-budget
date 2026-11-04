@@ -5,7 +5,8 @@ import { CATEGORIES } from '../lib/categorize';
 import PickMenu from './PickMenu.vue';
 
 // The ledger. Short mode on Transactions; full mode with filters on Reports.
-const props = defineProps({ full: { type: Boolean, default: false }, limit: { type: Number, default: 8 }, title: { type: String, default: 'Recent activity' } });
+// fill: the list takes exactly the height of its row and scrolls inside, so it lines up with the cell beside it.
+const props = defineProps({ full: { type: Boolean, default: false }, limit: { type: Number, default: 8 }, title: { type: String, default: 'Recent activity' }, fill: { type: Boolean, default: false } });
 
 const kind = ref('All');
 const cat = ref('All');
@@ -40,7 +41,7 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
 </script>
 
 <template>
-  <section class="card cell ledger" :class="{ 'ledger-full': full }">
+  <section class="card cell ledger" :class="{ 'ledger-full': full, 'ledger-fill': fill }">
     <div class="cell-head">
       <p class="label">{{ title }}</p>
       <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>

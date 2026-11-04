@@ -92,7 +92,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <SpendSummary class="span-4" />
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
-        <TransactionsView class="span-8" id="ledger" :limit="8" />
+        <TransactionsView class="span-8" id="ledger" :limit="40" fill />
       </template>
       <template v-else-if="active === 'Playground'">
         <PlaygroundView />
@@ -100,8 +100,8 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       <template v-else>
         <InsightsCell class="span-8" id="insights" />
         <OpportunitiesCell class="span-4" id="opportunities" />
-        <ReportsView class="span-12" id="reports" />
-        <TransactionsView class="span-12" id="activity" full title="All activity" />
+        <ReportsView class="span-6" id="reports" />
+        <TransactionsView class="span-6" id="activity" full fill title="All activity" />
       </template>
     </main>
 

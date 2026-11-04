@@ -8,8 +8,8 @@ const rate = Math.round((saved / cashFlow.reduce((s, d) => s + d.income, 0)) * 1
 </script>
 
 <template>
-  <section class="card wide">
-    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Dummy data</span></div>
+  <section class="card cell report-cell">
+    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Sample history</span></div>
     <div class="stat-row">
       <div class="stat"><span class="muted small">Saved</span><b>{{ fmt(saved) }}</b></div>
       <div class="stat"><span class="muted small">Savings rate</span><b>{{ rate }}%</b></div>

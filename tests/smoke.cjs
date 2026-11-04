@@ -121,6 +121,9 @@ async function run(url) {
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
   assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');
+  const [rb, ab] = await Promise.all([page.locator('#reports').boundingBox(), page.locator('#activity').boundingBox()]);
+  assert.ok(Math.abs(rb.y - ab.y) < 2, 'year in numbers and all activity sit side by side');
+  assert.ok(Math.abs((rb.y + rb.height) - (ab.y + ab.height)) < 2, 'year in numbers and all activity share a bottom line');
   await page.click('#activity .chip-btn:has-text("Imported")');
   assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
 
