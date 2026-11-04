@@ -1,18 +1,19 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { cashFlow, activeMonths } from '../lib/ledger';
+import { cashFlow, activeMonths, firstMonth } from '../lib/ledger';
 
-// Income rises above the line, spending hangs below it. Last 12 months.
+// Income rises above the line, spending hangs below it, for each month since you started (up to 12).
 const hover = ref(null);
 const max = computed(() => Math.max(1, ...cashFlow.value.map(d => Math.max(d.income, d.expense))));
 const total = computed(() => cashFlow.value.reduce((s, d) => s + d.income - d.expense, 0));
+const since = computed(() => new Date(`${cashFlow.value[0]?.key || firstMonth.value}-01T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
 const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 </script>
 
 <template>
   <section class="card cell">
     <div class="cell-head">
-      <div><p class="label">Cash flow · last 12 months</p><p class="big sm">{{ fmt(total) }} <span class="muted small">kept</span></p></div>
+      <div><p class="label">Cash flow · since {{ since }}</p><p class="big sm">{{ fmt(total) }} <span class="muted small">kept</span></p></div>
       <div class="legend-inline"><span><i class="sw stripe-violet" />Income</span><span><i class="sw solid-violet" />Spending</span></div>
     </div>
     <div v-if="activeMonths.length" class="caps" @mouseleave="hover = null">

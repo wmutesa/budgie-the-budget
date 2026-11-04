@@ -22,6 +22,7 @@ export const MODELS = {
 const ROUTES = {
   receipt: ['ollama', 'small', 'medium'],
   advice: ['ollama', 'medium', 'small'],
+  budget: ['ollama', 'medium', 'small'],
 };
 
 const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '' }); // idle | loading | ready | error | skipped | waiting
@@ -32,7 +33,7 @@ export const ai = reactive({
   medium: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { receipt: '', advice: '' }, // which model last did each task
+  used: { receipt: '', advice: '', budget: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -194,6 +195,24 @@ export async function aiReadReceipt(text) {
   ], { json: true, temperature: 0, max_tokens: 200 });
   const out = firstJSON(reply);
   return out && typeof out.total === 'number' ? out : null;
+}
+
+// Draft monthly budgets from income and spending. Returns [{ name, budget }] or null.
+export async function aiDraftBudgets(input) {
+  const subs = Object.fromEntries(Object.entries(input.subs).map(([k, v]) => [k, Math.round(v)]));
+  const facts = [
+    `Monthly income: ${input.income ? `$${input.income}` : 'unknown'}.`,
+    `Average monthly spending by category: ${JSON.stringify(input.spend)}.`,
+    `Subscriptions per month by category: ${JSON.stringify(subs)}.`,
+    `Planned monthly amounts: ${JSON.stringify(input.planned)}.`,
+  ].join(' ');
+  const reply = await route('budget', [
+    { role: 'system', content: `You set realistic monthly budgets in US dollars. Choose 4 to 8 categories, only from this list: ${JSON.stringify(input.allowed)}. Base amounts on the facts: cover real spending with a little room, follow planned amounts, and keep the total under 90% of income when income is known. Reply with JSON only: {"budgets": [{"category": string, "amount": number}]}` },
+    { role: 'user', content: facts },
+  ], { json: true, temperature: 0.1, max_tokens: 300 });
+  const out = firstJSON(reply);
+  const list = Array.isArray(out?.budgets) ? out.budgets : null;
+  return list ? list.map(b => ({ name: String(b.category || b.name || ''), budget: Number(b.amount ?? b.budget) })) : null;
 }
 
 // A short read on the month from the given facts. Returns null when no model is ready.

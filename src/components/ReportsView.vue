@@ -1,8 +1,9 @@
 <script setup>
 import { computed } from 'vue';
 import { cashFlow, activeMonths, topMerchants as merchants } from '../lib/ledger';
+const since = computed(() => new Date(`${cashFlow.value[0].key}-01T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }));
 
-// Year in numbers, from your own entries over the last 12 months.
+// Year in numbers, from your own entries for each month since you started (up to 12).
 const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const short = n => (Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n));
 const net = d => d.income - d.expense;
@@ -18,14 +19,14 @@ const tints = ['#7c3aed']; // one accent; the rest stays neutral
 const spark = computed(() => {
   const v = cashFlow.value.map(net);
   const min = Math.min(...v), max = Math.max(...v), span = max - min || 1;
-  const pts = v.map((x, i) => [(i / (v.length - 1)) * 100, 34 - ((x - min) / span) * 28]);
+  const pts = v.map((x, i) => [v.length > 1 ? (i / (v.length - 1)) * 100 : 100, 34 - ((x - min) / span) * 28]);
   return { line: pts.map(p => p.join(',')).join(' '), area: `0,40 ${pts.map(p => p.join(',')).join(' ')} 100,40`, last: pts[pts.length - 1] };
 });
 </script>
 
 <template>
   <section class="card cell report-cell">
-    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Last 12 months, from your entries</span></div>
+    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Since {{ since }}, from your entries</span></div>
 
     <div class="stat-row tinted">
       <div class="stat t-violet">

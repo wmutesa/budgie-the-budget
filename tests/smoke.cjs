@@ -135,8 +135,11 @@ async function run(url) {
   assert.match(await page.textContent('.fx'), /0\.92/, 'live rates appear');
   assert.match(await page.textContent('.wallets'), /≈/, 'wallets show converted values');
 
-  assert.equal(await page.locator('.cap-col').count(), 12, 'cash flow shows twelve months');
-  await page.locator('.cap-col').nth(11).hover();
+  // Months start when you started (here: the earliest test entry, 9 days ago) and run to this month.
+  const nineDaysAgo = new Date(); nineDaysAgo.setDate(nineDaysAgo.getDate() - 9);
+  const expectedMonths = nineDaysAgo.getMonth() === new Date().getMonth() ? 1 : 2;
+  assert.equal(await page.locator('.cap-col').count(), expectedMonths, 'cash flow shows only the months since you started');
+  await page.locator('.cap-col').last().hover();
   assert.match(await page.textContent('.cap-tip'), new RegExp(new Date().toLocaleDateString('en-US', { month: 'short' })), 'hovering a month shows its totals');
 
   // Known companies appear instantly from the built-in directory.
@@ -161,6 +164,11 @@ async function run(url) {
 
   await page.click('.nb-pages button:nth-child(2)');
   assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
+  await page.waitForFunction(() => /Drafted from your spending|Made by AI/.test(document.querySelector('[data-test="budgets-by"]')?.textContent || ''));
+  const budgetText = await page.textContent('#budgets');
+  assert.match(budgetText, /Food & dining[\s\S]*Housing|Housing[\s\S]*Food & dining/, 'budgets are drafted from the categories you spend in');
+  assert.doesNotMatch(budgetText, /Software/, 'categories you never use are left out');
+  assert.equal(await page.locator('#budgets .swatch').first().evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(124, 58, 237)', 'Housing keeps its set colour');
   assert.match(await page.textContent('body'), /Recent activity/, 'transactions page lists activity');
   assert.equal(await page.locator('.kpi').count(), 4, 'four summary tiles');
 

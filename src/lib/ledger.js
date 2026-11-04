@@ -30,12 +30,21 @@ export function spentIn(month) {
 // ---------- Numbers worked out from your own entries ----------
 const monthKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-// The last 12 months, oldest first: { key: 'YYYY-MM', m: 'Jan', year, income, expense } in USD.
+// The month Budgie's history starts: when you started, or your earliest entry
+// if you imported older ones.
+export const firstMonth = computed(() => {
+  const earliest = store.transactions.reduce((m, t) => { const k = String(t.date).slice(0, 7); return /^\d{4}-\d{2}$/.test(k) && k < m ? k : m; }, store.startedAt || monthKey(new Date()));
+  return earliest;
+});
+
+// Each month from when you started up to this one (at most the last 12), oldest first:
+// { key: 'YYYY-MM', m: 'Jan', year, income, expense } in USD.
 export const cashFlow = computed(() => {
   const months = [];
   const d = new Date(); d.setDate(1);
   for (let i = 11; i >= 0; i--) {
     const x = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    if (monthKey(x) < firstMonth.value) continue;
     months.push({ key: monthKey(x), m: x.toLocaleDateString('en-US', { month: 'short' }), year: x.getFullYear(), income: 0, expense: 0 });
   }
   const byKey = Object.fromEntries(months.map(m => [m.key, m]));

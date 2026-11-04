@@ -1293,3 +1293,11 @@ html, body { background: #fff; }
 .ai-state { font-size: 11px; font-weight: 600; color: #71717a; }
 .ai-state.ready { color: #15803d; } .ai-state.loading { color: #6d28d9; } .ai-state.error { color: #b45309; }
 .ai-note { color: #b45309; }
+.bf-amt { border: 0; background: none; padding: 0; cursor: text; }
+.bf-amt:hover { color: #6d28d9; text-decoration: underline dotted; text-underline-offset: 3px; }
+.bf-edit { width: 110px; } .bf-edit .field { width: 100%; }
+.bf-foot { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+.bf-empty { display: grid; gap: 10px; }
+.bf-income { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.bf-income .field { width: 100%; }
+.bf-empty .btn { justify-self: start; }

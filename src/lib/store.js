@@ -2,7 +2,6 @@
 // subscriptions, budgets and plan. It syncs to their account (see sync.js) and
 // a copy is kept in this browser so the app opens instantly and works offline.
 import { reactive, watch } from 'vue';
-import { budgets as defaultBudgets } from '../data/defaults';
 
 // Data saved before personal accounts existed; moved into the first account
 // that signs in on this device.
@@ -22,7 +21,11 @@ function fromSaved(saved = {}) {
     // Entries from the old sample data are dropped; Budgie only shows your own.
     transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(t => t && t.source !== 'sample') : [],
     drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
-    budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
+    // Monthly budgets, drafted by AI or rules (see budgets.js) and editable.
+    budgets: Array.isArray(saved.budgets) ? saved.budgets : [],
+    budgetMeta: saved.budgetMeta && typeof saved.budgetMeta === 'object' ? saved.budgetMeta : {},
+    // The month you started using Budgie (YYYY-MM); charts begin there.
+    startedAt: typeof saved.startedAt === 'string' ? saved.startedAt : new Date().toISOString().slice(0, 7),
     dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
     banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
     plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },

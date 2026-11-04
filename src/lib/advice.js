@@ -40,7 +40,9 @@ export const cards = computed(() => {
   const out = [];
   const p = pace.value;
 
-  if (p.projected > p.budget) {
+  if (!p.budget) {
+    // No budgets yet: the budgets card drafts them once there is income or spending.
+  } else if (p.projected > p.budget) {
     out.push({ id: `pace-${month}`, tone: 'warn', title: 'On pace to overspend', body: `Spending is heading for ${usd(p.projected)} against a ${usd(p.budget)} budget. Slow the biggest category for the rest of the month.` });
   } else {
     out.push({ id: `pace-${month}`, tone: 'good', title: 'Spending is on pace', body: `At this rate the month ends near ${usd(p.projected)}, under your ${usd(p.budget)} budget.` });

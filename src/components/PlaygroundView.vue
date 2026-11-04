@@ -1,4 +1,5 @@
 <script setup>
+import { colorFor } from '../lib/budgets';
 import { ref, computed, watch, onMounted } from 'vue';
 import { store } from '../lib/store';
 import { organize, parseChunk, GROUPS, EXAMPLE } from '../lib/plan';
@@ -120,12 +121,12 @@ const applied = ref('');
 function applyPlan() {
   const sums = {};
   plan.items.filter(i => !['Savings', 'Goals'].includes(i.group) && i.monthly).forEach(i => { sums[i.category] = (sums[i.category] || 0) + Number(i.monthly); });
-  const palette = ['#7c3aed', '#16a34a', '#2563eb', '#db2777', '#d97706', '#0891b2', '#4f46e5'];
   Object.entries(sums).forEach(([name, v], n) => {
     const amount = Math.ceil(v / 10) * 10;
     const b = store.budgets.find(x => x.name === name);
-    if (b) b.budget = amount; else store.budgets.push({ name, budget: amount, color: palette[n % palette.length] });
+    if (b) Object.assign(b, { budget: amount, edited: true }); else store.budgets.push({ name, budget: amount, color: colorFor(name, n), edited: true });
   });
+  store.budgetMeta = { source: 'plan', by: 'your plan', at: new Date().toISOString() };
   applied.value = `Budgets updated for ${Object.keys(sums).length} categories.`;
 }
 onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
