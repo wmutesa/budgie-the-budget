@@ -158,14 +158,14 @@ async function run(url) {
   await page.locator('#activity .dc-col').nth(12).hover();
   await page.waitForTimeout(250);
   assert.ok(await page.locator('#activity .dc-col').nth(12).locator('.dc-tip').isVisible(), 'activity bars show a tooltip on hover');
-  assert.ok((await page.locator('#reports .m-net.loss').count()) > 0 && (await page.locator('#reports .m-net.gain').count()) > 0, 'month by month marks gains and losses');
+  assert.ok((await page.locator('#months .m-net.loss').count()) > 0 && (await page.locator('#months .m-net.gain').count()) > 0, 'month by month marks gains and losses');
   assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
   assert.match(await page.textContent('#reports'), /Year in numbers/i, 'year in numbers moved to reports');
-  const [rb, ab] = await Promise.all([page.locator('#reports').boundingBox(), page.locator('#activity').boundingBox()]);
-  assert.ok(Math.abs(rb.y - ab.y) < 2, 'year in numbers and all activity sit side by side');
-  assert.ok(Math.abs((rb.y + rb.height) - (ab.y + ab.height)) < 2, 'year in numbers and all activity share a bottom line');
+  const [mb, wb, ib, ob] = await Promise.all(['#months', '#where', '#insights', '#opportunities'].map(s => page.locator(s).boundingBox()));
+  assert.ok(Math.abs(mb.y - wb.y) < 2 && Math.abs((mb.y + mb.height) - (wb.y + wb.height)) < 2, 'month by month and where money goes line up');
+  assert.ok(Math.abs((ib.y + ib.height) - (ob.y + ob.height)) < 2, 'insights and savings ideas share a bottom line');
   await page.click('#activity .chip-btn:has-text("Imported")');
   assert.match(await page.textContent('#activity'), /Payroll/, 'imported filter shows statement rows');
 

@@ -44,5 +44,9 @@ const apply = c => { c.action.run(); store.dismissed.push(c.id); };
       </article>
       <p v-if="!cards.length" class="muted">Nothing to act on right now.</p>
     </div>
+    <div v-if="facts.length > 2" class="noticed">
+      <p class="kicker">Also noticed</p>
+      <ul><li v-for="f in facts.slice(2)" :key="f">{{ f }}</li></ul>
+    </div>
   </section>
 </template>
