@@ -23,7 +23,6 @@ import KpiStrip from './components/KpiStrip.vue';
 import InsightsCell from './components/InsightsCell.vue';
 import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
-import AccountManager from './components/AccountManager.vue';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
@@ -86,7 +85,6 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <AccountCards class="span-8" id="accounts" />
         <SignalsCell class="span-4" />
         <WalletCards class="span-12" />
-        <AccountManager class="span-12" />
       </template>
       <template v-else-if="active === 'Transactions'">
         <KpiStrip />

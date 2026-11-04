@@ -78,6 +78,6 @@ export function sampleTransactions() {
     [9, 'Groceries', -64.9, 'Food & dining'],
   ];
   return rows.map(([n, merchant, amount, category], i) => ({
-    id: `s${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'sample', domain: '', logo: null, accountId: null,
+    id: `s${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'sample', domain: '', logo: null,
   }));
 }
