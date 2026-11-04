@@ -185,14 +185,19 @@ async function main() {
     await lost.context.close();
 
     // The owner removes Alex, whose session stops working.
-    await owner.page.click('.icon-x');
+    await owner.page.click('.acct-sheet .icon-x');
     await owner.page.click('[data-test="account"]');
-    await owner.page.waitForSelector('.acct-list li:has-text("Alex") button');
+    const alexRow = owner.page.locator('.acct-sheet .acct-list li', { hasText: 'Alex' }).getByRole('button', { name: 'Remove' });
+    await alexRow.waitFor();
     await owner.page.waitForFunction(() => document.querySelector('[data-test="codes-left"]')?.textContent.trim());
-    await Promise.all([
-      owner.page.waitForResponse(r => r.url().includes('/api/people/') && r.request().method() === 'DELETE'),
-      owner.page.click('.acct-list li:has-text("Alex") button'),
-    ]);
+    // Click until the server sees the removal (a click during a re-render can miss).
+    let removed = false;
+    for (let attempt = 0; attempt < 3 && !removed; attempt++) {
+      const seen = owner.page.waitForResponse(r => r.url().includes('/api/people/') && r.request().method() === 'DELETE', { timeout: 5000 }).then(() => true, () => false);
+      await alexRow.click();
+      removed = await seen;
+    }
+    assert.ok(removed, 'the owner can remove a person');
     await owner.page.waitForFunction(() => !document.querySelector('.acct-sheet').textContent.includes('Alex'));
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
 
