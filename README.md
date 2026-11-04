@@ -41,3 +41,23 @@ npm test           # browser smoke test; live services are faked so it runs offl
 - `src/lib/store.js`: base currency and tracked subscriptions, saved in the browser
 - `src/data/demo.js`: sample balances and transactions
 - `legacy/`: the earlier single-file version, kept for reference
+
+## Repository rules
+
+`.github/rulesets/protect-main.json` protects the default branch (`main`). Import it once:
+
+1. GitHub → **Settings → Rules → Rulesets → New ruleset → Import a ruleset**.
+2. Choose `.github/rulesets/protect-main.json` from this repository, review, and **Create**.
+
+What it enforces on `main`:
+
+- Changes arrive through a pull request; review threads must be resolved; stale approvals are dismissed after new pushes.
+- The `ci` check (build plus browser test) must pass, on a branch that is up to date with `main`.
+- Linear history: squash or rebase merges only.
+- No force pushes and no deleting `main`.
+
+Repository admins can bypass the rules for emergencies. To make the rules apply to everyone, remove the `bypass_actors` entry before importing, or set the bypass mode to "For pull requests only" afterwards.
+
+## Branches
+
+Work happens on short-lived branches merged into `main` through pull requests. After merging, GitHub deletes the head branch automatically if **Settings → General → Automatically delete head branches** is on.
