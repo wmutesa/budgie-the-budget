@@ -5,9 +5,12 @@
   "description": "Ledgerline local-first budgeting app, deployed as Cloudflare static assets",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "check": "node --check app.js && node --check ai.js",
+    "test": "node tests/smoke.js"
   },
   "devDependencies": {
+    "playwright": "^1.64.1",
     "wrangler": "^4.0.0"
   }
 }
