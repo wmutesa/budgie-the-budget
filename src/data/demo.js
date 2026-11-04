@@ -1,0 +1,58 @@
+// Dummy data for development. It mirrors the shape the real data will have,
+// so the screens can be checked under realistic numbers before live data exists.
+
+export const accounts = [
+  { id: 'checking', name: 'My balance', sub: 'Wallet overview & spending', balance: 20520.32, change: 1.5 },
+  { id: 'savings', name: 'Savings account', sub: 'Steady growth savings', balance: 15800.45, change: 3.2 },
+  { id: 'invest', name: 'Investment portfolio', sub: 'Track your wealth growth', balance: 50120.78, change: 4.7 },
+];
+
+export const wallets = [
+  { code: 'USD', name: 'US Dollar', balance: 22678.0, limit: '$10k a month', status: 'Active' },
+  { code: 'EUR', name: 'Euro', balance: 18345.0, limit: '€8k a month', status: 'Active' },
+  { code: 'GBP', name: 'British Pound', balance: 15000.0, limit: '£7.5k a month', status: 'Inactive' },
+  { code: 'BDT', name: 'Bangladeshi Taka', balance: 122678.0, limit: '৳10k a month', status: 'Active' },
+];
+
+// Twelve months of cash flow.
+export const cashFlow = [
+  { m: 'Jan', income: 21400, expense: 14200 },
+  { m: 'Feb', income: 19800, expense: 15100 },
+  { m: 'Mar', income: 26300, expense: 16900 },
+  { m: 'Apr', income: 24100, expense: 13800 },
+  { m: 'May', income: 22900, expense: 15600 },
+  { m: 'Jun', income: 25700, expense: 14400 },
+  { m: 'Jul', income: 27200, expense: 17300 },
+  { m: 'Aug', income: 23600, expense: 16100 },
+  { m: 'Sep', income: 25100, expense: 15800 },
+  { m: 'Oct', income: 28400, expense: 18200 },
+  { m: 'Nov', income: 26900, expense: 16700 },
+  { m: 'Dec', income: 30100, expense: 19400 },
+];
+
+export const spending = [
+  { name: 'House rent', amount: 2000, color: '#a3e635' },
+  { name: 'Food & dining', amount: 1500, color: '#f5b942' },
+  { name: 'Transport', amount: 640, color: '#60a5fa' },
+  { name: 'Others', amount: 800, color: '#8a919c' },
+];
+
+export const bills = [
+  { name: 'Netflix', date: 'Jun 28, 2026', amount: 15.99, status: 'Scheduled', color: '#e50914' },
+  { name: 'Spotify Premium', date: 'Jun 30, 2026', amount: 9.99, status: 'Scheduled', color: '#1db954' },
+  { name: 'Adobe Creative Cloud', date: 'Jul 4, 2026', amount: 52.99, status: 'Scheduled', color: '#fa0f00' },
+];
+
+export const transactions = [
+  { id: 1, title: 'Mobile app purchase', date: 'Wed, 10:29 AM', amount: 25500, status: 'Success', kind: 'in' },
+  { id: 2, title: 'Software license', date: 'Wed, 10:29 AM', amount: -25500, status: 'Success', kind: 'out' },
+  { id: 3, title: 'Trader Joe’s', date: 'Yesterday', amount: -86.4, status: 'Success', kind: 'out' },
+  { id: 4, title: 'Payroll · Employer', date: 'Nov 1', amount: 2350, status: 'Success', kind: 'in' },
+  { id: 5, title: 'Metro top-up', date: 'Nov 6', amount: -64, status: 'Pending', kind: 'out' },
+];
+
+export const goals = [
+  { name: 'Emergency fund', saved: 7200, target: 10000, color: '#a3e635' },
+  { name: 'Europe vacation', saved: 1400, target: 5000, color: '#f5b942' },
+  { name: 'Tesla Model 3', saved: 13500, target: 30000, color: '#60a5fa' },
+];

@@ -4,13 +4,21 @@
   "private": true,
   "description": "Budgie local-first budgeting app, deployed as Cloudflare static assets",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "check": "node --check app.js && node --check ai.js",
-    "test": "node tests/smoke.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "check": "vite build",
+    "test": "node tests/smoke.cjs"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.10",
     "playwright": "^1.64.1",
+    "vite": "^7.3.7",
     "wrangler": "^4.0.0"
-  }
+  },
+  "dependencies": {
+    "vue": "^3.5.44"
+  },
+  "type": "module"
 }

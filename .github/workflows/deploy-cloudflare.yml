@@ -62,6 +62,17 @@ jobs:
             echo "::notice::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID as repository secrets to enable automatic deploys."
           fi
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build the site
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          npm ci
+          npm run build
+
       - name: Deploy to Cloudflare Workers
         id: deploy
         if: steps.secrets.outputs.ready == 'true'

@@ -1,58 +1,13 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="color-scheme" content="dark light" />
-  <title>Budgie · Local budget</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <header class="masthead">
-    <div class="wordmark-line">
-      <span class="wordmark">Budgie</span>
-      <span class="eyebrow" id="eyebrow"></span>
-    </div>
-    <nav class="jumps" aria-label="Jump to section">
-      <a href="#overview">Overview</a><a href="#plan">Plan</a><a href="#accounts">Accounts</a>
-      <a href="#goals">Goals</a><a href="#ledger">Ledger</a><a href="#reports">Reports</a><a href="#set">Settings</a>
-    </nav>
-    <div class="tools">
-      <form id="global-search" class="search" role="search">
-        <input name="q" type="search" placeholder="Search transactions" aria-label="Search transactions" />
-      </form>
-      <button id="demo-pill" class="demo-pill" data-action="clear-demo" hidden title="Clear the demo data">Demo data · clear</button>
-      <span id="ai-pill" class="pill">AI · checking</span>
-      <button class="ghost tiny" data-action="theme" title="Switch light and dark" aria-label="Switch light and dark theme">Theme</button>
-      <div class="top-actions" id="top-actions"></div>
-    </div>
-  </header>
-
-  <main id="view"></main>
-
-  <div class="fab" id="fab">
-    <nav class="fab-panel" id="fab-panel" aria-label="Quick menu">
-      <span class="fab-label">Jump to</span>
-      <a href="#overview">Overview</a><a href="#plan">Plan</a><a href="#accounts">Accounts</a>
-      <a href="#goals">Goals</a><a href="#ledger">Ledger</a><a href="#reports">Reports</a><a href="#set">Settings</a>
-      <span class="fab-label">Do</span>
-      <button data-action="add-tx">Add entry</button>
-      <button data-action="add-goal">New goal</button>
-      <button data-action="add-sub">New subscription</button>
-      <button data-action="export-json">Export backup</button>
-      <button data-action="import-json">Import backup</button>
-      <button data-action="export-csv">Export CSV</button>
-      <button data-action="theme">Switch theme</button>
-    </nav>
-    <button class="fab-toggle" id="fab-toggle" aria-expanded="false" aria-controls="fab-panel">
-      <span class="fab-icon" aria-hidden="true"><i></i><i></i><i></i></span><span>Menu</span>
-    </button>
-  </div>
-
-  <dialog id="modal"><form id="modal-form" method="dialog"></form></dialog>
-  <input type="file" id="import-file" accept="application/json,.json" hidden />
-  <div class="toasts" id="toasts" aria-live="polite"></div>
-  <script src="ai.js"></script>
-  <script src="app.js"></script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Budgie: a personal finance dashboard with tracking, goals, subscriptions and reports." />
+    <title>Budgie · Personal finance</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>
