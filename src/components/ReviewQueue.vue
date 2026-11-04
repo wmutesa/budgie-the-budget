@@ -9,7 +9,7 @@ import PickMenu from './PickMenu.vue';
 const editing = ref(null);
 const colors = computed(() => Object.fromEntries(store.budgets.map(b => [b.name, b.color])));
 const catOptions = computed(() => CATEGORIES.map(c => ({ value: c, label: c, color: colors.value[c] || (c === 'Income' ? '#16a34a' : '#a1a1aa') })));
-const curOptions = ['USD', 'EUR', 'GBP', 'KES', 'NGN', 'JPY', 'CAD', 'INR'].map(c => ({ value: c, label: c }));
+const curOptions = ['USD', 'RWF', 'EUR', 'GBP', 'THB', 'KES', 'NGN', 'JPY', 'CAD', 'INR'].map(c => ({ value: c, label: c }));
 
 const iso = d => d.toISOString().slice(0, 10);
 const today = iso(new Date());

@@ -49,6 +49,8 @@ export function detectCurrency(text, fallback = 'USD') {
   if (/£|\bgbp\b/i.test(text)) return 'GBP';
   if (/ksh|\bkes\b/i.test(text)) return 'KES';
   if (/₦|\bngn\b/i.test(text)) return 'NGN';
+  if (/\brwf\b|\bfrw\b|\brf\b|rwandan? francs?/i.test(text)) return 'RWF';
+  if (/฿|\bthb\b|\bbaht\b/i.test(text)) return 'THB';
   if (/\$|\busd\b/i.test(text)) return 'USD';
   return fallback;
 }
@@ -148,20 +150,100 @@ export function statementToDrafts(text, opts = {}) {
   return rows.length >= 2 ? rowsToDrafts([['date', 'description', 'amount'], ...rows], { ...opts, source: 'pdf' }) : [];
 }
 
-// "Uber 23.40 yesterday" or "Salary +2350 Nov 1" -> one draft.
-export function quickToDraft(text, { base = 'USD' } = {}) {
+// Relative dates in plain language. Returns { date, phrase } or null.
+// "a week ago", "3 days ago", "in a month", "last friday", "next week", "on the 3rd", "the day before yesterday"...
+const NUMS = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, couple: 2, few: 3 };
+const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const shift = (d, unit, n) => {
+  const x = new Date(d);
+  if (unit === 'day') x.setDate(x.getDate() + n);
+  if (unit === 'week') x.setDate(x.getDate() + 7 * n);
+  if (unit === 'month') x.setMonth(x.getMonth() + n);
+  if (unit === 'year') x.setFullYear(x.getFullYear() + n);
+  return x;
+};
+
+export function parseRelative(text, now = new Date()) {
+  const t = String(text).toLowerCase();
+  let m;
+  if ((m = t.match(/\b(the\s+)?day\s+before\s+yesterday\b/))) return { date: iso(shift(now, 'day', -2)), phrase: m[0] };
+  if ((m = t.match(/\b(the\s+)?day\s+after\s+tomorrow\b/))) return { date: iso(shift(now, 'day', 2)), phrase: m[0] };
+  if ((m = t.match(/\byesterday(\s+(morning|afternoon|evening|night))?\b|\blast\s+night\b/))) return { date: iso(shift(now, 'day', -1)), phrase: m[0] };
+  if ((m = t.match(/\btomorrow(\s+(morning|afternoon|evening|night))?\b/))) return { date: iso(shift(now, 'day', 1)), phrase: m[0] };
+  if ((m = t.match(/\b(today|tonight|this\s+(morning|afternoon|evening)|just\s+now|right\s+now)\b/))) return { date: iso(now), phrase: m[0] };
+  const num = '(a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|couple(?:\\s+of)?|few|\\d+)';
+  if ((m = t.match(new RegExp(`\\b${num}\\s+(day|week|month|year)s?\\s+ago\\b`)))) {
+    const n = NUMS[m[1].replace(/\s+of$/, '')] ?? Number(m[1]);
+    return { date: iso(shift(now, m[2], -n)), phrase: m[0] };
+  }
+  if ((m = t.match(new RegExp(`\\bin\\s+${num}\\s+(day|week|month|year)s?\\b`)))) {
+    const n = NUMS[m[1].replace(/\s+of$/, '')] ?? Number(m[1]);
+    return { date: iso(shift(now, m[2], n)), phrase: m[0] };
+  }
+  if ((m = t.match(/\b(last|next|this)\s+(week|month|year)\b/))) {
+    const n = m[1] === 'last' ? -1 : m[1] === 'next' ? 1 : 0;
+    return { date: iso(shift(now, m[2], n)), phrase: m[0] };
+  }
+  if ((m = t.match(/\b(?:(last|next|this|on)\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/))) {
+    const target = DAYS.indexOf(m[2]);
+    const today = now.getDay();
+    let diff;
+    if (m[1] === 'next') diff = ((target - today + 7) % 7) || 7;
+    else if (m[1] === 'last') diff = -(((today - target + 7) % 7) || 7);
+    else diff = -((today - target + 7) % 7); // most recent, including today
+    return { date: iso(shift(now, 'day', diff)), phrase: m[0] };
+  }
+  if ((m = t.match(/\b(?:on\s+)?the\s+(\d{1,2})(st|nd|rd|th)\b/))) {
+    const d = new Date(now.getFullYear(), now.getMonth(), Number(m[1]));
+    if (d > now) d.setMonth(d.getMonth() - 1);
+    return { date: iso(d), phrase: m[0] };
+  }
+  return null;
+}
+
+const titleCase = s => (s === s.toUpperCase() ? s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : s.charAt(0).toUpperCase() + s.slice(1));
+const FILLER = /\b(i|we|just|spent|spend|paid|pay|paying|bought|buy|got|get|purchased|charged|ordered|for|on|at|to|from|my|the|some|of|with|via|using|by|card|cash|about|around|roughly|like|approx|dollars?|bucks|usd|eur|euros?|gbp|pounds?|ksh|shillings?|naira)\b/gi;
+
+// "Uber 23.40 a week ago", "spent 12.50 on lunch at Chipotle last friday",
+// "got paid 2350 salary on the 1st", "Netflix 15.49 in a month" -> one draft.
+export function quickToDraft(text, { base = 'USD', match = null } = {}) {
   const s = String(text).trim();
   if (!s) return null;
-  const moneyMatch = s.match(/([+-])?\s*[$€£]?\s*(\d[\d,]*(?:\.\d{1,2})?)/);
+  const moneyMatch = s.match(/([+-])?\s*[$€£₦]?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(k\b)?/i);
   if (!moneyMatch) return null;
-  const value = parseMoney(moneyMatch[2]);
+  const value = parseMoney(moneyMatch[2]) * (moneyMatch[3] ? 1000 : 1);
   let rest = s.replace(moneyMatch[0], ' ');
+
   let date = null;
-  for (const word of ['today', 'yesterday']) if (new RegExp(`\\b${word}\\b`, 'i').test(rest)) { date = parseDate(word); rest = rest.replace(new RegExp(`\\b${word}\\b`, 'i'), ' '); }
-  const dm = rest.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|[A-Za-z]{3}\s+\d{1,2}(?:,?\s+\d{4})?)/);
-  if (!date && dm) { const withYear = /\d{4}/.test(dm[0]) ? dm[0] : `${dm[0]}, ${new Date().getFullYear()}`; date = parseDate(withYear); if (date) rest = rest.replace(dm[0], ' '); }
-  const merchant = rest.replace(/\s+/g, ' ').trim() || 'Unknown';
-  const income = moneyMatch[1] === '+' || /salary|payroll|refund|deposit/i.test(merchant);
+  const rel = parseRelative(rest);
+  if (rel) { date = rel.date; rest = rest.replace(new RegExp(rel.phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), ' '); }
+  if (!date) {
+    const dm = rest.match(/(\d{4}-\d{2}-\d{2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|[A-Za-z]{3,9}\s+\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?)/);
+    if (dm) {
+      const clean = dm[0].replace(/(\d)(st|nd|rd|th)/, '$1');
+      const withYear = /\d{4}/.test(clean) ? clean : `${clean}, ${new Date().getFullYear()}`;
+      const parsed = parseDate(withYear);
+      if (parsed) { date = parsed; rest = rest.replace(dm[0], ' '); }
+    }
+  }
+
+  const income = moneyMatch[1] === '+' || /\b(salary|payroll|paycheck|refund|deposit|received|got paid|earned|income|wage|bonus)\b/i.test(s);
+
+  // Prefer the place after "at" / "from" as the merchant, keep the item as a note: "lunch at Chipotle".
+  let note = '';
+  let merchant = rest;
+  const at = rest.match(/\b(?:at|from)\s+(.+)$/i);
+  if (at) { note = rest.slice(0, at.index).replace(FILLER, ' ').replace(/\s+/g, ' ').trim(); merchant = at[1]; }
+  merchant = merchant.replace(FILLER, ' ').replace(/[^\w&'’+ .-]/g, ' ').replace(/\s+/g, ' ').trim();
+  const known = match ? match(s) : null;
+  if (known) { if (!note && merchant && merchant.toLowerCase() !== known.name.toLowerCase()) note = merchant; merchant = known.name; }
+  merchant = merchant ? titleCase(merchant) : income ? 'Income' : 'Unknown';
+
   const amount = income ? Math.abs(value) : -Math.abs(value);
-  return { merchant, amount, currency: detectCurrency(s, base), date: date || todayISO(), source: 'quick', category: guessCategory(merchant, amount), confidence: 0.8 };
+  return {
+    merchant, amount, note: note ? titleCase(note) : '',
+    currency: detectCurrency(s, base), date: date || todayISO(), source: 'quick',
+    category: known ? (income ? 'Income' : known.category) : guessCategory(`${merchant} ${note}`, amount),
+    confidence: 0.8,
+  };
 }

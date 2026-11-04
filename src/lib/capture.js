@@ -14,7 +14,7 @@ export async function brandFor(name) {
   if (brandCache.has(key)) return brandCache.get(key);
   const known = matchMerchant(name);
   if (known) {
-    const hit = { name: known.name, domain: known.domain, logo: logoUrl(known.domain), description: known.category, website: `https://${known.domain}` };
+    const hit = { name: known.name, domain: known.domain, logo: known.domain ? logoUrl(known.domain) : null, description: known.category, website: known.domain ? `https://${known.domain}` : null };
     brandCache.set(key, hit);
     return hit;
   }
@@ -102,6 +102,6 @@ export async function captureFile(file, { base = 'USD', onProgress } = {}) {
 }
 
 export function captureNote(text, base = 'USD') {
-  const d = quickToDraft(text, { base });
+  const d = quickToDraft(text, { base, match: matchMerchant });
   return d ? [d] : [];
 }

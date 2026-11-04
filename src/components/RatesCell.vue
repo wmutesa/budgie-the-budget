@@ -3,8 +3,8 @@ import { computed } from 'vue';
 import { rates, loadRates, ratesLabel } from '../lib/rates';
 import { store } from '../lib/store';
 
-const bases = ['USD', 'EUR', 'GBP', 'KES', 'NGN'];
-const watchList = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'INR', 'KES', 'NGN', 'BDT'];
+const bases = ['USD', 'RWF', 'EUR', 'GBP', 'THB', 'KES'];
+const watchList = ['USD', 'RWF', 'EUR', 'GBP', 'THB', 'JPY', 'CAD', 'INR', 'KES', 'NGN'];
 const shown = computed(() => watchList.filter(c => c !== rates.base && rates.values[c]));
 const setBase = b => { store.base = b; loadRates(b, { force: true }); };
 const fmt = n => (n >= 100 ? n.toFixed(1) : n.toFixed(4));

@@ -881,3 +881,67 @@ html, body { background: #fff; }
 .dc-col:hover i { background: #7c3aed; }
 .cat-tag { background: none; box-shadow: none; padding: 0; font-weight: 500; color: #3f3f46; display: inline-flex; align-items: center; gap: 5px; }
 .cat-tag::before { content: ""; width: 6px; height: 6px; background: var(--c); display: inline-block; }
+
+/* ---------- Hide scrollbars everywhere; scrolling still works ---------- */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* ---------- November cell: lighter tints ---------- */
+.spend-list .meter { background: #f7f7f8; height: 6px; border-radius: 3px; }
+.spend-list .meter i { opacity: .38; border-radius: 3px; }
+.rows dd { font-weight: 600; }
+.chip-s { font-weight: 600; border-radius: 2px; }
+.chip-s.up { background: #f0fdf4; color: #166534; }
+.chip-s.down { background: #fdf2f8; color: #9d174d; }
+.rows div { border-bottom-color: #f4f4f5; }
+
+/* ---------- Savings goal: very light ---------- */
+.goal-card { background: #fcfbff !important; }
+.goal-card .g-track { stroke: #f3f0ff; }
+.goal-card .g-fill { stroke: #c4b5fd; }
+.goal-card .thin { background: #f3f0ff; height: 5px; border-radius: 3px; }
+.goal-card .thin i { background: #c4b5fd; border-radius: 3px; }
+.goal-card .tag-light { background: #f3f0ff; }
+
+/* ---------- Expense breakdown: one light stacked bar and a dotted list ---------- */
+.eb-stack { display: flex; gap: 3px; height: 34px; margin: 4px 0 14px; }
+.eb-stack i { display: flex; align-items: center; padding-left: 8px; min-width: 34px; border-radius: 3px; }
+.eb-stack span { font-family: var(--display); font-size: 12px; font-weight: 600; color: #3f3f46; }
+.eb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.eb-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: 12.5px; }
+.eb-name { display: inline-flex; align-items: center; gap: 8px; }
+.eb-sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.eb-dots { height: 1px; background: radial-gradient(circle, #d4d4d8 1px, transparent 1.2px) 0 0 / 6px 2px repeat-x; position: relative; }
+.eb-dots::after { content: ""; position: absolute; left: 0; top: -1px; height: 3px; width: var(--w); background: radial-gradient(circle, #a78bfa 1.2px, transparent 1.5px) 0 0 / 6px 3px repeat-x; }
+.eb-list b { font-variant-numeric: tabular-nums; }
+
+/* ---------- Month by month and top merchants: lightest tints, dashed merchant bars ---------- */
+.lm.in, .mb.in { background: #e4e4e7; }
+.lm.out, .mb.out { background: #ede9fe; }
+.mb { height: 7px; }
+.m-row.best { background: #fcfbff; box-shadow: inset 2px 0 0 #c4b5fd; }
+.m-net.neg { color: #9d174d; }
+.merchant-list.colored .meter { height: 6px; background: repeating-linear-gradient(90deg, #f3f0ff 0 8px, transparent 8px 12px); border-radius: 0; }
+.merchant-list.colored .meter i { background: repeating-linear-gradient(90deg, #a78bfa 0 8px, transparent 8px 12px) !important; border-radius: 0; }
+.merchant-list.colored .m-dot { background: #c4b5fd !important; }
+.stat-row.tinted .stat.t-violet { box-shadow: inset 0 2px 0 #c4b5fd; }
+.ring circle:last-child { stroke: #a78bfa; }
+
+/* ---------- Subscriptions: compact long lists ---------- */
+.subs-scroll { max-height: 420px; overflow-y: auto; }
+.more-btn { width: 100%; margin-top: 8px; background: #fafafa; border: 1px dashed #d4d4d8; padding: 9px; font-size: 12px; font-weight: 600; color: #3f3f46; }
+.more-btn:hover { border-color: #a78bfa; color: #000; }
+
+/* ---------- Dictation ---------- */
+.note-wrap { position: relative; min-width: 0; }
+.note-wrap .note-field { padding-right: 46px; }
+.mic { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); background: #fff; padding: 0; color: #3f3f46; }
+.mic:hover { border-color: #000; color: #000; }
+.mic.on { background: #f5f3ff; border-color: #a78bfa; color: #7c3aed; animation: mic-pulse 1.2s ease-in-out infinite; }
+@keyframes mic-pulse { 50% { box-shadow: 0 0 0 6px rgba(167, 139, 250, .18); } }
+.hint-line { margin: 0; font-size: 11px; color: #71717a; }
+.span-12 .wallets { grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 1100px) { .span-12 .wallets { grid-template-columns: repeat(2, 1fr); } }
+/* No grey band under short pages; odd rate counts fill the last row */
+.grid.hl.canvas { min-height: 0; }
+.fx li:last-child:nth-child(odd) { grid-column: span 2; }

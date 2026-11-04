@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
 
 async function fakeNetwork(page) {
   await page.route('**/open.er-api.com/**', route => route.fulfill({
-    json: { result: 'success', time_last_update_utc: 'Wed, 04 Nov 2026 00:02:31 +0000', rates: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 151.3, CAD: 1.37, INR: 84.1, KES: 129.5, NGN: 1550, BDT: 122.2 } },
+    json: { result: 'success', time_last_update_utc: 'Wed, 04 Nov 2026 00:02:31 +0000', rates: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 151.3, CAD: 1.37, INR: 84.1, KES: 129.5, NGN: 1550, BDT: 122.2, RWF: 1450, THB: 33.8 } },
   }));
   await page.route('**/www.wikidata.org/**', route => {
     const action = new URL(route.request().url()).searchParams.get('action');
@@ -139,6 +139,35 @@ async function run(url) {
   await page.click('.nb-pages button:nth-child(2)');
   assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
   await page.click('.nb-pages button:nth-child(1)');
+
+  // Sentences with relative dates become clean drafts.
+  await page.click('.nb-pages button:nth-child(2)');
+  await page.fill('[data-test="quick-note"]', 'spent 12.50 on lunch at chipotle last friday');
+  await page.press('[data-test="quick-note"]', 'Enter');
+  await page.waitForSelector('#review');
+  const draftText = await page.textContent('.draft-card >> nth=0');
+  assert.match(draftText, /Chipotle/, 'merchant comes from "at Chipotle"');
+  assert.doesNotMatch(draftText, /friday/i, 'the date phrase is removed from the merchant');
+  await page.click('[data-test="accept-all"]');
+
+  // Rwandan francs in the live rates.
+  await page.click('.nb-pages button:nth-child(1)');
+  assert.match(await page.textContent('.fx'), /RWF/, 'Rwandan franc rate appears');
+
+  // A long subscription list stays compact.
+  const many = await context.newPage();
+  await fakeNetwork(many);
+  await many.addInitScript(() => {
+    const names = ['Netflix', 'Spotify', 'YouTube Premium', 'Disney+', 'Hulu', 'Max', 'Apple Music', 'iCloud+', 'Google One', 'Dropbox', 'Notion', 'Figma', 'GitHub', 'Vercel', 'Cursor', 'Claude', 'ChatGPT', 'Canva', 'Adobe Creative Cloud', 'Duolingo', 'Headspace', 'Calm', 'Strava', 'Audible', 'Crunchyroll', 'Peacock', 'Paramount+', 'Tidal', 'NordVPN', '1Password'];
+    const subs = names.map((n, i) => ({ id: 's' + i, name: n, domain: '', logo: null, amount: 5 + i, currency: i % 5 === 0 ? 'RWF' : 'USD', cycle: 'monthly', next: '2026-12-0' + ((i % 9) + 1) }));
+    localStorage.setItem('budgie.v2', JSON.stringify({ base: 'USD', subscriptions: subs }));
+  });
+  await many.goto(url, { waitUntil: 'load' });
+  assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 6, '30 subscriptions show 6 at first');
+  assert.match(await many.textContent('[data-test="subs-more"]'), /Show 24 more/, 'the rest sit behind a toggle');
+  await many.click('[data-test="subs-more"]');
+  assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 30, 'all 30 appear when expanded');
+  await many.close();
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });

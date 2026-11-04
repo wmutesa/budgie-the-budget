@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { store, monthly, daysUntil } from '../lib/store';
 import { convert } from '../lib/rates';
 
@@ -10,6 +10,12 @@ const fmt = (n, c) => new Intl.NumberFormat('en-US', { style: 'currency', curren
 const when = d => { const n = daysUntil(d); return n < 0 ? `${-n}d overdue` : n === 0 ? 'today' : `in ${n}d`; };
 const remove = id => { store.subscriptions = store.subscriptions.filter(s => s.id !== id); };
 const ideas = ['Netflix', 'Spotify', 'YouTube Premium', 'Claude'];
+// Long lists stay compact: the first few, then the rest behind a toggle, scrolling inside.
+const LIMIT = 6;
+const expanded = ref(false);
+const visible = computed(() => (expanded.value ? items.value : items.value.slice(0, LIMIT)));
+const hidden = computed(() => Math.max(0, items.value.length - LIMIT));
+const hiddenTotal = computed(() => items.value.slice(LIMIT).reduce((s, x) => s + (convert(monthly(x), x.currency, store.base) ?? 0), 0));
 </script>
 
 <template>
@@ -22,8 +28,8 @@ const ideas = ['Netflix', 'Spotify', 'YouTube Premium', 'Claude'];
       <p>Search any service by name. Budgie finds it on the web, adds its logo and site, and tracks the cost in your currency.</p>
       <div class="chips"><button v-for="i in ideas" :key="i" class="chip-btn" @click="emit('add', i)">{{ i }}</button></div>
     </div>
-    <ul v-else class="subs">
-      <li v-for="s in items" :key="s.id" class="sub-row">
+    <ul v-else class="subs" :class="{ 'subs-scroll': expanded && items.length > LIMIT }" data-test="subs-list">
+      <li v-for="s in visible" :key="s.id" class="sub-row">
         <img v-if="s.logo" :src="s.logo" :alt="`${s.name} logo`" width="28" height="28" loading="lazy" />
         <span v-else class="logo-fallback">{{ s.name[0] }}</span>
         <div class="grow">
@@ -37,5 +43,8 @@ const ideas = ['Netflix', 'Spotify', 'YouTube Premium', 'Claude'];
         <button class="icon-x" :aria-label="`Stop tracking ${s.name}`" @click="remove(s.id)">×</button>
       </li>
     </ul>
+    <button v-if="hidden" class="more-btn" data-test="subs-more" @click="expanded = !expanded">
+      {{ expanded ? 'Show fewer' : `Show ${hidden} more · ${fmt(hiddenTotal, store.base)} a month` }}
+    </button>
   </section>
 </template>

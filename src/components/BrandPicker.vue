@@ -19,13 +19,13 @@ async function run() {
   if (ctl) ctl.abort();
   ctl = new AbortController();
   if (q.value.trim().length < 2) { results.value = []; return; }
-  const local = searchDirectory(q.value).map(e => ({ id: `dir:${e.domain}:${e.name}`, name: e.name, description: e.category, domain: e.domain, logo: logoUrl(e.domain), website: `https://${e.domain}`, local: true }));
+  const local = searchDirectory(q.value).map(e => ({ id: `dir:${e.domain}:${e.name}`, name: e.name, description: e.category, domain: e.domain, logo: e.domain ? logoUrl(e.domain) : null, website: e.domain ? `https://${e.domain}` : null, local: true }));
   results.value = local;
   loading.value = true;
   error.value = '';
   try {
     const web = await searchBrands(q.value, { signal: ctl.signal });
-    const seen = new Set(local.map(r => r.domain));
+    const seen = new Set(local.map(r => r.domain).filter(Boolean));
     results.value = [...local, ...web.filter(r => !seen.has(r.domain))];
   }
   catch (e) { if (e.name !== 'AbortError') error.value = 'Could not reach the web search.'; }
@@ -44,9 +44,10 @@ const manual = () => emit('pick', { name: q.value.trim(), domain: '', logo: null
     <ul class="results">
       <li v-for="r in results" :key="r.id">
         <button class="result" data-test="brand-result" @click="emit('pick', r)">
-          <img :src="r.logo" :alt="`${r.name} logo`" width="28" height="28" />
+          <img v-if="r.logo" :src="r.logo" :alt="`${r.name} logo`" width="28" height="28" />
+          <span v-else class="logo-fallback">{{ r.name[0] }}</span>
           <span class="grow"><b>{{ r.name }}</b><span class="muted small">{{ r.description || r.domain }}</span></span>
-          <span class="muted small">{{ r.local ? `${r.domain} · known` : r.domain }}</span>
+          <span class="muted small">{{ r.local ? `${r.domain || 'local place'} · known` : r.domain }}</span>
         </button>
       </li>
     </ul>

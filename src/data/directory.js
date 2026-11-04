@@ -257,6 +257,73 @@ Headspace|headspace.com|Health
 Calm|calm.com|Health
 Strava|strava.com|Health
 MyFitnessPal|myfitnesspal.com|Health
+RwandAir|rwandair.com|Transport
+MTN Rwanda|mtn.co.rw|Housing|mtn momo|momo
+Airtel Rwanda|airtel.co.rw|Housing
+Bank of Kigali|bk.rw|Other|bk
+I&M Bank|imbankgroup.com|Other
+Irembo|irembo.gov.rw|Other
+StarTimes|startimestv.com|Entertainment
+Inyange|inyangeindustries.com|Food & dining
+Question Coffee|questioncoffee.com|Food & dining
+Simba Supermarket||Food & dining|simba
+Kimironko Market||Food & dining|kimironko
+Nyabugogo Market||Food & dining|nyabugogo
+Kigali City Market||Food & dining|nyarugenge market
+MBTA|mbta.com|Transport|the t|charliecard
+Bluebikes|bluebikes.com|Transport
+Star Market|starmarket.com|Food & dining
+Stop & Shop|stopandshop.com|Food & dining|stop and shop
+Market Basket|shopmarketbasket.com|Food & dining
+Roche Bros.|rochebros.com|Food & dining|roche bros
+Wegmans|wegmans.com|Food & dining
+Legal Sea Foods|legalseafoods.com|Food & dining
+Tatte Bakery|tattebakery.com|Food & dining|tatte
+Flour Bakery|flourbakery.com|Food & dining|flour
+Mike's Pastry|mikespastry.com|Food & dining|mikes pastry
+Boston Public Market|bostonpublicmarket.org|Food & dining
+Faneuil Hall Marketplace|faneuilhallmarketplace.com|Shopping|faneuil hall|quincy market
+Harvard Coop|thecoop.com|Shopping|the coop
+Eversource|eversource.com|Housing
+National Grid|nationalgridus.com|Housing
+MTA|mta.info|Transport|subway|metrocard|omny
+Citi Bike|citibikenyc.com|Transport
+Fairway Market|fairwaymarket.com|Food & dining|fairway
+Zabar's|zabars.com|Food & dining|zabars
+Russ & Daughters|russanddaughters.com|Food & dining
+Katz's Delicatessen|katzsdelicatessen.com|Food & dining|katz
+Joe's Pizza|joespizzanyc.com|Food & dining|joes pizza
+Sweetgreen|sweetgreen.com|Food & dining
+Levain Bakery|levainbakery.com|Food & dining|levain
+Joe Coffee|joecoffeecompany.com|Food & dining
+Chelsea Market|chelseamarket.com|Food & dining
+Bloomingdale's|bloomingdales.com|Shopping|bloomingdales
+B&H Photo|bhphotovideo.com|Shopping|b and h
+7-Eleven Thailand|7eleven.co.th|Food & dining|7-eleven|seven eleven|7 eleven
+Big C|bigc.co.th|Food & dining
+Lotus's|lotuss.com|Food & dining|lotuss|tesco lotus
+Tops|tops.co.th|Food & dining
+Makro|makro.co.th|Food & dining
+Foodland|foodland.co.th|Food & dining
+Central|central.co.th|Shopping|central world|centralworld
+Siam Paragon|siamparagon.co.th|Shopping
+Terminal 21|terminal21.co.th|Shopping
+Chatuchak Weekend Market||Shopping|chatuchak|jj market
+BTS Skytrain|bts.co.th|Transport|bts|rabbit card
+MRT Bangkok|bemplc.co.th|Transport|mrt
+LINE MAN|lineman.line.me|Food & dining|lineman
+Robinhood|robinhood.in.th|Food & dining
+AIS|ais.th|Housing
+True|true.th|Housing|truemove
+dtac|dtac.co.th|Housing
+Thai Airways|thaiairways.com|Transport
+Bangkok Airways|bangkokair.com|Transport
+PTT Station|pttor.com|Transport|ptt
+After You|afteryoudessertcafe.com|Food & dining
+MK Restaurants|mkrestaurant.com|Food & dining|mk suki
+Kasikornbank|kasikornbank.com|Other|kbank
+Bangkok Bank|bangkokbank.com|Other
+SCB|scb.co.th|Other|siam commercial bank
 `;
 
 export const DIRECTORY = RAW.trim().split('\n').map(line => {

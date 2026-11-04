@@ -11,7 +11,8 @@ export const wallets = [
   { code: 'USD', name: 'US Dollar', balance: 22678.0, limit: '$10k a month', status: 'Active' },
   { code: 'EUR', name: 'Euro', balance: 18345.0, limit: '€8k a month', status: 'Active' },
   { code: 'GBP', name: 'British Pound', balance: 15000.0, limit: '£7.5k a month', status: 'Inactive' },
-  { code: 'BDT', name: 'Bangladeshi Taka', balance: 122678.0, limit: '৳10k a month', status: 'Active' },
+  { code: 'RWF', name: 'Rwandan Franc', balance: 350000, limit: 'FRw 400k a month', status: 'Active' },
+  { code: 'THB', name: 'Thai Baht', balance: 18500, limit: '฿20k a month', status: 'Active' },
 ];
 
 // Twelve months of cash flow.

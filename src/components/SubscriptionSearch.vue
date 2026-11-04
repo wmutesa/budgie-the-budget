@@ -9,7 +9,7 @@ const emit = defineEmits(['close']);
 const picked = ref(null);
 const inMonth = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
 const form = reactive({ amount: '', currency: store.base, cycle: 'monthly', next: inMonth });
-const currencies = ['USD', 'EUR', 'GBP', 'KES', 'NGN'];
+const currencies = ['USD', 'RWF', 'EUR', 'GBP', 'THB', 'KES'];
 const cycles = [['monthly', 'Monthly'], ['yearly', 'Yearly'], ['weekly', 'Weekly']];
 
 function save() {
