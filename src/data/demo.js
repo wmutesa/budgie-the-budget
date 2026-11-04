@@ -37,12 +37,6 @@ export const spending = [
   { name: 'Others', amount: 800, color: '#db2777' },
 ];
 
-export const bills = [
-  { name: 'Netflix', date: 'Jun 28, 2026', amount: 15.99, status: 'Scheduled', color: '#e50914' },
-  { name: 'Spotify Premium', date: 'Jun 30, 2026', amount: 9.99, status: 'Scheduled', color: '#1db954' },
-  { name: 'Adobe Creative Cloud', date: 'Jul 4, 2026', amount: 52.99, status: 'Scheduled', color: '#fa0f00' },
-];
-
 export const transactions = [
   { id: 1, title: 'Mobile app purchase', date: 'Wed, 10:29 AM', amount: 25500, status: 'Success', kind: 'in' },
   { id: 2, title: 'Software license', date: 'Wed, 10:29 AM', amount: -25500, status: 'Success', kind: 'out' },

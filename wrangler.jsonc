@@ -1,11 +1,14 @@
 {
-  // Budgie is a static site: Cloudflare serves the files in this folder.
-  // No Worker code runs and no user data leaves the browser.
+  // Budgie is a static Vue site. Cloudflare's GitHub integration deploys every
+  // push to main by running `npx wrangler deploy`, which first runs the build
+  // command below, so the dashboard's own build-command field can stay empty.
   "name": "budgie",
   "compatibility_date": "2026-11-01",
+  "build": {
+    "command": "npm run build"
+  },
   "assets": {
     "directory": "./dist",
-    "html_handling": "auto-trailing-slash",
-    "not_found_handling": "404-page"
+    "not_found_handling": "single-page-application"
   }
 }

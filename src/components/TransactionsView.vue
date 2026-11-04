@@ -1,10 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { transactions } from '../data/demo';
+import { store } from '../lib/store';
 
 // Chip filters instead of dropdowns.
 const filter = ref('All');
-const query = ref('');
 const filters = ['All', 'Income', 'Spending', 'Pending'];
 
 const rows = computed(() =>
@@ -12,7 +12,7 @@ const rows = computed(() =>
     if (filter.value === 'Income' && t.amount <= 0) return false;
     if (filter.value === 'Spending' && t.amount >= 0) return false;
     if (filter.value === 'Pending' && t.status !== 'Pending') return false;
-    return !query.value || t.title.toLowerCase().includes(query.value.toLowerCase());
+    return !store.query || t.title.toLowerCase().includes(store.query.toLowerCase());
   })
 );
 const fmt = n => (n < 0 ? '−' : '+') + Math.abs(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -25,7 +25,7 @@ const fmt = n => (n < 0 ? '−' : '+') + Math.abs(n).toLocaleString('en-US', { s
       <div class="chips">
         <button v-for="f in filters" :key="f" class="chip-btn" :class="{ on: filter === f }" @click="filter = f">{{ f }}</button>
       </div>
-      <input v-model="query" class="field" type="search" placeholder="Search" aria-label="Search transactions" />
+      <input v-model="store.query" class="field" type="search" placeholder="Search" aria-label="Search transactions" />
     </div>
     <table class="table">
       <thead><tr><th>Activity</th><th>Date</th><th class="num">Amount</th><th>Status</th></tr></thead>

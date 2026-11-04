@@ -1,12 +1,12 @@
 name: Deploy to Cloudflare
 
-# Every push to main runs the tests, then publishes the site to Cloudflare Workers.
+# Manual fallback deploy: runs the tests, then publishes the site to Cloudflare Workers.
 # Requires two repository secrets: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
 # Without them the test job still runs and the deploy job is skipped with a notice.
 
 on:
-  push:
-    branches: [main]
+  # Manual fallback only. Cloudflare's GitHub integration deploys main
+  # automatically, so running this on every push would publish twice.
   workflow_dispatch:
 
 permissions:

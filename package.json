@@ -2,12 +2,12 @@
   "name": "budgie",
   "version": "0.1.0",
   "private": true,
-  "description": "Budgie local-first budgeting app, deployed as Cloudflare static assets",
+  "description": "Budgie: budgeting, subscriptions and savings tracking with live exchange rates. Vue + Vite, deployed on Cloudflare Workers.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "wrangler deploy",
     "check": "vite build",
     "test": "node tests/smoke.cjs"
   },
