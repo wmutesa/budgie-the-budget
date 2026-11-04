@@ -8,6 +8,9 @@ import BillsList from './components/BillsList.vue';
 import GoalsPanel from './components/GoalsPanel.vue';
 import TransactionsTable from './components/TransactionsTable.vue';
 import WalletCards from './components/WalletCards.vue';
+import TransactionsView from './components/TransactionsView.vue';
+import BudgetsView from './components/BudgetsView.vue';
+import ReportsView from './components/ReportsView.vue';
 
 // Top navigation, no sidebar. Each tab shows a different set of panels.
 const tabs = ['Overview', 'Transactions', 'Budgets', 'Reports'];
@@ -59,10 +62,14 @@ const period = ref('This month');
           <TransactionsTable class="span-8" />
         </div>
       </template>
+      <template v-else-if="active === 'Transactions'">
+        <TransactionsView />
+      </template>
+      <template v-else-if="active === 'Budgets'">
+        <BudgetsView />
+      </template>
       <template v-else>
-        <div class="card">
-          <p class="muted">{{ active }} is in the next build stage. The overview shows the full layout today.</p>
-        </div>
+        <ReportsView />
       </template>
     </main>
   </div>

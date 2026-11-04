@@ -45,7 +45,13 @@ async function run(url) {
   assert.match(await page.textContent('.tip').catch(() => ''), /Expense|/, 'switching to Expense keeps the chart working');
 
   await page.click('.tabs button:nth-child(2)');
-  assert.match(await page.textContent('body'), /next build stage/, 'other tabs show a placeholder for now');
+  assert.ok(await page.$('.toolbar'), 'transactions tab shows its toolbar');
+  await page.click('.chip-btn >> nth=1');
+  assert.ok((await page.locator('.table tbody tr').count()) > 0, 'income filter keeps rows');
+  await page.click('.tabs button:nth-child(3)');
+  assert.match(await page.textContent('body'), /Monthly budgets/, 'budgets tab renders');
+  await page.click('.tabs button:nth-child(4)');
+  assert.match(await page.textContent('body'), /Top merchants/, 'reports tab renders');
   await page.click('.tabs button:nth-child(1)');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 } });

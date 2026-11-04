@@ -56,3 +56,20 @@ export const goals = [
   { name: 'Europe vacation', saved: 1400, target: 5000, color: '#16a34a' },
   { name: 'Tesla Model 3', saved: 13500, target: 30000, color: '#2563eb' },
 ];
+
+export const budgets = [
+  { name: 'Housing', budget: 2000, spent: 2000, color: '#7c3aed' },
+  { name: 'Food & dining', budget: 600, spent: 432, color: '#16a34a' },
+  { name: 'Transport', budget: 300, spent: 214, color: '#2563eb' },
+  { name: 'Shopping', budget: 250, spent: 286, color: '#db2777' },
+  { name: 'Entertainment', budget: 150, spent: 58, color: '#d97706' },
+];
+
+// Top merchants over the last three months.
+export const merchants = [
+  { name: 'Rent share', total: 4350, count: 3 },
+  { name: 'Mechanical keyboard', total: 498, count: 2 },
+  { name: 'Textbook', total: 424, count: 2 },
+  { name: 'Trader Joe’s', total: 259.2, count: 3 },
+  { name: 'Uniqlo', total: 236, count: 2 },
+];
