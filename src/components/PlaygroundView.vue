@@ -8,7 +8,6 @@ import { logoUrl } from '../lib/brands';
 import { CATEGORIES } from '../lib/categorize';
 import PickMenu from './PickMenu.vue';
 import MicButton from './MicButton.vue';
-import RecordingStrip from './RecordingStrip.vue';
 import { useDictation, canDictate } from '../lib/dictation';
 
 // Playground: write or say anything, Budgie organises it into a plan you can shape.
@@ -43,10 +42,10 @@ const toggleDictate = () => {
 
 const byGroup = computed(() => Object.fromEntries(GROUPS.filter(g => g !== 'Income').map(g => [g, plan.items.filter(i => i.group === g)])));
 const totals = computed(() => {
-  const t = { Needs: 0, Wants: 0, 'Savings & goals': 0 };
+  const t = { Needs: 0, Wants: 0, Savings: 0, Goals: 0 };
   plan.items.forEach(i => { if (t[i.group] !== undefined) t[i.group] += Number(i.monthly) || 0; });
-  const spent = t.Needs + t.Wants + t['Savings & goals'];
-  return { ...t, all: spent, left: (Number(plan.income) || 0) - spent };
+  const spent = t.Needs + t.Wants + t.Savings + t.Goals;
+  return { ...t, saving: t.Savings + t.Goals, all: spent, left: (Number(plan.income) || 0) - spent };
 });
 const pct = n => (plan.income ? Math.round((n / plan.income) * 100) : 0);
 
@@ -58,7 +57,10 @@ const templates = [
 ];
 const template = ref('503020');
 const tpl = computed(() => templates.find(t => t.id === template.value));
-const groupKeys = ['Needs', 'Wants', 'Savings & goals'];
+// Lanes on the board, and the three buckets the splits compare (savings and goals count together).
+const laneKeys = ['Needs', 'Wants', 'Savings', 'Goals'];
+const groupKeys = ['Needs', 'Wants', 'Saving'];
+const bucket = g => (g === 'Saving' ? totals.value.saving : totals.value[g]);
 
 // What-if: trim wants and see what it frees.
 const trim = ref(0);
@@ -75,7 +77,7 @@ const goalMonths = ref(6);
 const addGoal = () => {
   const target = Number(goalTarget.value);
   if (!goalName.value.trim() || !(target > 0)) return;
-  plan.items.push({ id: Math.random().toString(36).slice(2, 9), label: goalName.value.trim(), amount: target, target, months: goalMonths.value, monthly: Math.round((target / goalMonths.value) * 100) / 100, cadence: 'monthly', group: 'Savings & goals', category: 'Savings', manual: true, domain: '' });
+  plan.items.push({ id: Math.random().toString(36).slice(2, 9), label: goalName.value.trim(), amount: target, target, months: goalMonths.value, monthly: Math.round((target / goalMonths.value) * 100) / 100, cadence: 'monthly', group: 'Goals', category: 'Goal', manual: true, domain: '' });
   goalName.value = ''; goalTarget.value = '';
 };
 
@@ -83,8 +85,8 @@ const addLine = ref('');
 const quickAdd = () => { const i = parseChunk(addLine.value); if (i && i.group !== 'Income') { plan.items.push({ ...i, manual: true }); addLine.value = ''; } };
 const remove = id => { plan.items = plan.items.filter(i => i.id !== id); };
 const moveTo = (item, group) => { item.group = group; };
-const catOptions = CATEGORIES.filter(c => c !== 'Income').concat('Savings').map(c => ({ value: c, label: c }));
-const groupOptions = groupKeys.map(g => ({ value: g, label: g }));
+const catOptions = CATEGORIES.filter(c => c !== 'Income').concat('Savings', 'Goal').map(c => ({ value: c, label: c }));
+const groupOptions = laneKeys.map(g => ({ value: g, label: g }));
 
 // Suggestions as the plan changes.
 const tips = computed(() => {
@@ -94,8 +96,8 @@ const tips = computed(() => {
   if (!plan.items.length) return [{ tone: 'info', text: 'Type or paste anything on the left: bills, ideas, goals. Budgie sorts it as you write.' }];
   if (!inc) out.push({ tone: 'warn', text: 'Add your monthly income so Budgie can check the split.' });
   if (inc && t.left < 0) out.push({ tone: 'warn', text: `The plan is ${usd(-t.left)} over income. Trim wants by ${Math.min(100, Math.ceil((-t.left / Math.max(1, t.Wants)) * 100))}% to balance it.` });
-  if (inc && t.left > 0) out.push({ tone: 'good', text: `${usd(t.left)} is unassigned. Give it a job, such as extra savings.`, action: { label: 'Send to savings', run: () => plan.items.push({ id: Math.random().toString(36).slice(2, 9), label: 'Extra savings', monthly: Math.round(t.left), amount: Math.round(t.left), cadence: 'monthly', group: 'Savings & goals', category: 'Savings', manual: true, domain: '' }) } });
-  if (inc) groupKeys.forEach((g, i) => { const want = tpl.value.split[i]; const have = pct(t[g]); if (Math.abs(have - want) >= 8) out.push({ tone: have > want && g !== 'Savings & goals' ? 'warn' : 'info', text: `${g} take ${have}% of income; ${tpl.value.name} suggests about ${want}%.` }); });
+  if (inc && t.left > 0) out.push({ tone: 'good', text: `${usd(t.left)} is unassigned. Give it a job, such as extra savings.`, action: { label: 'Send to savings', run: () => plan.items.push({ id: Math.random().toString(36).slice(2, 9), label: 'Extra savings', monthly: Math.round(t.left), amount: Math.round(t.left), cadence: 'monthly', group: 'Savings', category: 'Savings', manual: true, domain: '' }) } });
+  if (inc) groupKeys.forEach((g, i) => { const want = tpl.value.split[i]; const have = pct(bucket(g)); const name = g === 'Saving' ? 'Savings and goals' : g; if (Math.abs(have - want) >= 8) out.push({ tone: have > want && g !== 'Saving' ? 'warn' : 'info', text: `${name} take ${have}% of income; ${tpl.value.name} suggests about ${want}%.` }); });
   const biggestWant = [...byGroup.value.Wants].sort((a, b) => (b.monthly || 0) - (a.monthly || 0))[0];
   if (biggestWant && biggestWant.monthly > 0) out.push({ tone: 'info', text: `Biggest want: ${biggestWant.label} at ${usd(biggestWant.monthly)} a month.` });
   plan.items.filter(i => i.monthly === null).forEach(i => out.push({ tone: 'warn', text: `Add an amount for “${i.label}”.` }));
@@ -117,7 +119,7 @@ watch(tips, async v => {
 const applied = ref('');
 function applyPlan() {
   const sums = {};
-  plan.items.filter(i => i.group !== 'Savings & goals' && i.monthly).forEach(i => { sums[i.category] = (sums[i.category] || 0) + Number(i.monthly); });
+  plan.items.filter(i => !['Savings', 'Goals'].includes(i.group) && i.monthly).forEach(i => { sums[i.category] = (sums[i.category] || 0) + Number(i.monthly); });
   const palette = ['#7c3aed', '#16a34a', '#2563eb', '#db2777', '#d97706', '#0891b2', '#4f46e5'];
   Object.entries(sums).forEach(([name, v], n) => {
     const amount = Math.ceil(v / 10) * 10;
@@ -142,12 +144,17 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
     <div class="scratch-wrap" :class="{ live: dict.listening.value }">
       <textarea v-model="plan.text" class="scratch-pad" data-test="scratch" spellcheck="false"
         placeholder="salary 4700&#10;rent 1450, groceries maybe 400&#10;netflix 15.49, github 4&#10;save 3000 for japan by june" />
-      <div v-if="canDictate" class="scratch-mic">
+      <div v-if="canDictate" class="scratch-mic" :class="{ live: dict.listening.value }">
+        <template v-if="dict.listening.value">
+          <i class="rec-dot" aria-hidden="true" />
+          <b class="rec-time">{{ Math.floor(dict.elapsed.value / 60) }}:{{ String(dict.elapsed.value % 60).padStart(2, '0') }}</b>
+          <span class="say-wave" aria-hidden="true"><i v-for="n in 8" :key="n" :style="{ animationDelay: `${(n * 97) % 900}ms` }" /></span>
+          <span class="rec-hint">One item at a time, then pause</span>
+          <button type="button" class="say-cancel" @click="dict.cancel()">Cancel</button>
+        </template>
         <MicButton :listening="dict.listening.value" label="Dictate your plan" @toggle="toggleDictate" />
       </div>
     </div>
-    <RecordingStrip v-if="dict.listening.value" :elapsed="dict.elapsed.value" :transcript="dict.transcript.value"
-      hint="Say one item at a time, like “rent fourteen fifty”, then pause." stop-label="Done" @stop="dict.stop()" @cancel="dict.cancel()" />
 
     <div class="board">
       <div v-for="(items, g) in byGroup" :key="g" class="lane" :data-group="g">
@@ -188,9 +195,9 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
     <div class="chips"><button v-for="t in templates" :key="t.id" class="chip-btn" :class="{ on: template === t.id }" @click="template = t.id">{{ t.name }}</button></div>
     <div class="split-bars">
       <div v-for="(g, i) in groupKeys" :key="g" class="split-row">
-        <span class="small">{{ g }}</span>
-        <div class="split-track"><i class="have" :style="{ width: Math.min(100, pct(totals[g])) + '%' }" /><i class="want" :style="{ left: tpl.split[i] + '%' }" /></div>
-        <span class="small">{{ pct(totals[g]) }}% / {{ tpl.split[i] }}%</span>
+        <span class="small">{{ g === 'Saving' ? 'Savings + goals' : g }}</span>
+        <div class="split-track"><i class="have" :style="{ width: Math.min(100, pct(bucket(g))) + '%' }" /><i class="want" :style="{ left: tpl.split[i] + '%' }" /></div>
+        <span class="small">{{ pct(bucket(g)) }}% / {{ tpl.split[i] }}%</span>
       </div>
     </div>
 

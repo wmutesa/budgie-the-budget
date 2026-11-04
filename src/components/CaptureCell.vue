@@ -5,7 +5,6 @@ import { captureFile, captureNote, enrich } from '../lib/capture';
 import { ai } from '../lib/ai';
 import { useDictation, canDictate } from '../lib/dictation';
 import MicButton from './MicButton.vue';
-import RecordingStrip from './RecordingStrip.vue';
 
 // Four ways in: camera, any file, a statement, or one line of text.
 const busy = ref('');
@@ -16,13 +15,20 @@ const dragging = ref(false);
 const camera = ref(null);
 const files = ref(null);
 
+let fade = null;
+function flash(text) {
+  message.value = text;
+  clearTimeout(fade);
+  fade = setTimeout(() => { if (message.value === text) message.value = ''; }, 1200);
+}
+
 async function addDrafts(drafts, label) {
   if (!drafts.length) { message.value = `Nothing to add from ${label}.`; return; }
   busy.value = 'Matching merchants on the web…';
   const enriched = [];
   for (const d of drafts.slice(0, 200)) enriched.push({ id: newId(), ...(await enrich(d)) });
   store.drafts.unshift(...enriched);
-  message.value = `${enriched.length} item${enriched.length === 1 ? '' : 's'} from ${label} ready to review.`;
+  flash(`${enriched.length} item${enriched.length === 1 ? '' : 's'} from ${label} ready to review.`);
 }
 
 async function handle(list) {
@@ -50,6 +56,7 @@ const dict = useDictation({
   onCancel: () => { note.value = before; },
 });
 const startNote = () => { message.value = ''; before = note.value; dict.toggle(); };
+const clock = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 async function onNote() {
   const drafts = captureNote(note.value, store.base);
@@ -66,15 +73,20 @@ async function onNote() {
       <p class="label">Add spending</p>
       <span class="muted small">Reader · {{ ai.status === 'ollama' ? `local AI (${ai.model})` : 'on-device rules' }}</span>
     </div>
-    <form class="say-bar" :class="{ live: dict.listening.value }" @submit.prevent="onNote">
-      <span class="say-icon" aria-hidden="true">+</span>
-      <input v-model="note" class="say-input" data-test="quick-note" autocomplete="off"
-        :placeholder="dict.listening.value ? 'Listening…' : 'Type or say it: 12.50 lunch at Chipotle last friday'" aria-label="Describe a payment" />
+    <form class="say-bar" :class="{ live: dict.listening.value }" @submit.prevent="dict.listening.value ? dict.stop() : onNote()">
+      <span v-if="!dict.listening.value" class="say-icon" aria-hidden="true">+</span>
+      <span v-else class="say-rec" role="status" aria-live="polite">
+        <i class="rec-dot" aria-hidden="true" /><b>{{ clock(dict.elapsed.value) }}</b>
+      </span>
+      <div class="say-field">
+        <input v-model="note" class="say-input" data-test="quick-note" autocomplete="off" :readonly="dict.listening.value"
+          :placeholder="dict.listening.value ? 'Say it like “12.50 for lunch at Chipotle yesterday”' : 'Type or say it: 12.50 lunch at Chipotle last friday'" aria-label="Describe a payment" />
+        <span v-if="dict.listening.value" class="say-wave" aria-hidden="true"><i v-for="n in 10" :key="n" :style="{ animationDelay: `${(n * 97) % 900}ms` }" /></span>
+      </div>
+      <button v-if="dict.listening.value" type="button" class="say-cancel" @click="dict.cancel()">Cancel</button>
       <MicButton v-if="canDictate" :listening="dict.listening.value" @toggle="startNote" />
-      <button class="say-add" type="submit" :disabled="!note.trim()">Add <span aria-hidden="true">↵</span></button>
+      <button class="say-add" data-test="say-add" type="submit" :disabled="!dict.listening.value && !note.trim()">{{ dict.listening.value ? 'Add it' : 'Add' }} <span aria-hidden="true">↵</span></button>
     </form>
-    <RecordingStrip v-if="dict.listening.value" :elapsed="dict.elapsed.value" :transcript="dict.transcript.value"
-      hint="Say it like “12.50 for lunch at Chipotle yesterday”." stop-label="Add it" @stop="dict.stop()" @cancel="dict.cancel()" />
     <div class="ways">
       <button class="way" @click="camera.click()"><b>Scan receipt</b><span>Take a photo with your camera</span></button>
       <button class="way" @click="files.click()"><b>Upload</b><span>Receipt photo, PDF or invoice</span></button>

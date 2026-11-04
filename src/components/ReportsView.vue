@@ -63,8 +63,8 @@ const spark = computed(() => {
             <i class="mb in" :style="{ width: (d.income / maxFlow) * 100 + '%' }" :title="`Income ${fmt(d.income)}`" />
             <i class="mb out" :style="{ width: (d.expense / maxFlow) * 100 + '%' }" :title="`Spent ${fmt(d.expense)}`" />
           </div>
-          <span class="m-num muted small">{{ short(d.income) }} / {{ short(d.expense) }}</span>
-          <span class="m-net" :class="net(d) >= 0 ? 'pos' : 'neg'">{{ net(d) >= 0 ? '+' : '−' }}{{ short(Math.abs(net(d))) }}</span>
+          <span class="m-num small"><span class="m-in">{{ short(d.income) }}</span> / <span class="m-out">{{ short(d.expense) }}</span></span>
+          <span class="m-net" :class="net(d) >= 0 ? 'gain' : 'loss'" :title="net(d) >= 0 ? 'Gain: you kept money this month' : 'Loss: you spent more than you earned'"><span aria-hidden="true">{{ net(d) >= 0 ? '▲' : '▼' }}</span> {{ net(d) >= 0 ? '+' : '−' }}{{ short(Math.abs(net(d))) }}</span>
         </div>
       </div>
     </div>

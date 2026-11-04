@@ -4,7 +4,6 @@
 export const accounts = [
   { id: 'checking', name: 'My balance', sub: 'Wallet overview & spending', balance: 20520.32, change: 1.5 },
   { id: 'savings', name: 'Savings account', sub: 'Steady growth savings', balance: 15800.45, change: 3.2 },
-  { id: 'invest', name: 'Investment portfolio', sub: 'Track your wealth growth', balance: 50120.78, change: 4.7 },
 ];
 
 export const wallets = [
@@ -18,7 +17,7 @@ export const wallets = [
 // Twelve months of cash flow.
 export const cashFlow = [
   { m: 'Jan', income: 21400, expense: 14200 },
-  { m: 'Feb', income: 19800, expense: 15100 },
+  { m: 'Feb', income: 19800, expense: 21300 },
   { m: 'Mar', income: 26300, expense: 16900 },
   { m: 'Apr', income: 24100, expense: 13800 },
   { m: 'May', income: 22900, expense: 15600 },

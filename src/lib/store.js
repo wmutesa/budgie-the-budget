@@ -20,11 +20,12 @@ export const store = reactive({
   dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
   banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
   plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
+  logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
   query: '',
 });
 
 watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan }),
+  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan, logoOverrides: store.logoOverrides }),
   value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
   { deep: true },
 );
@@ -48,3 +49,13 @@ export function daysUntil(iso) {
 export const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export const thisMonth = () => new Date().toISOString().slice(0, 7);
+
+// Apply a logo fix to every entry and subscription with the same name, and remember it.
+export function fixLogo(name, { domain, logo }) {
+  const key = String(name).trim().toLowerCase();
+  store.logoOverrides[key] = { domain, logo };
+  const same = x => String(x.merchant || x.name || '').trim().toLowerCase() === key;
+  store.transactions.forEach(t => { if (same(t)) Object.assign(t, { domain, logo }); });
+  store.subscriptions.forEach(s => { if (same(s)) Object.assign(s, { domain, logo }); });
+  store.drafts.forEach(d => { if (same(d)) Object.assign(d, { domain, logo }); });
+}

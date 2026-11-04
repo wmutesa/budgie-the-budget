@@ -155,6 +155,10 @@ async function run(url) {
 
   // Reports: advice, bank opportunities and the full ledger.
   await page.click('.nb-pages button:nth-child(3)');
+  await page.locator('#activity .dc-col').nth(12).hover();
+  await page.waitForTimeout(250);
+  assert.ok(await page.locator('#activity .dc-col').nth(12).locator('.dc-tip').isVisible(), 'activity bars show a tooltip on hover');
+  assert.ok((await page.locator('#reports .m-net.loss').count()) > 0 && (await page.locator('#reports .m-net.gain').count()) > 0, 'month by month marks gains and losses');
   assert.ok((await page.locator('.insight').count()) > 0, 'reports show suggestion cards');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
@@ -171,7 +175,7 @@ async function run(url) {
   await page.click('[data-test="organize"]');
   assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
   assert.match(await page.textContent('.lane[data-group="Wants"]'), /Netflix/, 'Netflix lands in wants');
-  assert.match(await page.textContent('.lane[data-group="Savings & goals"]'), /Laptop/i, 'the laptop goal lands in savings');
+  assert.match(await page.textContent('.lane[data-group="Goals"]'), /Laptop/i, 'the laptop goal lands in goals');
   assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'income is picked up from the notes');
   await page.click('[data-test="apply-plan"]');
   await page.click('.nb-pages button:nth-child(2)');
@@ -195,12 +199,12 @@ async function run(url) {
   await talk.goto(url, { waitUntil: 'load' });
   await talk.click('.nb-pages button:nth-child(2)');
   await talk.click('.say-bar .mic-btn');
-  await talk.waitForSelector('.rec-strip');
-  await talk.waitForFunction(() => document.querySelector('.rec-text').textContent.includes('Chipotle'));
-  await talk.click('.rec-done');
+  await talk.waitForSelector('.say-bar.live');
+  await talk.waitForFunction(() => document.querySelector('[data-test="quick-note"]').value.includes('Chipotle'));
+  await talk.click('[data-test="say-add"]');
   await talk.waitForSelector('#review');
   assert.match(await talk.textContent('.draft-card >> nth=0'), /Chipotle/, 'dictated words become a draft');
-  assert.equal(await talk.$('.rec-strip'), null, 'the recording strip closes when done');
+  assert.equal(await talk.$('.say-bar.live'), null, 'the bar leaves recording mode when done');
   await talk.close();
 
   // Rwandan francs in the live rates.

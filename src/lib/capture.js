@@ -5,12 +5,15 @@ import { searchBrands } from './brands';
 import { guessCategory, CATEGORIES } from './categorize';
 import { matchMerchant } from '../data/directory';
 import { logoUrl } from './brands';
+import { store } from './store';
 
 const brandCache = new Map();
 
 export async function brandFor(name) {
   const key = name.trim().toLowerCase();
   if (!key || key === 'unknown' || key === 'unknown merchant') return null;
+  const fixed = store.logoOverrides[key];
+  if (fixed) return { name: name.trim(), domain: fixed.domain, logo: fixed.logo, description: '', website: fixed.domain ? `https://${fixed.domain}` : null };
   if (brandCache.has(key)) return brandCache.get(key);
   const known = matchMerchant(name);
   if (known) {

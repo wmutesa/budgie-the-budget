@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { store, monthly, daysUntil } from '../lib/store';
+import { store, monthly, daysUntil, fixLogo } from '../lib/store';
+import LogoFix from './LogoFix.vue';
 import { convert } from '../lib/rates';
 
 const emit = defineEmits(['add']);
@@ -30,8 +31,7 @@ const hiddenTotal = computed(() => items.value.slice(LIMIT).reduce((s, x) => s +
     </div>
     <ul v-else class="subs" :class="{ 'subs-scroll': expanded && items.length > LIMIT }" data-test="subs-list">
       <li v-for="s in visible" :key="s.id" class="sub-row">
-        <img v-if="s.logo" :src="s.logo" :alt="`${s.name} logo`" width="28" height="28" loading="lazy" />
-        <span v-else class="logo-fallback">{{ s.name[0] }}</span>
+        <LogoFix :name="s.name" :logo="s.logo || ''" :size="28" @pick="p => fixLogo(s.name, p)" />
         <div class="grow">
           <b>{{ s.name }}</b>
           <span class="muted small">{{ s.domain || 'added manually' }} · {{ s.cycle }} · {{ when(s.next) }}</span>
