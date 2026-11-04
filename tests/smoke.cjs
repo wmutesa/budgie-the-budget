@@ -247,7 +247,7 @@ async function run(url) {
   assert.match(mk, /4\.12%/, 'the Treasury yield shows as a percentage');
   assert.match(mk, /US stock market[\s\S]*\+14\.2%[\s\S]*Bonds/, 'markets to watch are ranked by the past year');
   assert.match(mk, /not financial advice/i, 'markets are labelled as information, not advice');
-  await page.click('#markets .mk-tabs button:has-text("News")');
+  assert.ok(await page.isVisible('#markets .mk-news a'), 'news shows beside markets to watch, without tabs');
   assert.equal(await page.getAttribute('#markets .mk-news a', 'rel'), 'noopener noreferrer', 'news links open safely');
   assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
@@ -361,7 +361,7 @@ async function run(url) {
   await guide.click('[data-test="account"]');
   const sheet = await guide.locator('.acct-sheet').boundingBox();
   const vp = guide.viewportSize();
-  assert.ok(Math.abs(sheet.x - 150) < 2 && Math.abs(sheet.y - 150) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 150) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 150) < 2, `the settings card leaves 150px on every side (${JSON.stringify(sheet)})`);
+  assert.ok(Math.abs(sheet.x - 75) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card leaves 75px on every side (${JSON.stringify(sheet)})`);
   assert.equal(await guide.locator('[data-test="account"]').evaluate(e => getComputedStyle(e).borderRadius), '50%', 'the account button is round');
   // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
   await guide.waitForSelector('[data-test="ai-panel"]');

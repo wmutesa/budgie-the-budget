@@ -90,6 +90,15 @@ const catOptions = CATEGORIES.filter(c => c !== 'Income').concat('Savings', 'Goa
 const groupOptions = laneKeys.map(g => ({ value: g, label: g }));
 
 // Suggestions as the plan changes.
+// Income split for the bar under the notes.
+const badLogo = ref({});
+const splitParts = computed(() => [
+  { key: 'needs', label: 'Needs', v: totals.value.Needs || 0 },
+  { key: 'wants', label: 'Wants', v: totals.value.Wants || 0 },
+  { key: 'savings', label: 'Savings', v: totals.value.Savings || 0 },
+  { key: 'goals', label: 'Goals', v: totals.value.Goals || 0 },
+  { key: 'left', label: totals.value.left >= 0 ? 'Unassigned' : 'Over', v: Math.abs(totals.value.left || 0) },
+]);
 const tips = computed(() => {
   const out = [];
   const t = totals.value;
@@ -157,12 +166,21 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
       </div>
     </div>
 
+    <div v-if="plan.income || totals.all" class="pg-split" data-test="pg-split">
+      <div class="pg-split-bar" aria-hidden="true">
+        <i v-for="s in splitParts" :key="s.key" :class="`pg-${s.key}`" :style="{ flex: Math.max(s.v, 0.0001) }" :title="`${s.label} ${usd(s.v)}`" />
+      </div>
+      <ul class="pg-split-legend">
+        <li v-for="s in splitParts" :key="s.key"><i :class="`pg-${s.key}`" />{{ s.label }} <b>{{ usd(s.v) }}</b><span v-if="plan.income" class="muted small">{{ pct(s.v) }}%</span></li>
+      </ul>
+    </div>
+
     <div class="board">
       <div v-for="(items, g) in byGroup" :key="g" class="lane" :data-group="g">
         <div class="lane-head"><b>{{ g }}</b><span>{{ usd(totals[g]) }}<template v-if="plan.income"> · {{ pct(totals[g]) }}%</template></span></div>
         <article v-for="i in items" :key="i.id" class="plan-item">
-          <img v-if="i.domain" :src="logoUrl(i.domain)" :alt="`${i.label} logo`" width="20" height="20" />
-          <span v-else class="pi-dot" />
+          <img v-if="i.domain && !badLogo[i.id]" :src="logoUrl(i.domain)" :alt="`${i.label} logo`" width="20" height="20" @error="badLogo[i.id] = true" />
+          <span v-else class="pi-dot">{{ i.label[0] }}</span>
           <div class="pi-main">
             <b>{{ i.label }}</b>
             <span class="muted small">{{ i.category }}<template v-if="i.cadence !== 'monthly'"> · {{ i.cadence }} {{ usd(i.amount) }}</template><template v-if="i.months"> · {{ i.months }} mo</template></span>
@@ -181,6 +199,18 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
       <input v-model="addLine" class="field note-field" placeholder="Add one more: gym 40 a month" />
       <button class="btn" type="submit">Add</button>
     </form>
+
+    <div v-if="aiNote || tips.length" class="pg-notes" data-test="pg-notes">
+      <p class="kicker">Budgie's notes <span class="muted small">· {{ labelFor('advice') }}</span></p>
+      <p v-if="aiNote" class="ai-hint ai-brief"><span class="ai-spark" aria-hidden="true">✦</span>{{ aiNote }}</p>
+      <ul>
+        <li v-for="(t, n) in tips" :key="n" :class="t.tone">
+          <span class="ai-spark" aria-hidden="true">✦</span>
+          <span>{{ t.text }}</span>
+          <button v-if="t.action" class="btn small" type="button" @click="t.action.run()">{{ t.action.label }}</button>
+        </li>
+      </ul>
+    </div>
   </section>
 
   <section class="card cell span-4 tools-cell">
@@ -218,14 +248,4 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
     <p v-if="applied" class="status-line done">{{ applied }}</p>
   </section>
 
-  <section class="card cell span-12 tips-cell">
-    <div class="cell-head"><p class="label">Suggestions while you plan</p><span class="muted small">{{ labelFor('advice') }}</span></div>
-    <p v-if="aiNote" class="think">{{ aiNote }}</p>
-    <div class="tip-row">
-      <article v-for="(t, n) in tips" :key="n" class="insight" :class="t.tone">
-        <p>{{ t.text }}</p>
-        <div v-if="t.action" class="insight-acts"><button class="btn primary small" @click="t.action.run()">{{ t.action.label }}</button></div>
-      </article>
-    </div>
-  </section>
 </template>

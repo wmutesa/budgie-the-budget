@@ -25,6 +25,7 @@ const advice = computed(() => {
 const savingsLinks = computed(() => store.banks.filter(id => BANKS[id]).map(id => BANKS[id].products.find(p => p.kind === 'savings')).filter(Boolean));
 const openRates = () => savingsLinks.value.forEach(p => window.open(p.url, '_blank', 'noopener,noreferrer'));
 
+const byBank = computed(() => store.banks.filter(id => BANKS[id]).map(id => ({ bank: BANKS[id], items: ideas.value.filter(o => o.bank === BANKS[id]) })));
 const ideas = computed(() => store.banks.filter(id => BANKS[id]).flatMap(id => {
   const bank = BANKS[id];
   const save = Math.round(surplus.value / 2 / 10) * 10;
@@ -44,16 +45,17 @@ const ideas = computed(() => store.banks.filter(id => BANKS[id]).flatMap(id => {
       <p>{{ advice }}</p>
       <button type="button" class="opp-ai-link" @click="openRates">Compare today's savings rates ↗</button>
     </div>
-    <ul class="opp-list">
-      <li v-for="o in ideas" :key="o.p.url" class="opp">
-        <img :src="logoUrl(o.bank.domain)" :alt="`${o.bank.name} logo`" width="22" height="22" @error="e => (e.target.style.visibility = 'hidden')" />
-        <div class="grow">
-          <b>{{ o.title }}</b>
-          <span class="muted small">{{ o.body }}</span>
-          <a :href="o.p.url" target="_blank" rel="noopener noreferrer" class="opp-link">Today's rate on {{ o.bank.domain }} ↗</a>
-        </div>
-      </li>
-    </ul>
+    <div class="opp-banks">
+      <div v-for="g in byBank" :key="g.bank.domain" class="opp-bank">
+        <p class="opp-bank-head">
+          <img :src="logoUrl(g.bank.domain)" :alt="`${g.bank.name} logo`" width="16" height="16" @error="e => (e.target.style.visibility = 'hidden')" />
+          <b>{{ g.bank.name }}</b>
+        </p>
+        <a v-for="o in g.items" :key="o.p.url" :href="o.p.url" target="_blank" rel="noopener noreferrer" class="opp-line" :title="o.body">
+          <span><b>{{ o.title }}</b><span class="muted small">{{ o.body }}</span></span><span aria-hidden="true">↗</span>
+        </a>
+      </div>
+    </div>
     <p class="meta small">Suggestions, not financial advice. Rates change daily, so check the bank's page.</p>
   </section>
 </template>

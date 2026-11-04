@@ -9,7 +9,6 @@ import { accountTotal } from '../lib/ledger';
 const data = ref(null);
 const error = ref('');
 const brief = ref('');
-const tab = ref('watch');
 
 async function load() {
   error.value = '';
@@ -65,6 +64,9 @@ const summary = computed(() => {
   if (ranked.length > 1) parts.push(`Over the past year, ${ranked[0].name.toLowerCase()} grew the most (${sign(ranked[0].year)}) and ${ranked[ranked.length - 1].name.toLowerCase()} the least (${sign(ranked[ranked.length - 1].year)}).`);
   return parts.join(' ');
 });
+const watchRanked = computed(() => [...(data.value?.watch || [])].sort((a, b) => (b.year ?? -99) - (a.year ?? -99)));
+const maxYear = computed(() => Math.max(1, ...watchRanked.value.map(r => Math.abs(r.year || 0))));
+const barWidth = v => Math.round((Math.abs(v || 0) / maxYear.value) * 100);
 const updated = computed(() => (data.value?.updatedAt ? new Date(data.value.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
 </script>
 
@@ -75,7 +77,10 @@ const updated = computed(() => (data.value?.updatedAt ? new Date(data.value.upda
       <span class="muted small">Yahoo Finance{{ updated ? ` · ${updated}` : '' }}</span>
     </div>
 
-    <p v-if="summary" class="mk-summary" data-test="markets-summary"><span class="ai-spark" aria-hidden="true">✦</span>{{ summary }}</p>
+    <div v-if="summary || brief" class="mk-intro">
+      <p v-if="summary" class="mk-summary" data-test="markets-summary"><span class="ai-spark" aria-hidden="true">✦</span>{{ summary }}</p>
+      <p v-if="brief" class="ai-hint ai-brief"><span class="ai-spark" aria-hidden="true">✦</span>{{ brief }} <span class="muted small">· {{ ai.used.news }}, on your device</span></p>
+    </div>
     <p v-if="error" class="empty-note">{{ error }} <button class="si-link" type="button" @click="load">Try again</button></p>
     <p v-else-if="!data" class="muted small">Loading markets…</p>
 
@@ -84,47 +89,42 @@ const updated = computed(() => (data.value?.updatedAt ? new Date(data.value.upda
         <div v-for="r in data.indexes" :key="r.symbol" class="mk-tile" :title="r.about">
           <span class="small">{{ r.name }}</span>
           <b>{{ price(r) }}</b>
-          <span class="small" :class="tone(r.day)">{{ sign(r.day) }} today</span>
-          <svg viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true"><polyline :points="spark(r.spark)" fill="none" :stroke="r.month >= 0 ? '#16a34a' : '#e11d48'" stroke-width="1.3" vector-effect="non-scaling-stroke" /></svg>
+          <span class="mk-pill" :class="tone(r.day)">{{ sign(r.day) }} today</span>
+          <svg viewBox="0 0 100 24" preserveAspectRatio="none" aria-hidden="true">
+            <polygon v-if="spark(r.spark)" :points="`0,24 ${spark(r.spark)} 100,24`" :fill="r.month >= 0 ? '#dcfce7' : '#ffe4e6'" />
+            <polyline :points="spark(r.spark)" fill="none" :stroke="r.month >= 0 ? '#16a34a' : '#e11d48'" stroke-width="1.3" vector-effect="non-scaling-stroke" />
+          </svg>
         </div>
       </div>
 
       <div class="mk-body">
         <div class="mk-col">
-          <div class="mk-tabs" role="tablist">
-            <button role="tab" :class="{ on: tab === 'watch' }" :aria-selected="tab === 'watch'" @click="tab = 'watch'">Markets to watch</button>
-            <button role="tab" :class="{ on: tab === 'news' }" :aria-selected="tab === 'news'" @click="tab = 'news'">News</button>
-          </div>
+          <div class="mk-col-head"><p class="kicker">Markets to watch</p><span class="muted small">past year</span></div>
+          <p class="muted small">Broad funds many people use to grow savings. Past growth does not predict future growth.</p>
+          <ul class="mk-watch">
+            <li v-for="r in watchRanked" :key="r.symbol">
+              <span class="mk-name"><b>{{ r.name }}</b> <span class="muted small">{{ r.symbol }}</span><span class="muted small mk-about">{{ r.about }}</span></span>
+              <span class="mk-year">
+                <span class="mk-bar"><i :class="tone(r.year)" :style="{ width: barWidth(r.year) + '%' }" /></span>
+                <b :class="tone(r.year)">{{ sign(r.year) }}</b>
+              </span>
+              <span class="mk-num"><span :class="tone(r.month)">{{ sign(r.month) }}</span><span class="muted small">1 mo</span></span>
+            </li>
+            <li v-if="!data.watch.length" class="muted small">Fund data is not available right now.</li>
+          </ul>
+        </div>
 
-          <template v-if="tab === 'watch'">
-            <p class="muted small">Broad funds many people use to grow savings, ranked by the past year. Past growth does not predict future growth.</p>
-            <ul class="mk-watch">
-              <li v-for="r in [...data.watch].sort((a, b) => (b.year ?? -99) - (a.year ?? -99))" :key="r.symbol">
-                <span><b>{{ r.name }}</b> <span class="muted small">{{ r.symbol }}</span><span class="muted small mk-about">{{ r.about }}</span></span>
-                <span class="mk-num"><span :class="tone(r.month)">{{ sign(r.month) }}</span><span class="muted small">1 month</span></span>
-                <span class="mk-num"><b :class="tone(r.year)">{{ sign(r.year) }}</b><span class="muted small">1 year</span></span>
-              </li>
-              <li v-if="!data.watch.length" class="muted small">Fund data is not available right now.</li>
-            </ul>
-          </template>
-
-          <ul v-else class="mk-news">
+        <div class="mk-col">
+          <div class="mk-col-head"><p class="kicker">News</p><span class="muted small">Yahoo Finance</span></div>
+          <ul class="mk-news">
             <li v-for="n in data.news" :key="n.link">
               <a :href="n.link" target="_blank" rel="noopener noreferrer">{{ n.title }}</a>
               <span class="muted small">{{ n.source }}{{ ago(n.date) ? ` · ${ago(n.date)}` : '' }}</span>
             </li>
             <li v-if="!data.news.length" class="muted small">No headlines right now.</li>
           </ul>
+          <p class="meta small">Information, not financial advice. Prices may be delayed.<template v-if="!brief">&#32;{{ ai.ready ? 'Budgie is reading the headlines…' : 'When the AI on this device is ready, Budgie sums up the headlines for you.' }}</template></p>
         </div>
-
-        <aside class="mk-ai">
-          <span class="opp-ai-tag">What this means for you</span>
-          <p v-if="brief">{{ brief }}</p>
-          <p v-else-if="ai.ready" class="muted small">Reading the headlines…</p>
-          <p v-else class="muted small">When the AI model on this device is ready, Budgie sums up the headlines for your savings here.</p>
-          <span class="muted small">{{ brief ? ai.used.news : labelFor('news') }} · on your device</span>
-          <p class="meta small">Information, not financial advice. Prices may be delayed.</p>
-        </aside>
       </div>
     </template>
   </section>
