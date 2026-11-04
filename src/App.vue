@@ -76,7 +76,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
     </section>
   </main>
   <div v-else class="app">
-    <main class="grid hl canvas">
+    <main class="grid hl canvas" :class="{ 'fit-page': active === 'Markets' }">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header class="cell nav-bar span-12">
         <div class="nb-brand">
@@ -115,12 +115,12 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       </template>
       <template v-else-if="active === 'Transactions'">
         <KpiStrip />
-        <CaptureCell class="span-8" id="capture" />
+        <CaptureCell class="span-5" id="capture" />
+        <AccountCards class="span-3 accounts-side" id="accounts" />
         <SpendSummary class="span-4" />
         <ReviewQueue v-if="store.drafts.length" class="span-12" id="review" />
         <BudgetsView class="span-4" id="budgets" />
         <TransactionsView class="span-8" id="ledger" :limit="40" fill />
-        <AccountCards class="span-12" id="accounts" />
       </template>
       <template v-else-if="active === 'Playground'">
         <PlaygroundView />

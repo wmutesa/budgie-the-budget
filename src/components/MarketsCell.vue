@@ -49,6 +49,22 @@ const ago = d => {
   const h = Math.round((Date.now() - t) / 36e5);
   return h < 1 ? 'just now' : h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 };
+// A short paragraph on the day, written from the numbers.
+const summary = computed(() => {
+  const d = data.value;
+  if (!d || !d.indexes.length) return '';
+  const by = s => d.indexes.find(r => r.symbol === s);
+  const sp = by('^GSPC'), nq = by('^IXIC'), ty = by('^TNX');
+  const parts = [];
+  if (sp && sp.day !== null) {
+    const mood = sp.day > 0.2 ? 'up' : sp.day < -0.2 ? 'down' : 'about flat';
+    parts.push(`US stocks are ${mood} today: the S&P 500 is ${sign(sp.day)}${nq && nq.day !== null ? ` and the Nasdaq ${sign(nq.day)}` : ''}.`);
+  }
+  if (ty) parts.push(`The 10-year Treasury yield is ${ty.price.toFixed(2)}%, which tends to move savings, CD and mortgage rates.`);
+  const ranked = [...d.watch].filter(r => r.year !== null).sort((a, b) => b.year - a.year);
+  if (ranked.length > 1) parts.push(`Over the past year, ${ranked[0].name.toLowerCase()} grew the most (${sign(ranked[0].year)}) and ${ranked[ranked.length - 1].name.toLowerCase()} the least (${sign(ranked[ranked.length - 1].year)}).`);
+  return parts.join(' ');
+});
 const updated = computed(() => (data.value?.updatedAt ? new Date(data.value.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''));
 </script>
 
@@ -59,6 +75,7 @@ const updated = computed(() => (data.value?.updatedAt ? new Date(data.value.upda
       <span class="muted small">Yahoo Finance{{ updated ? ` · ${updated}` : '' }}</span>
     </div>
 
+    <p v-if="summary" class="mk-summary" data-test="markets-summary"><span class="ai-spark" aria-hidden="true">✦</span>{{ summary }}</p>
     <p v-if="error" class="empty-note">{{ error }} <button class="si-link" type="button" @click="load">Try again</button></p>
     <p v-else-if="!data" class="muted small">Loading markets…</p>
 
