@@ -21,11 +21,12 @@ export const store = reactive({
   banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
   plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
   logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
+  accounts: Array.isArray(saved.accounts) ? saved.accounts : [], // Real user accounts (not demo)
   query: '',
 });
 
 watch(
-  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan, logoOverrides: store.logoOverrides }),
+  () => ({ base: store.base, subscriptions: store.subscriptions, transactions: store.transactions, drafts: store.drafts, budgets: store.budgets, dismissed: store.dismissed, banks: store.banks, plan: store.plan, logoOverrides: store.logoOverrides, accounts: store.accounts }),
   value => { try { localStorage.setItem(KEY, JSON.stringify(value)); } catch { /* storage blocked */ } },
   { deep: true },
 );
