@@ -65,7 +65,19 @@ window.webkitSpeechRecognition = FakeRec;
 // A stand-in for the account server (worker/index.js): signed in as the owner,
 // with data kept in memory so reloads and other pages see the same account.
 // tests/accounts.cjs tests the real server.
-const fakeAccount = { data: { guide: { done: true } }, version: 1 };
+// Test entries, dated relative to today, loaded through the fake account.
+// (The app itself starts empty; this only gives the test something to check.)
+function testEntries() {
+  const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+  return [
+    [0, 'Trader Joe’s', -86.4, 'Food & dining'], [1, 'Metro top-up', -64, 'Transport'], [2, 'Rent share', -1450, 'Housing'],
+    [2, 'Uniqlo', -118, 'Shopping'], [3, 'Payroll · Employer', 2350, 'Income'], [4, 'Chipotle', -42.1, 'Food & dining'],
+    [5, 'Pharmacy', -57.3, 'Health'], [6, 'Cinema', -28, 'Entertainment'], [8, 'Amazon', -168, 'Shopping'], [9, 'Groceries', -64.9, 'Food & dining'],
+  ].map(([n, merchant, amount, category], i) => ({ id: `t${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'csv', domain: '', logo: null }));
+}
+const fakeAccount = { data: { guide: { done: true }, transactions: testEntries(),
+  balances: [{ id: 'b1', name: 'Chase checking', kind: 'checking', balance: 2500, currency: 'USD', updatedAt: new Date().toISOString() }, { id: 'b2', name: 'Bank of Kigali', kind: 'savings', balance: 350000, currency: 'RWF', updatedAt: new Date().toISOString() }],
+  goals: [{ id: 'g1', name: 'Emergency fund', saved: 1200, target: 5000, color: '#db2777' }] }, version: 1 };
 async function fakeApi(page, account = fakeAccount) {
   await page.route('**/api/**', async route => {
     const req = route.request();
@@ -114,8 +126,8 @@ async function run(url) {
 
   assert.match(await page.textContent('.nav-bar .brand-word'), /BUDGIE/, 'navigation renders inside the grid');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
-  assert.match(await page.textContent('.lede'), /You hold/, 'the brief renders');
-  for (const label of ['Savings goal', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
+  assert.match(await page.textContent('.lede'), /You hold[\s\S]*spent/, 'the brief renders from your entries');
+  for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Signals', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
   }
 
@@ -124,8 +136,8 @@ async function run(url) {
   assert.match(await page.textContent('.wallets'), /≈/, 'wallets show converted values');
 
   assert.equal(await page.locator('.cap-col').count(), 12, 'cash flow shows twelve months');
-  await page.locator('.cap-col').nth(5).hover();
-  assert.match(await page.textContent('.cap-tip'), /Jun/, 'hovering a month shows its totals');
+  await page.locator('.cap-col').nth(11).hover();
+  assert.match(await page.textContent('.cap-tip'), new RegExp(new Date().toLocaleDateString('en-US', { month: 'short' })), 'hovering a month shows its totals');
 
   // Known companies appear instantly from the built-in directory.
   await page.click('[data-test="add-sub"]');
@@ -268,6 +280,25 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
+  // A new account starts empty: no sample entries, and each card says what to add.
+  await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
+  await guide.click('.nb-pages button:nth-child(1)');
+  const body = await guide.textContent('body');
+  assert.doesNotMatch(body, /Trader Joe|sample data|Sample balances|Investment portfolio/i, 'a new account has no sample data');
+  assert.ok((await guide.locator('.empty-note').count()) >= 4, 'empty cards explain what to add');
+  await guide.click('[data-test="add-account"]');
+  await guide.fill('.acc-form input[aria-label="Account name"]', 'Bank of Kigali');
+  await guide.fill('.acc-form input[aria-label="Balance today"]', '250000');
+  await guide.click('.acc-form .pick-btn >> nth=1');
+  await guide.click('.pick-pop .pick-opt:has-text("RWF")');
+  await guide.click('.acc-form button[type="submit"]');
+  assert.match(await guide.textContent('[data-test="accounts"]'), /Bank of Kigali[\s\S]*RWF/, 'you can add your own account');
+  await guide.click('[data-test="add-goal"]');
+  await guide.fill('.goal-form input[aria-label="Goal name"]', 'Emergency fund');
+  await guide.fill('.goal-form input[aria-label="Target"]', '5000');
+  await guide.fill('.goal-form input[aria-label="Saved so far"]', '1000');
+  await guide.click('.goal-form button[type="submit"]');
+  assert.match(await guide.textContent('[data-test="goals"]'), /Emergency fund[\s\S]*20%/, 'you can add your own goal');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   assert.match(seen, /Losing your device/, 'the guide explains the risks');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });

@@ -3,7 +3,6 @@ import { computed } from 'vue';
 import { store, monthly, daysUntil, thisMonth } from './store';
 import { convert } from './rates';
 import { budgetRows, monthTotals, spentIn } from './ledger';
-import { goals } from '../data/demo';
 
 const usd = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const round50 = n => Math.ceil(n / 50) * 50;
@@ -80,7 +79,7 @@ export const cards = computed(() => {
     out.push({ id: `next-${month}`, tone: 'info', title: 'Plan for next month', body: `You averaged ${usd(avg)} of spending over the last ${prior.length} month${prior.length === 1 ? '' : 's'} on record. A budget near ${usd(round50(avg))} keeps you realistic.` });
   }
 
-  const goal = goals[0];
+  const goal = store.goals[0];
   if (goal && surplus.value > 0) {
     out.push({ id: `save-${month}`, tone: 'good', title: 'Money left to put to work', body: `Income is ahead of projected spending by about ${usd(surplus.value)}. Moving half of that to ${goal.name.toLowerCase()} gets you to ${usd(goal.target)} sooner.` });
   }

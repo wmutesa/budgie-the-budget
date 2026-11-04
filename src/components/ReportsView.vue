@@ -1,21 +1,22 @@
 <script setup>
 import { computed } from 'vue';
-import { cashFlow, merchants } from '../data/demo';
+import { cashFlow, activeMonths, topMerchants as merchants } from '../lib/ledger';
 
+// Year in numbers, from your own entries over the last 12 months.
 const fmt = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const short = n => (Math.abs(n) >= 1000 ? `$${(n / 1000).toFixed(1)}k` : fmt(n));
 const net = d => d.income - d.expense;
-const saved = cashFlow.reduce((s, d) => s + net(d), 0);
-const income = cashFlow.reduce((s, d) => s + d.income, 0);
-const rate = Math.round((saved / income) * 100);
-const best = cashFlow.reduce((a, b) => (net(b) > net(a) ? b : a));
-const maxFlow = Math.max(...cashFlow.map(d => Math.max(d.income, d.expense)));
-const topM = Math.max(...merchants.map(m => m.total));
+const saved = computed(() => cashFlow.value.reduce((s, d) => s + net(d), 0));
+const income = computed(() => cashFlow.value.reduce((s, d) => s + d.income, 0));
+const rate = computed(() => (income.value > 0 ? Math.max(0, Math.round((saved.value / income.value) * 100)) : 0));
+const best = computed(() => activeMonths.value.reduce((x, y) => (net(y) > net(x) ? y : x), activeMonths.value[0] || { m: '—', key: '', income: 0, expense: 0 }));
+const maxFlow = computed(() => Math.max(1, ...cashFlow.value.map(d => Math.max(d.income, d.expense))));
+const topM = computed(() => Math.max(1, ...merchants.value.map(m => m.total)));
 const tints = ['#7c3aed']; // one accent; the rest stays neutral
 
 // A small area chart of net savings per month.
 const spark = computed(() => {
-  const v = cashFlow.map(net);
+  const v = cashFlow.value.map(net);
   const min = Math.min(...v), max = Math.max(...v), span = max - min || 1;
   const pts = v.map((x, i) => [(i / (v.length - 1)) * 100, 34 - ((x - min) / span) * 28]);
   return { line: pts.map(p => p.join(',')).join(' '), area: `0,40 ${pts.map(p => p.join(',')).join(' ')} 100,40`, last: pts[pts.length - 1] };
@@ -24,7 +25,7 @@ const spark = computed(() => {
 
 <template>
   <section class="card cell report-cell">
-    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Sample history</span></div>
+    <div class="card-head"><p class="label">Year in numbers</p><span class="muted small">Last 12 months, from your entries</span></div>
 
     <div class="stat-row tinted">
       <div class="stat t-violet">
@@ -47,7 +48,7 @@ const spark = computed(() => {
       </div>
       <div class="stat t-blue">
         <span class="small">Best month</span><b>{{ best.m }}</b>
-        <span class="small">kept {{ fmt(net(best)) }}</span>
+        <span class="small">{{ best.key ? `kept ${fmt(net(best))}` : 'no entries yet' }}</span>
       </div>
     </div>
 
@@ -57,7 +58,7 @@ const spark = computed(() => {
         <span class="legend-mini"><i class="lm in" />Income <i class="lm out" />Spent</span>
       </div>
       <div class="month-rows">
-        <div v-for="d in cashFlow" :key="d.m" class="m-row" :class="{ best: d.m === best.m }">
+        <div v-for="d in cashFlow" :key="d.key" class="m-row" :class="{ best: d.key === best.key, quiet: !d.income && !d.expense }">
           <span class="m-name">{{ d.m }}</span>
           <div class="m-bars">
             <i class="mb in" :style="{ width: (d.income / maxFlow) * 100 + '%' }" :title="`Income ${fmt(d.income)}`" />
@@ -72,6 +73,7 @@ const spark = computed(() => {
     <div>
       <p class="kicker">Top merchants · 3 months</p>
       <ul class="merchant-list colored">
+        <li v-if="!merchants.length" class="muted small">Your top places to spend appear here.</li>
         <li v-for="(m, i) in merchants" :key="m.name">
           <div class="row-line"><span><i class="m-dot" :style="{ background: tints[i % tints.length] }" />{{ m.name }} <span class="muted small">×{{ m.count }}</span></span><b>{{ fmt(m.total) }}</b></div>
           <div class="meter"><i :style="{ width: (m.total / topM) * 100 + '%', background: tints[i % tints.length] }" /></div>

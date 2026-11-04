@@ -40,7 +40,7 @@ Highlights:
 - Signing out removes this device's copy, unless it holds changes that have not synced yet.
 - Sessions use a secure, HttpOnly cookie. Only hashes of session cookies and invite links are stored.
 - Other network requests go only to: exchange-rate services (ExchangeRate-API, Frankfurter), Wikidata for company lookups, Google's favicon service for logos, Google Fonts, the jsDelivr CDN for receipt-reading files, and Ollama on your own computer (`localhost`) if you run it.
-- Balances and the year's history are sample data until real accounts are connected.
+- Budgie starts empty. Every number comes from what you add: entries, imported statements, account balances, goals and subscriptions.
 - Export features are on the roadmap.
 
 See [SECURITY.md](SECURITY.md) for how the site is protected and how to report a problem.

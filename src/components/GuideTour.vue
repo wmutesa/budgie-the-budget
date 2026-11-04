@@ -11,7 +11,7 @@ const emit = defineEmits(['page', 'done']);
 const steps = [
   { title: `Welcome to Budgie${account.user?.name ? `, ${account.user.name.split(' ')[0]}` : ''}`,
     body: 'Budgie keeps track of your spending, subscriptions, savings and goals, with live exchange rates. This quick tour shows where everything is. It takes about a minute.',
-    note: 'The numbers you see now are sample data, so you can explore safely. Your own entries replace them as you add them.' },
+    note: 'Budgie starts empty: every number comes from what you add. Start with one thing you spent today, your account balances, or a bank statement.' },
   { page: 'Overview', target: '.nb-pages', title: 'Four pages',
     body: 'Overview is your month at a glance. Transactions is where you add spending. Reports explains your money. Playground turns rough notes into a plan.' },
   { page: 'Overview', target: '#overview', title: 'Your month in a sentence',

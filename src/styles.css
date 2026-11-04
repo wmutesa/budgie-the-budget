@@ -1248,3 +1248,27 @@ html, body { background: #fff; }
 .rc-skip { display: grid; gap: 4px; border-top: 1px solid var(--line); padding-top: 10px; }
 .rc-skip p { margin: 0; font-size: 11.5px; color: #71717a; line-height: 1.45; }
 [data-test="codes-left"] { min-height: 1.45em; }
+
+
+/* ---------- Empty states and hand-entered accounts and goals ---------- */
+.empty-note { margin: 0; padding: 12px; border: 1px dashed var(--line); background: #fcfcfd; color: #52525b; font-size: 12.5px; line-height: 1.5; }
+.m-row.quiet { opacity: .45; }
+.accounts-cell { display: grid; gap: 12px; align-content: start; }
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.acc { border: 1px solid var(--line); padding: 12px; display: grid; gap: 6px; }
+.acc-top { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
+.acc-name { display: grid; min-width: 0; }
+.acc-name b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.acc-amount, .goal-amt { border: 0; background: none; padding: 0; text-align: left; font-family: var(--display); font-weight: 600; color: #18181b; cursor: text; }
+.acc-amount { font-size: 20px; letter-spacing: -.01em; }
+.acc-amount:hover, .goal-amt:hover { color: #6d28d9; text-decoration: underline dotted; text-underline-offset: 3px; }
+.acc p { margin: 0; }
+.acc-edit .field, .goal-edit .field { width: 100%; }
+.acc-form, .goal-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.acc-form .field, .goal-form .field { width: 100%; }
+.acc-form-acts { display: flex; gap: 8px; grid-column: 1 / -1; }
+.acc-add { justify-self: start; }
+.goal-lines .row-line { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; }
+.goal-amt { font-size: 12.5px; font-family: inherit; }
+.goal-edit { width: 110px; }
+.goal-card { display: grid; gap: 12px; align-content: start; }

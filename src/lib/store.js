@@ -2,7 +2,7 @@
 // subscriptions, budgets and plan. It syncs to their account (see sync.js) and
 // a copy is kept in this browser so the app opens instantly and works offline.
 import { reactive, watch } from 'vue';
-import { sampleTransactions, budgets as defaultBudgets } from '../data/demo';
+import { budgets as defaultBudgets } from '../data/defaults';
 
 // Data saved before personal accounts existed; moved into the first account
 // that signs in on this device.
@@ -19,7 +19,8 @@ function fromSaved(saved = {}) {
   return {
     base: saved.base || 'USD',
     subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
-    transactions: Array.isArray(saved.transactions) ? saved.transactions : sampleTransactions(),
+    // Entries from the old sample data are dropped; Budgie only shows your own.
+    transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(t => t && t.source !== 'sample') : [],
     drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
     budgets: Array.isArray(saved.budgets) ? saved.budgets : defaultBudgets.map(b => ({ ...b })),
     dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
@@ -27,6 +28,12 @@ function fromSaved(saved = {}) {
     plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
     logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
     guide: saved.guide && typeof saved.guide === 'object' ? saved.guide : { done: false },
+    // Accounts you track by hand: { id, name, kind, balance, currency }.
+    balances: Array.isArray(saved.balances) ? saved.balances : [],
+    // Savings goals: { id, name, saved, target, color }.
+    goals: Array.isArray(saved.goals) ? saved.goals : [],
+    // One net-worth reading per day, for the chart: { date, total }.
+    netHistory: Array.isArray(saved.netHistory) ? saved.netHistory.slice(-400) : [],
   };
 }
 const SAVED_FIELDS = Object.keys(fromSaved());
