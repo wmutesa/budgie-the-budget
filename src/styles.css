@@ -1127,3 +1127,7 @@ html, body { background: #fff; }
 .m-row { grid-template-columns: 34px 1fr 104px 80px; }
 .m-net.gain, .m-net.loss { justify-self: end; }
 @media (max-width: 760px) { .m-row { grid-template-columns: 30px 1fr 78px; } }
+/* Month by month: colour the numbers only */
+.m-net.gain, .m-net.loss, .m-row.best .m-net.gain { background: none; padding: 0; }
+.m-net.gain, .m-row.best .m-net.gain { color: #15803d; }
+.m-net.loss { color: #be123c; }
