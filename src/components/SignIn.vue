@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { account, signIn, registerWithInvite, passkeyError, canUsePasskeys } from '../lib/account';
 import SignInBackdrop from './SignInBackdrop.vue';
+import PasskeyNote from './PasskeyNote.vue';
 
 // The first screen for anyone not signed in: sign in with a passkey, or
 // create one from an invite link.
@@ -57,11 +58,7 @@ async function run(fn) {
       <p v-if="!supported" class="si-error" role="alert">This browser cannot use passkeys. Try an up-to-date Chrome, Safari, Edge or Firefox.</p>
       <p v-if="error" class="si-error" role="alert">{{ error }}</p>
 
-      <ul class="si-points">
-        <li>Your data syncs to your account, so it follows you to every device.</li>
-        <li>Each person sees only their own data.</li>
-        <li>No passwords: passkeys cannot be phished or reused.</li>
-      </ul>
+      <PasskeyNote :open="Boolean(account.invite?.token)" :owner="account.invite?.role === 'owner'" />
     </section>
   </main>
 </template>

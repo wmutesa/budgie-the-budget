@@ -65,7 +65,7 @@ window.webkitSpeechRecognition = FakeRec;
 // A stand-in for the account server (worker/index.js): signed in as the owner,
 // with data kept in memory so reloads and other pages see the same account.
 // tests/accounts.cjs tests the real server.
-const fakeAccount = { data: null, version: 0 };
+const fakeAccount = { data: { guide: { done: true } }, version: 1 };
 async function fakeApi(page, account = fakeAccount) {
   await page.route('**/api/**', async route => {
     const req = route.request();
@@ -238,7 +238,7 @@ async function run(url) {
   const many = await context.newPage();
   const names = ['Netflix', 'Spotify', 'YouTube Premium', 'Disney+', 'Hulu', 'Max', 'Apple Music', 'iCloud+', 'Google One', 'Dropbox', 'Notion', 'Figma', 'GitHub', 'Vercel', 'Cursor', 'Claude', 'ChatGPT', 'Canva', 'Adobe Creative Cloud', 'Duolingo', 'Headspace', 'Calm', 'Strava', 'Audible', 'Crunchyroll', 'Peacock', 'Paramount+', 'Tidal', 'NordVPN', '1Password'];
   const subs = names.map((n, i) => ({ id: 's' + i, name: n, domain: '', logo: null, amount: 5 + i, currency: i % 5 === 0 ? 'RWF' : 'USD', cycle: 'monthly', next: '2026-12-0' + ((i % 9) + 1) }));
-  await fakeNetwork(many, { data: { base: 'USD', subscriptions: subs }, version: 1 });
+  await fakeNetwork(many, { data: { base: 'USD', subscriptions: subs, guide: { done: true } }, version: 1 });
   await many.goto(url, { waitUntil: 'load' });
   await many.waitForSelector('.acct-dot.saved');
   assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 6, '30 subscriptions show 6 at first');
@@ -246,6 +246,42 @@ async function run(url) {
   await many.click('[data-test="subs-more"]');
   assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 30, 'all 30 appear when expanded');
   await many.close();
+
+  // First-time guide: a welcome note, then one step per part of the app, once per person.
+  const fresh = { data: null, version: 0 };
+  const guideCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const guide = await guideCtx.newPage();
+  guide.on('pageerror', e => errors.push(`guide page error: ${e.message}`));
+  await fakeNetwork(guide, fresh);
+  await guide.goto(url, { waitUntil: 'load' });
+  await guide.waitForSelector('[data-test="guide"]');
+  assert.match(await guide.textContent('[data-test="guide"]'), /Welcome to Budgie, Willy/, 'new people get a welcome note');
+  let steps = 0;
+  let seen = '';
+  while (await guide.$('[data-test="guide"]')) {
+    const label = await guide.textContent('[data-test="guide-next"]');
+    seen += await guide.textContent('[data-test="guide"]');
+    await guide.click('[data-test="guide-next"]');
+    steps++;
+    if (/Start using/.test(label)) break;
+    await guide.waitForTimeout(400);
+  }
+  assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
+  assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
+  assert.match(seen, /Losing your device/, 'the guide explains the risks');
+  await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
+  await guide.waitForFunction(() => document.querySelector('.acct-dot.saved'));
+  await guide.waitForTimeout(1500);
+  assert.equal(fresh.data?.guide?.done, true, 'finishing the guide is saved to the account');
+  await guide.reload({ waitUntil: 'load' });
+  await guide.waitForSelector('.nb-pages');
+  await guide.waitForTimeout(800);
+  assert.equal(await guide.$('[data-test="guide"]'), null, 'the guide does not come back');
+  await guide.click('[data-test="account"]');
+  await guide.click('[data-test="replay-guide"]');
+  await guide.waitForSelector('[data-test="guide"]');
+  await guide.click('[data-test="guide-skip"]');
+  await guideCtx.close();
 
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });

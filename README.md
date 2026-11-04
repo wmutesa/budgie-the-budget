@@ -27,6 +27,7 @@ Highlights:
 
 - **Invite-only.** The owner invites people from the account menu (the initial in the top bar). Each invite link works once and expires after 7 days.
 - **Passkeys, no passwords.** People sign in with their fingerprint, face or device PIN. To use another device, open the account menu, choose **Add a device**, and open the link on that device within 24 hours.
+- **First-time guide.** New people get a welcome note and a short tour of each page, including how passkeys work and their risks. It shows once per person and can be replayed from the account menu, which also keeps the passkey note.
 - **Each person's data is their own.** Nobody, including the owner, sees anyone else's data in the app. The owner can remove a person, which deletes their account and data.
 
 ## Your data and privacy

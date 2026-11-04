@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue';
+import PasskeyNote from './PasskeyNote.vue';
 import {
   account, signOut, listPasskeys, removePasskey, deviceLink,
   listPeople, invitePerson, cancelInvite, removePerson,
@@ -66,6 +67,8 @@ async function copy() {
   try { await navigator.clipboard.writeText(link.value.url); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* select it by hand */ }
 }
 const leave = () => act(async () => { await signOut(); open.value = false; });
+const emit = defineEmits(['tour']);
+const tour = () => { open.value = false; emit('tour'); };
 </script>
 
 <template>
@@ -124,7 +127,12 @@ const leave = () => act(async () => { await signOut(); open.value = false; });
           </form>
         </section>
 
-        <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave">Sign out</button>
+        <PasskeyNote :owner="isOwner" />
+
+        <div class="acct-foot">
+          <button class="btn small" type="button" data-test="replay-guide" @click="tour">Take the tour again</button>
+          <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave">Sign out</button>
+        </div>
       </div>
     </div>
   </span>

@@ -1187,3 +1187,40 @@ html, body { background: #fff; }
 @keyframes siBlink { 0%, 94%, 100% { opacity: 1; } 95%, 98% { opacity: 0; } }
 @keyframes siBob { from { transform: translateY(0); } to { transform: translateY(-5px) rotate(-4deg); } }
 @media (prefers-reduced-motion: reduce) { .si-bird .si-eye, .si-bird.busy { animation: none; } }
+
+/* ---------- First-run guide ---------- */
+.gt { position: fixed; inset: 0; z-index: 60; }
+.gt-dim { position: absolute; inset: 0; background: rgba(9, 9, 11, .38); }
+.gt-hole { position: fixed; box-shadow: 0 0 0 9999px rgba(9, 9, 11, .38); outline: 2px solid #a78bfa; outline-offset: 0; pointer-events: none; transition: top .25s, left .25s, width .25s, height .25s; }
+.gt-card { position: fixed; z-index: 1; width: min(340px, calc(100vw - 32px)); background: #fff; border: 1px solid #000; padding: 16px; display: grid; gap: 10px; box-shadow: 6px 6px 0 #ede9fe; transition: top .25s, left .25s; }
+.gt-card.centered { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100vw - 32px)); padding: 22px; }
+.gt-card h2 { margin: 0; font-family: var(--display); font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.gt-card.centered h2 { font-size: 24px; }
+.gt-card p { margin: 0; font-size: 13px; line-height: 1.5; color: #3f3f46; }
+.gt-note { padding: 8px 10px; background: #f5f3ff; color: #4c1d95 !important; font-size: 12px !important; }
+.gt-top { display: flex; justify-content: space-between; align-items: center; }
+.gt-count { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; color: #7c3aed; }
+.gt-skip { border: 0; background: none; padding: 0; font-size: 11.5px; color: #71717a; text-decoration: underline; }
+.gt-dots { display: flex; gap: 4px; }
+.gt-dots i { width: 14px; height: 3px; background: #e4e4e7; }
+.gt-dots i.past { background: #c4b5fd; } .gt-dots i.on { background: #7c3aed; }
+.gt-acts { display: flex; justify-content: flex-end; gap: 8px; }
+.acct-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+@media (prefers-reduced-motion: reduce) { .gt-hole, .gt-card { transition: none; } }
+
+/* ---------- Passkey note ---------- */
+.pk-note { border: 1px solid var(--line); background: #fcfcfd; font-size: 12.5px; color: #3f3f46; }
+.pk-note summary { cursor: pointer; padding: 10px 12px; font-weight: 600; color: #18181b; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+.pk-note summary::-webkit-details-marker { display: none; }
+.pk-note summary::after { content: '+'; font-weight: 400; color: #7c3aed; font-size: 16px; line-height: 1; }
+.pk-note[open] summary::after { content: '−'; }
+.pk-note[open] summary { border-bottom: 1px solid var(--line); }
+.pk-note .pk-h { margin: 12px 12px 4px; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #7c3aed; }
+.pk-note ul { margin: 0; padding: 0 12px 10px; list-style: none; display: grid; gap: 7px; }
+.pk-note li { position: relative; padding-left: 14px; line-height: 1.45; }
+.pk-note li::before { content: ''; position: absolute; left: 0; top: 6px; width: 6px; height: 6px; background: #c4b5fd; }
+.pk-note li b { color: #18181b; }
+.si-card .pk-note { max-height: 46vh; overflow: auto; }
+.gt-pk { max-height: 44vh; overflow: auto; }
+.gt-pk summary { pointer-events: none; }
+.gt-pk summary::after { display: none; }

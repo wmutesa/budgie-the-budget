@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import HeadlineCell from './components/HeadlineCell.vue';
 import GoalCell from './components/GoalCell.vue';
 import NetWorthCell from './components/NetWorthCell.vue';
@@ -25,6 +25,7 @@ import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
+import GuideTour from './components/GuideTour.vue';
 import { account, startAccount } from './lib/account';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
@@ -36,6 +37,12 @@ const active = ref('Overview');
 const searching = ref(false);
 const seed = ref('');
 const openSearch = (q = '') => { seed.value = q; searching.value = true; };
+// First-run guide: once per person, after their data has loaded; replayable from the account menu.
+const touring = ref(false);
+watch(() => [account.status, account.sync, store.guide?.done], () => {
+  if (account.status === 'signed-in' && account.sync !== 'saving' && store.guide && !store.guide.done) touring.value = true;
+}, { immediate: true });
+const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
 const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
@@ -75,7 +82,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
           <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
-          <AccountMenu />
+          <AccountMenu @tour="touring = true" />
         </div>
       </header>
 
@@ -113,5 +120,6 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
     </main>
 
     <SubscriptionSearch v-if="searching" :seed="seed" @close="searching = false" />
+    <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>
 </template>

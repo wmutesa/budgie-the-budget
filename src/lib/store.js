@@ -26,6 +26,7 @@ function fromSaved(saved = {}) {
     banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
     plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
     logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
+    guide: saved.guide && typeof saved.guide === 'object' ? saved.guide : { done: false },
   };
 }
 const SAVED_FIELDS = Object.keys(fromSaved());

@@ -112,7 +112,7 @@ async function routes(request, env, url) {
   if (path === '/api/invite' && method === 'POST') {
     const invite = await findInvite(env, (await body(request)).token);
     if (!invite) return fail(404, 'This invite link is not valid. It may have expired or been used already.');
-    return json({ name: invite.name, addsDevice: Boolean(invite.user_id) });
+    return json({ name: invite.name, addsDevice: Boolean(invite.user_id), role: invite.role });
   }
 
   if (path === '/api/register/options' && method === 'POST') {

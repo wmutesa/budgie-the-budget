@@ -72,6 +72,8 @@ async function main() {
     await owner.page.goto(`${base}/invite#${ownerToken}`);
     await owner.page.waitForSelector('text=Welcome, Willy');
     await owner.page.click('[data-test="create-passkey"]');
+    await owner.page.waitForSelector('[data-test="guide-skip"]');
+    await owner.page.click('[data-test="guide-skip"]');
     await owner.page.waitForSelector('.nb-pages');
     assert.equal(new URL(owner.page.url()).hash, '', 'the invite token is removed from the address bar');
 
@@ -111,6 +113,8 @@ async function main() {
     await alex.page.goto(inviteLink.replace(/^https?:\/\/[^/]+/, base));
     await alex.page.waitForSelector('text=Welcome, Alex');
     await alex.page.click('[data-test="create-passkey"]');
+    await alex.page.waitForSelector('[data-test="guide-skip"]');
+    await alex.page.click('[data-test="guide-skip"]');
     await alex.page.waitForSelector('.nb-pages');
     await alex.page.waitForSelector('.acct-dot.saved');
     const alexData = await getJSON(alex.page, '/api/data');
