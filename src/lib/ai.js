@@ -10,8 +10,9 @@
 // If a model fails, the next one takes over.
 import { reactive } from 'vue';
 import { CATEGORIES } from './categorize';
-// The processor engine's WebAssembly file, served from Budgie's own site.
-import wllamaWasm from '@wllama/wllama/esm/wasm/wllama.wasm?url';
+// The processor engine's WebAssembly file, from the jsDelivr CDN (same pinned
+// version as the package), so the site itself stays small.
+const wllamaWasm = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm';
 
 const OLLAMA = 'http://localhost:11434';
 const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
