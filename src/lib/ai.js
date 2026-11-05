@@ -10,6 +10,8 @@
 // If a model fails, the next one takes over.
 import { reactive } from 'vue';
 import { CATEGORIES } from './categorize';
+// The processor engine's WebAssembly file, served from Budgie's own site.
+import wllamaWasm from '@wllama/wllama/esm/wasm/wllama.wasm?url';
 
 const OLLAMA = 'http://localhost:11434';
 const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
@@ -20,32 +22,36 @@ const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
 export const MODELS = {
   small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', mb: 450, good: 'receipts' },
   medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', id32: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', mb: 1300, good: 'writing' },
+  // Runs on the processor (llama.cpp in WebAssembly), so it works in any modern
+  // browser, including those without WebGPU. Slower, used when the others cannot run.
+  cpu: { url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf', name: 'Qwen 2.5 (processor)', size: 'about 490 MB', mb: 700, good: 'any browser' },
 };
 const FAIL_KEY = 'budgie.aiFailed'; // when the last automatic start failed, to avoid retrying on every visit
 const STALL_MS = 90 * 1000;          // give up if a download makes no progress for this long
 // For each task, which models to try, in order.
 const ROUTES = {
-  receipt: ['ollama', 'small', 'medium'],
-  advice: ['ollama', 'medium', 'small'],
-  budget: ['ollama', 'medium', 'small'],
-  news: ['ollama', 'medium', 'small'],
-  account: ['ollama', 'small', 'medium'],
+  receipt: ['ollama', 'small', 'medium', 'cpu'],
+  advice: ['ollama', 'medium', 'small', 'cpu'],
+  budget: ['ollama', 'medium', 'small', 'cpu'],
+  news: ['ollama', 'medium', 'small', 'cpu'],
+  account: ['ollama', 'small', 'medium', 'cpu'],
 };
 
-const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '' }); // idle | loading | ready | error | skipped | waiting
+const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '', detail: '' }); // idle | loading | ready | error | skipped | waiting
 export const ai = reactive({
   enabled: true,
   ollama: { state: 'checking', model: '' }, // checking | ready | absent
   small: engineState(),
   medium: engineState(),
+  cpu: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
   used: { receipt: '', advice: '', budget: '', news: '', account: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
-const engines = { small: null, medium: null };
-const loading = { small: null, medium: null };
+const engines = { small: null, medium: null, cpu: null };
+const loading = { small: null, medium: null, cpu: null };
 
 const read = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage blocked */ } };
@@ -60,9 +66,9 @@ const meteredConnection = () => {
 const capableDevice = () => !navigator.deviceMemory || navigator.deviceMemory >= 8;
 
 const isReady = key => (key === 'ollama' ? ai.ollama.state === 'ready' : ai[key].state === 'ready' && Boolean(engines[key]));
-const nameOf = key => (key === 'ollama' ? `Ollama · ${ai.ollama.model}` : `${MODELS[key].name} (in browser)`);
+const nameOf = key => (key === 'ollama' ? `Ollama · ${ai.ollama.model}` : key === 'cpu' ? 'Qwen 2.5 (in browser, processor)' : `${MODELS[key].name} (in browser)`);
 function refreshLabel() {
-  const ready = ['ollama', 'medium', 'small'].filter(isReady);
+  const ready = ['ollama', 'medium', 'small', 'cpu'].filter(isReady);
   ai.ready = ready.length > 0;
   ai.label = ready.length ? `AI · ${ready.map(k => (k === 'ollama' ? 'Ollama' : MODELS[k].name)).join(' + ')}` : 'Built-in rules';
 }
@@ -72,7 +78,8 @@ export function labelFor(task) {
   if (!ai.enabled) return 'Built-in rules';
   const key = ROUTES[task].find(isReady);
   if (key) return nameOf(key);
-  return ai.small.state === 'loading' ? `Built-in rules · AI loading ${ai.small.progress}%` : 'Built-in rules';
+  const busy = ['small', 'cpu'].find(k => ai[k].state === 'loading');
+  return busy ? `Built-in rules · AI loading ${ai[busy].progress}%` : 'Built-in rules';
 }
 
 // ---------- Ollama ----------
@@ -158,7 +165,7 @@ export function loadModel(key) {
     } catch (e) {
       engines[key] = null;
       try { worker?.terminate(); } catch { /* already gone */ }
-      Object.assign(ai[key], { state: 'error', error: e?.plain ? e.message : explain(e) });
+      Object.assign(ai[key], { state: 'error', error: e?.plain ? e.message : explain(e), detail: String(e?.message || e || '').slice(0, 300) });
       if (key === 'small') write(FAIL_KEY, String(Date.now()));
       return false;
     } finally {
@@ -174,9 +181,9 @@ export function loadModel(key) {
 if (typeof window !== 'undefined') {
   window.addEventListener('unhandledrejection', ev => {
     const m = String(ev.reason?.message || ev.reason || '');
-    if (/webgpu|gpu|mlc|tvm|shader|wasm|model|adapter|device lost/i.test(m)) {
+    if (/webgpu|gpu|mlc|tvm|shader|wasm|model|adapter|device lost|wllama|llama|gguf/i.test(m)) {
       ev.preventDefault();
-      for (const key of ['small', 'medium']) if (ai[key].state === 'loading' || ai[key].state === 'ready') {
+      for (const key of ['small', 'medium', 'cpu']) if (ai[key].state === 'loading' || ai[key].state === 'ready') {
         engines[key] = null;
         Object.assign(ai[key], { state: 'error', error: explain(ev.reason) });
       }
@@ -185,7 +192,49 @@ if (typeof window !== 'undefined') {
   });
 }
 
+// ---------- Processor engine (wllama: llama.cpp in WebAssembly) ----------
+export function loadCpuModel() {
+  if (engines.cpu) return Promise.resolve(true);
+  if (loading.cpu) return loading.cpu;
+  Object.assign(ai.cpu, { state: 'loading', progress: 0, text: 'Starting…', error: '', detail: '' });
+  loading.cpu = (async () => {
+    try {
+      if (typeof WebAssembly !== 'object') throw Object.assign(new Error('This browser cannot run WebAssembly.'), { plain: true });
+      const { Wllama } = await import('@wllama/wllama');
+      const w = new Wllama({ default: wllamaWasm }, { suppressNativeLog: true });
+      let last = Date.now();
+      const stall = new Promise((_, reject) => {
+        const t = setInterval(() => { if (Date.now() - last > STALL_MS) { clearInterval(t); reject(new Error('stalled')); } }, 5000);
+        loading.cpuTimer = t;
+      });
+      await Promise.race([
+        w.loadModelFromUrl(MODELS.cpu.url, {
+          n_ctx: 2048,
+          progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
+        }),
+        stall,
+      ]);
+      engines.cpu = w;
+      Object.assign(ai.cpu, { state: 'ready', progress: 100, text: '' });
+      return true;
+    } catch (e) {
+      engines.cpu = null;
+      Object.assign(ai.cpu, { state: 'error', error: e?.plain ? e.message : explain(e), detail: String(e?.message || e || '').slice(0, 300) });
+      return false;
+    } finally {
+      clearInterval(loading.cpuTimer);
+      loading.cpu = null;
+      refreshLabel();
+    }
+  })();
+  return loading.cpu;
+}
+
 async function browserChat(key, messages, { temperature = 0, max_tokens = 200 } = {}) {
+  if (key === 'cpu') {
+    const out = await engines.cpu.createChatCompletion({ messages, temperature, max_tokens });
+    return out.choices?.[0]?.message?.content || '';
+  }
   const out = await engines[key].chat.completions.create({ messages, temperature, max_tokens });
   return out.choices?.[0]?.message?.content || '';
 }
@@ -194,7 +243,15 @@ async function browserChat(key, messages, { temperature = 0, max_tokens = 200 } 
 export async function startBrowserModels({ force = false } = {}) {
   if (!ai.enabled) return;
   const info = await checkDevice();
-  if (!info.ok) { Object.assign(ai.small, { state: 'error', error: info.why }); Object.assign(ai.medium, { state: 'skipped', error: '' }); refreshLabel(); return; }
+  if (!info.ok) {
+    // No usable graphics chip: run on the processor instead.
+    Object.assign(ai.small, { state: 'skipped', error: info.why });
+    Object.assign(ai.medium, { state: 'skipped', error: '' });
+    refreshLabel();
+    if (!force && meteredConnection()) { ai.cpu.state = 'waiting'; ai.note = 'The AI model waits for a faster connection before downloading.'; return; }
+    await loadCpuModel();
+    return;
+  }
   // After a failed automatic start, wait a day before trying again on its own.
   const failed = Number(read(FAIL_KEY)) || 0;
   if (!force && failed && Date.now() - failed < 864e5) {
@@ -210,6 +267,7 @@ export async function startBrowserModels({ force = false } = {}) {
   const ok = await loadModel('small');
   if (ok && (force || capableDevice())) loadModel('medium');
   else if (ok) Object.assign(ai.medium, { state: 'skipped', error: '' });
+  else await loadCpuModel(); // the graphics chip failed: fall back to the processor
 }
 
 // ---------- on and off ----------
@@ -225,11 +283,12 @@ export async function setAIEnabled(on) {
   write(OFF_KEY, on ? null : 'off');
   if (on) return detectAI();
   // Off: stop the models and delete their downloads from this device.
-  for (const key of ['small', 'medium']) {
-    try { await engines[key]?.unload?.(); } catch { /* already gone */ }
+  for (const key of ['small', 'medium', 'cpu']) {
+    try { await (key === 'cpu' ? engines.cpu?.exit?.() : engines[key]?.unload?.()); } catch { /* already gone */ }
     engines[key] = null;
     Object.assign(ai[key], engineState());
   }
+  try { const { Wllama } = await import('@wllama/wllama'); await new Wllama({ default: wllamaWasm }).cacheManager?.clear?.(); } catch { /* nothing cached */ }
   ai.note = '';
   refreshLabel();
   try {

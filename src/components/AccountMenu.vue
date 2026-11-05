@@ -109,28 +109,21 @@ const tour = () => { open.value = false; emit('tour'); };
     <Teleport to="body">
     <div v-if="open" class="overlay" @click.self="open = false">
       <div class="sheet acct-sheet" role="dialog" aria-label="Account">
-        <div class="cell-head">
-          <p class="label">{{ account.user?.name }} <span class="muted small">· {{ isOwner ? 'Owner' : 'Member' }}</span></p>
+        <div class="acct-top">
+          <span class="acct-avatar" aria-hidden="true">{{ initial }}</span>
+          <div class="acct-who">
+            <p class="label">{{ account.user?.name }} <span class="acct-role">{{ isOwner ? 'Owner' : 'Member' }}</span></p>
+            <p class="acct-sync" :class="account.sync">{{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
+          </div>
+          <p v-if="error" class="si-error" role="alert">{{ error }}</p>
           <button class="icon-x" aria-label="Close" @click="open = false">×</button>
         </div>
 
-        <p class="acct-sync" :class="account.sync">{{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
-        <p v-if="error" class="si-error" role="alert">{{ error }}</p>
+        <div class="acct-grid">
+        <div class="acct-col">
 
-        <div v-if="link" class="acct-link">
-          <p class="small">{{ link.label }}</p>
-          <div class="acct-link-row">
-            <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
-            <button class="btn primary small" type="button" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
-          </div>
-          <div class="acct-qr">
-            <QrCode :text="link.url" :size="148" />
-            <p class="small muted">Or scan this with the other device's camera.</p>
-          </div>
-        </div>
-
-        <section class="acct-sec">
-          <div class="acct-sec-head"><p class="kicker">Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink">Add a device</button></div>
+        <section class="acct-sec t-blue">
+          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink">Add a device</button></div>
           <ul class="acct-list">
             <li v-for="p in passkeys" :key="p.id">
               <span>{{ p.label || 'Passkey' }}</span>
@@ -140,9 +133,9 @@ const tour = () => { open.value = false; emit('tour'); };
           </ul>
         </section>
 
-        <section class="acct-sec">
+        <section class="acct-sec t-amber">
           <div class="acct-sec-head">
-            <p class="kicker">Recovery codes</p>
+            <p class="kicker"><span class="acct-ico" aria-hidden="true">✳</span>Recovery codes</p>
             <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes">{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
           </div>
           <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
@@ -151,8 +144,27 @@ const tour = () => { open.value = false; emit('tour'); };
           <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
         </section>
 
-        <section v-if="isOwner" class="acct-sec">
-          <div class="acct-sec-head"><p class="kicker">People</p><span class="muted small">{{ people.length }} with access</span></div>
+        <section class="acct-sec t-slate">
+          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData">Download a copy</button></div>
+          <p class="small muted">Everything you have added, as one file: entries, budgets, accounts, goals, subscriptions and plans.</p>
+        </section>
+        </div>
+
+        <div class="acct-col">
+        <div v-if="link" class="acct-link">
+          <p class="small">{{ link.label }}</p>
+          <div class="acct-link-row">
+            <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
+            <button class="btn primary small" type="button" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
+          </div>
+          <div class="acct-qr">
+            <QrCode :text="link.url" :size="110" />
+            <p class="small muted">Or scan this with the other device's camera.</p>
+          </div>
+        </div>
+
+        <section v-if="isOwner" class="acct-sec t-green">
+          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">☺</span>People</p><span class="muted small">{{ people.length }} with access</span></div>
           <ul class="acct-list">
             <li v-for="p in people" :key="p.id">
               <span>{{ p.name }}<span v-if="p.id === account.user.id" class="muted small"> · you</span></span>
@@ -171,15 +183,16 @@ const tour = () => { open.value = false; emit('tour'); };
           </form>
         </section>
 
-        <section class="acct-sec">
-          <div class="acct-sec-head"><p class="kicker">Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData">Download a copy</button></div>
-          <p class="small muted">Everything you have added, as one file: entries, budgets, accounts, goals, subscriptions and plans.</p>
-        </section>
 
-        <!-- Below People: its progress updates must not shift the lists above. -->
-        <AIPanel />
+        <PasskeyNote v-if="!isOwner" :owner="isOwner" />
+        </div>
 
-        <PasskeyNote :owner="isOwner" />
+        <div class="acct-col">
+        <!-- In its own column: its progress updates must not shift the lists beside it. -->
+        <AIPanel class="t-violet" />
+        <PasskeyNote v-if="isOwner" :owner="isOwner" />
+        </div>
+        </div>
 
         <div class="acct-foot">
           <button class="btn small" type="button" data-test="replay-guide" @click="tour">Take the tour again</button>
