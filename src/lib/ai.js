@@ -13,6 +13,7 @@ import { CATEGORIES } from './categorize';
 // The processor engine's WebAssembly file, from the jsDelivr CDN (same pinned
 // version as the package), so the site itself stays small.
 const wllamaWasm = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm';
+const WLLAMA_JS = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/index.js';
 
 const OLLAMA = 'http://localhost:11434';
 const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
@@ -201,7 +202,7 @@ export function loadCpuModel() {
   loading.cpu = (async () => {
     try {
       if (typeof WebAssembly !== 'object') throw Object.assign(new Error('This browser cannot run WebAssembly.'), { plain: true });
-      const { Wllama } = await import('@wllama/wllama');
+      const { Wllama } = await import(/* @vite-ignore */ WLLAMA_JS);
       const w = new Wllama({ default: wllamaWasm }, { suppressNativeLog: true });
       let last = Date.now();
       const stall = new Promise((_, reject) => {
@@ -289,7 +290,7 @@ export async function setAIEnabled(on) {
     engines[key] = null;
     Object.assign(ai[key], engineState());
   }
-  try { const { Wllama } = await import('@wllama/wllama'); await new Wllama({ default: wllamaWasm }).cacheManager?.clear?.(); } catch { /* nothing cached */ }
+  try { const { Wllama } = await import(/* @vite-ignore */ WLLAMA_JS); await new Wllama({ default: wllamaWasm }).cacheManager?.clear?.(); } catch { /* nothing cached */ }
   ai.note = '';
   refreshLabel();
   try {

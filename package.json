@@ -23,7 +23,6 @@
     "@mlc-ai/web-llm": "0.2.86",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
-    "@wllama/wllama": "3.8.1",
     "pdfjs-dist": "^6.5.438",
     "qrcode-generator": "^2.0.4",
     "read-excel-file": "^9.3.14",
