@@ -80,6 +80,14 @@ const nextStep = computed(() => {
     </p>
     <ul v-if="showDone" class="tk-list"><TaskRow v-for="x in items.filter(y => y.done)" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
     <p v-if="!items.length" class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
+    <!-- This week's deadlines, as part of Up next -->
+    <div class="td-week" data-test="today-deadlines">
+      <div class="cell-head"><p class="label">This week</p><span class="muted small">{{ deadlines.length }} deadlines</span></div>
+      <ul v-if="deadlines.length" class="td-list">
+        <li v-for="t in deadlines.slice(0, 6)" :key="t.id" :style="{ '--k': KINDS[t.kind].color }"><i /><span><b>{{ t.title }}</b><span class="muted small">{{ dayLabel(t.date) }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }}{{ t.project ? ` · #${t.project}` : '' }}</span></span></li>
+      </ul>
+      <p v-else class="empty-note">No assignments or exams due this week.</p>
+    </div>
   </section>
   </div>
   <div class="td-col td-side span-4">
@@ -99,13 +107,6 @@ const nextStep = computed(() => {
       </li>
     </ul>
     <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
-  </section>
-  <section class="card cell" data-test="today-deadlines">
-    <div class="cell-head"><p class="label">This week</p><span class="muted small">{{ deadlines.length }} deadlines</span></div>
-    <ul v-if="deadlines.length" class="td-list">
-      <li v-for="t in deadlines.slice(0, 6)" :key="t.id" :style="{ '--k': KINDS[t.kind].color }"><i /><span><b>{{ t.title }}</b><span class="muted small">{{ dayLabel(t.date) }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }}{{ t.project ? ` · #${t.project}` : '' }}</span></span></li>
-    </ul>
-    <p v-else class="empty-note">No assignments or exams due this week.</p>
   </section>
   </div>
 

@@ -226,7 +226,7 @@ const tickX = x => toggleDone(x.task, x.date);
       <section v-else class="sch-time" aria-label="Time line">
         <div ref="headEl" class="sch-cols-head" :style="{ '--n': columns.length }">
           <span class="sch-axis-h"><button v-if="!listOpen" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="listOpen = true"><Icon name="list" :size="16" /></button><template v-else>{{ isToday ? 'Today' : fromIso(day).toLocaleDateString('en-US', { weekday: 'short' }) }}</template></span>
-          <span v-for="col in columns" :key="col.key" class="sch-col-h">{{ col.label }}<i :style="{ background: col.color }" /></span>
+          <span v-for="col in columns" :key="col.key" class="sch-col-h" :style="{ '--c': col.color }">{{ col.label }}<i /></span>
         </div>
         <div ref="grid" class="sch-grid" :style="{ '--n': columns.length, '--h': `${HOUR}px` }">
           <div class="sch-axis">
