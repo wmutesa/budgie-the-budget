@@ -11,6 +11,7 @@ import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
 import ProfileYou from './ProfileYou.vue';
 import DigestSettings from './DigestSettings.vue';
+import { addSample, removeSample, hasSample } from '../lib/sample';
 import { DIGESTS_LIVE } from '../lib/digest';
 import {
   account, signOut, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
@@ -22,6 +23,10 @@ import {
 const open = ref(false);
 // One page at a time, chosen from the menu on the left.
 const tab = ref('profile');
+// Sample data: fill the app to see it full, then take it back out.
+const sampleOn = computed(() => hasSample());
+function loadSample() { const t0 = performance.now(); const r = addSample(); toast(`${r.tasks} items and ${r.goals} goals added in ${Math.round(performance.now() - t0)} ms.`, { kind: 'success', title: 'Sample data' }); }
+function clearSample() { const n = removeSample(); toast(`${n} sample items removed.`, { kind: 'success', title: 'Sample data' }); }
 const TABS = computed(() => [
   ['profile', 'Profile', 'user'],
   ['digests', DIGESTS_LIVE ? 'Digests & AI' : 'AI', 'sparkle'],
@@ -236,13 +241,19 @@ const tour = () => { open.value = false; emit('tour'); };
             <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Download a copy</p><button class="btn small" type="button" data-test="download-data" @click="downloadData"><Icon name="download" :size="14" />Download</button></div>
             <p class="small muted">Everything you have added, as one file: tasks, routines, goals, calendars, details about you and settings.</p>
           </section>
+          <section class="acct-sec t-a">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◇</span>Sample data</p>
+              <button v-if="!sampleOn" class="btn small" type="button" data-test="sample-add" @click="loadSample"><Icon name="sparkle" :size="14" />Fill with sample data</button>
+              <button v-else class="btn small" type="button" data-test="sample-remove" @click="clearSample"><Icon name="trash" :size="14" />Remove sample data</button></div>
+            <p class="small muted">See Budgie full: about 300 made-up tasks, classes, routines and goals. Removing it leaves everything you added yourself.</p>
+          </section>
           <section class="acct-sec t-b">
             <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">▶</span>The tour</p><button class="btn small" type="button" data-test="replay-guide" @click="tour"><Icon name="play" :size="14" />Take the tour again</button></div>
-            <p class="small muted">A one-minute walk through the four pages.</p>
+            <p class="small muted">A one-minute walk through the three pages.</p>
           </section>
           <section v-if="!isOwner" class="acct-sec t-a">
             <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">✕</span>Delete my account</p><button class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe"><Icon name="trash" :size="14" />Delete</button></div>
-            <p class="small muted">Removes your account, digests and all of your data for good.</p>
+            <p class="small muted">Removes your account and all of your data for good.</p>
           </section>
         </template>
         </div>

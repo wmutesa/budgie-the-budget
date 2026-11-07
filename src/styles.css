@@ -2605,3 +2605,30 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .sch-cal { border: 0 !important; margin: 0 !important; }
 .sch-extras { margin: 0 28px 28px; max-width: 520px; }
 @media (max-width: 900px) { .sch-extras { margin: 0 12px 20px; } }
+
+/* Settings: mostly black, grey and white with few lines. Hues stay on the Profile page only. */
+.acct-sheet .acct-top { background: #fff !important; border-bottom: 1px solid #f0f0f2 !important; padding: 4px 2px 14px !important; }
+.acct-body { border: 0 !important; }
+.acct-nav { background: #fff !important; border-right: 1px solid #f0f0f2 !important; padding: 4px 10px 4px 0 !important; }
+.acct-nav button { color: #71717a !important; }
+.acct-nav button:hover { background: #f4f4f5 !important; color: #000 !important; }
+.acct-nav button.on { background: #f4f4f5 !important; color: #000 !important; box-shadow: none !important; }
+.acct-nav button.on .ico, .acct-nav button .ico { color: currentColor !important; }
+.acct-page:not([data-page="profile"]) .acct-sec { background: #fff !important; border: 0 !important; border-bottom: 1px solid #f0f0f2 !important; padding: 4px 0 16px !important; box-shadow: none !important; }
+.acct-page:not([data-page="profile"]) .acct-sec:last-child { border-bottom: 0 !important; }
+.acct-page:not([data-page="profile"]) .acct-sec .kicker, .acct-page:not([data-page="profile"]) .acct-sec .kicker .acct-ico { color: #18181b !important; }
+.acct-page:not([data-page="profile"]) .acct-list li { border-color: #f4f4f5 !important; background: #fff !important; }
+.acct-page:not([data-page="profile"]) .btn.primary { background: #18181b !important; border-color: #18181b !important; color: #fff !important; }
+.acct-page:not([data-page="profile"]) .acct-link { background: #fafafa !important; border: 0 !important; }
+@media (max-width: 700px) {
+  .acct-nav { border-right: 0 !important; border-bottom: 1px solid #f0f0f2 !important; padding: 0 0 6px !important; }
+  .acct-nav button.on { box-shadow: none !important; }
+}
+.acct-top .acct-role { background: #f4f4f5 !important; color: #3f3f46 !important; }
+.acct-page:not([data-page="profile"]) details, .acct-page:not([data-page="profile"]) summary { background: #fafafa !important; border-color: #f0f0f2 !important; color: #18181b !important; }
+.acct-page:not([data-page="profile"]) summary::after, .acct-page:not([data-page="profile"]) summary .ico { color: #71717a !important; }
+.sch-box.narrow { padding: 5px 8px; gap: 2px; }
+.sch-box.narrow .sch-box-top { flex-direction: column; align-items: flex-start; gap: 1px; }
+.sch-box.narrow .sch-box-top b { max-width: 100%; }
+.sch-box.narrow .sch-box-top span { font-size: 11px; color: #52525b; }
+.sch-box.narrow.short .sch-box-top b { font-size: 12px; }

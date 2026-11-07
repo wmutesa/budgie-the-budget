@@ -280,6 +280,11 @@ async function run(url) {
   // Your details live in your profile; the AI page has no digest settings while digests are on hold.
   await page.click('[data-test="account"]');
   await page.waitForSelector('[data-test="profile-you"]');
+  if (process.env.SHOTS) {
+    await page.screenshot({ path: `${process.env.SHOTS}/settings-profile.png` });
+    for (const id of ['security', 'data']) { await page.click(`[data-test="acct-tab-${id}"]`); await page.waitForTimeout(150); await page.screenshot({ path: `${process.env.SHOTS}/settings-${id}.png` }); }
+    await page.click('[data-test="acct-tab-profile"]');
+  }
   await page.fill('[data-test="you-name"]', 'Sam');
   await page.fill('[data-test="you-study"]', 'Electrical Engineering');
   assert.equal(await page.textContent('[data-test="acct-tab-digests"]'), 'AI', 'the settings page is called AI for now');
@@ -396,6 +401,35 @@ async function run(url) {
     assert.ok(over <= 0, `${p} fits a phone (overflow ${over}px)`);
     if (process.env.SHOTS) await mobile.screenshot({ path: `${process.env.SHOTS}/phone-${p.toLowerCase()}.png`, fullPage: true });
   }
+
+  // Full of sample data: how fast it stays.
+  const full = await context.newPage();
+  await full.setViewportSize({ width: 1440, height: 900 });
+  full.on('pageerror', e => errors.push(`full page error: ${e.message}`));
+  await fakeNetwork(full);
+  await full.goto(url, { waitUntil: 'load' });
+  await full.click('[data-test="account"]');
+  await full.click('[data-test="acct-tab-data"]');
+  await full.click('[data-test="sample-add"]');
+  const filled = await full.textContent('[data-test="toast"]:has-text("Sample data")');
+  await full.keyboard.press('Escape');
+  await full.click('[data-test="account-close"], .acct-sheet [aria-label="Close"]').catch(() => {});
+  const timings = { fill: Number(filled.match(/in (\d+) ms/)[1]) };
+  const time = async (name, act, ready) => { const t0 = Date.now(); await act(); await full.waitForSelector(ready); timings[name] = Date.now() - t0; if (process.env.SHOTS) await full.screenshot({ path: `${process.env.SHOTS}/full-${name}.png` }); };
+  await time('today', () => full.click(tab('Today')), '[data-test="today-goals"]');
+  await time('schedule', async () => { await full.click(tab('Planner')); await full.click('[data-test="view-schedule"]'); await full.click('[data-test="cal-day"]'); }, '[data-test="sch-box"]');
+  await time('week', () => full.click('[data-test="cal-week"]'), '.cal-dh');
+  await time('month', () => full.click('[data-test="cal-month"]'), '.cal-mcell');
+  await time('tasks', () => full.click('[data-test="view-tasks"]'), '.pln-group');
+  await time('search', () => full.fill('[data-test="search"]', 'lab'), '[data-test="search-pop"]');
+  const n = await full.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('budgie.v3'))) || '{}').tasks?.length || 0);
+  console.log('with sample data:', n, 'tasks;', Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', '));
+  for (const [k, v] of Object.entries(timings)) assert.ok(v < 2500, `${k} stays quick with sample data (${v} ms)`);
+  await full.click('[data-test="account"]');
+  await full.click('[data-test="acct-tab-data"]');
+  await full.click('[data-test="sample-remove"]');
+  await full.waitForSelector('[data-test="sample-add"]');
+  await full.close();
 
   await browser.close();
   assert.deepEqual(errors, [], 'no page errors');

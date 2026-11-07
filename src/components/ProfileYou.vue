@@ -10,7 +10,7 @@ const me = store.me;
 
 <template>
   <section class="acct-sec t-b you" data-test="profile-you">
-    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="user" :size="12" /></span>About you</p><span class="muted small">Used for your digests and draft emails</span></div>
+    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="user" :size="12" /></span>About you</p><span class="muted small">Helps Budgie plan for you</span></div>
     <div class="you-grid">
       <label class="tk-f"><span>Name</span><input v-model="me.name" maxlength="60" autocomplete="name" data-test="you-name" /></label>
       <label class="tk-f"><span>School or work</span><input v-model="me.school" maxlength="80" placeholder="e.g. State University" /></label>

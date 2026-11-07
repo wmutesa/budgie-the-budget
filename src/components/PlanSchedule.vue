@@ -246,7 +246,7 @@ const tickX = x => toggleDone(x.task, x.date);
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col" @click="pick(col, $event)">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45 }" :style="boxStyle(x)" data-test="sch-box" @click="editing = x">
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, narrow: x.lanes > 1 }" :style="boxStyle(x)" data-test="sch-box" @click="editing = x">
               <span class="sch-box-top"><b>{{ x.task.title }}</b><span>{{ hhmm(x.s) }} - {{ hhmm(x.e) }}</span></span>
               <span v-if="x.task.notes && x.e - x.s >= 60" class="sch-box-note">{{ x.task.notes }}</span>
               <span v-if="x.task.subtasks?.length && x.e - x.s >= 60" class="sch-box-subs">

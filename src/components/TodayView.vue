@@ -49,7 +49,7 @@ const nextStep = computed(() => {
       <template v-if="deadlines.length"><mark class="m-pink">{{ deadlines.length }} {{ deadlines.length === 1 ? 'deadline' : 'deadlines' }}</mark> this week, first <b>{{ deadlines[0].title }}</b> {{ dayLabel(deadlines[0].date).toLowerCase() }}. </template>
       <template v-if="overdue"><mark class="m-amber">{{ overdue }} overdue</mark>. </template>
       <template v-if="best">Your {{ best.t.title.toLowerCase() }} streak is <mark class="m-green">{{ best.n }} days</mark>. </template>
-      <template v-if="nextStep">{{ nextStep.text }}<template v-if="nextStep.what"> <b>{{ nextStep.what }}</b> <span class="lede-note">({{ nextStep.note }})</span></template>. </template>
+      <template v-if="nextStep">{{ nextStep.text }}<template v-if="nextStep.what">{{ ' ' }}<b>{{ nextStep.what }}</b> <span class="lede-note">({{ nextStep.note }})</span></template>. </template>
     </p>
     <p class="brief-acts">
       <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="14" />Planner</button>
