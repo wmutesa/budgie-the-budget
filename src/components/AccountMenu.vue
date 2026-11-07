@@ -6,7 +6,7 @@ import QrCode from './QrCode.vue';
 import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
 import {
-  account, signOut, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
+  account, signOut, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
 } from '../lib/account';
 
@@ -93,6 +93,15 @@ function downloadData() {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
+const leaveEverywhere = () => act(async () => {
+  if (!confirm('Sign out on every device, including this one? You will need your passkey to sign in again.')) return;
+  await signOutEverywhere(); open.value = false;
+});
+const removeMe = () => act(async () => {
+  const typed = prompt('This deletes your Budgie account and all of your data for good. Type DELETE to confirm.');
+  if (typed !== 'DELETE') return;
+  await deleteMyAccount(); open.value = false;
+});
 const leave = () => act(async () => { await signOut(); open.value = false; });
 const emit = defineEmits(['tour']);
 const tour = () => { open.value = false; emit('tour'); };
@@ -196,7 +205,11 @@ const tour = () => { open.value = false; emit('tour'); };
 
         <div class="acct-foot">
           <button class="btn small" type="button" data-test="replay-guide" @click="tour">Take the tour again</button>
-          <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave">Sign out</button>
+          <span class="acct-foot-right">
+            <button v-if="!isOwner" class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe">Delete my account</button>
+            <button class="btn small" type="button" data-test="sign-out-everywhere" :disabled="busy" @click="leaveEverywhere">Sign out everywhere</button>
+            <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave">Sign out</button>
+          </span>
         </div>
       </div>
     </div>

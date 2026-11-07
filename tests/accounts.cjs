@@ -53,6 +53,9 @@ async function main() {
   d1(`INSERT INTO invites (id, token_hash, name, role, created_at, expires_at) VALUES ('owner-invite', '${hash}', 'Willy', 'owner', ${Date.now()}, ${Date.now() + 864e5})`);
 
   const dev = spawn(wrangler, ['dev', '--local', '--persist-to', state, '--port', String(port), '--ip', '127.0.0.1', '--show-interactive-dev-session=false'], { cwd: root, stdio: 'pipe', env: { ...process.env, CI: '1' } });
+  // Stop the local server however the test ends, so its port is free next time.
+  process.on('exit', () => { try { dev.kill(); } catch { /* already stopped */ } });
+  process.on('uncaughtException', e => { console.error(`accounts test failed: ${e.stack}`); process.exit(1); });
   let log = '';
   dev.stdout.on('data', d => (log += d));
   dev.stderr.on('data', d => (log += d));
@@ -200,6 +203,48 @@ async function main() {
     assert.ok(removed, 'the owner can remove a person');
     await owner.page.waitForFunction(() => !document.querySelector('.acct-sheet').textContent.includes('Alex'));
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
+
+    // The owner cannot delete their own account; a member can delete theirs.
+    const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
+    assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');
+    await owner.page.click('[data-test="account"]').catch(() => {});
+    await owner.page.waitForSelector('.acct-invite .field');
+    await owner.page.fill('.acct-invite .field', 'Sam');
+    await owner.page.click('.acct-invite button');
+    await owner.page.waitForFunction(() => /Sam/.test(document.querySelector('.acct-link p')?.textContent || ''));
+    const samLink = await owner.page.inputValue('.acct-link .field');
+    const sam = await personPage(browser);
+    await sam.page.goto(samLink.replace(/^https?:\/\/[^/]+/, base));
+    await sam.page.click('[data-test="create-passkey"]');
+    await sam.page.waitForSelector('[data-test="codes-skip"]');
+    await sam.page.click('[data-test="codes-skip"]');
+    await sam.page.waitForSelector('[data-test="guide-skip"]');
+    await sam.page.click('[data-test="guide-skip"]');
+    await sam.page.click('[data-test="account"]');
+    sam.page.removeAllListeners('dialog');
+    sam.page.once('dialog', d => d.accept('DELETE'));
+    await sam.page.click('[data-test="delete-account"]');
+    await sam.page.waitForSelector('[data-test="sign-in"]');
+    assert.equal((await getJSON(sam.page, '/api/data')).status, 401, 'a deleted account is signed out');
+    const people = await owner.page.evaluate(async () => (await (await fetch('/api/people')).json()).people.map(p => p.name));
+    assert.ok(!people.includes('Sam'), 'a deleted account is gone from People');
+    await sam.context.close();
+
+    // Sign out everywhere ends every session for that person.
+    const second = await personPage(browser);
+    await second.page.goto(base);
+    await second.page.click('[data-test="sign-in"]').catch(() => {});
+    await owner.page.evaluate(async () => fetch('/api/sessions', { method: 'DELETE' }));
+    assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'signing out everywhere ends this session too');
+    await second.context.close();
+
+    // Endpoints that work without signing in are limited per network address.
+    let limited = false;
+    for (let i = 0; i < 130 && !limited; i++) {
+      const r = await fetch(`${base}/api/login/options`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: '{}' });
+      limited = r.status === 429;
+    }
+    assert.ok(limited, 'too many sign-in requests from one address are refused');
 
     console.log('accounts test passed');
   } catch (e) {

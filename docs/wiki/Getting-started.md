@@ -2,7 +2,7 @@
 
 ## Use Budgie
 
-Budgie is a web app. There is nothing to download or install: open https://budgie.engineering-willy-mutesa.workers.dev in an up-to-date browser on your phone, tablet or computer.
+Budgie is a web app. There is nothing to download or install: open the Budgie address in your invite in an up-to-date browser on your phone, tablet or computer.
 
 1. Open the invite link you were sent and create a passkey. Your device asks for your fingerprint, face or PIN.
 2. Save your recovery codes, or skip them if your passkey syncs with iCloud Keychain or Google Password Manager.
@@ -22,7 +22,7 @@ Budgie works without AI. For smarter receipt reading and suggestions, it can use
 
 ```bash
 ./scripts/ollama-setup.sh
-OLLAMA_ORIGINS="https://budgie.engineering-willy-mutesa.workers.dev" ollama serve
+OLLAMA_ORIGINS="<your Budgie address>" ollama serve
 ```
 
 Your browser may ask whether Budgie can reach devices on your local network; allow it to use Ollama.
@@ -38,4 +38,4 @@ npx wrangler d1 migrations apply budgie --local
 npm run dev:api
 ```
 
-Open http://localhost:8787. To create the first owner invite on the local database, see "First owner" in the README.
+Open http://localhost:8787.

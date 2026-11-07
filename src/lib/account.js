@@ -260,6 +260,19 @@ export async function recoverWithCode(code) {
 export const recoveryStatus = () => api('/api/recovery-codes');
 export const newRecoveryCodes = () => api('/api/recovery-codes', { method: 'POST', body: {} });
 export const dropRecoveryCodes = () => api('/api/recovery-codes', { method: 'DELETE' });
+export async function signOutEverywhere() {
+  await push().catch(() => {});
+  const id = account.user?.id;
+  await api('/api/sessions', { method: 'DELETE' });
+  if (id && !read(pendingKey(id))) clearLocal(id);
+  signedOutLocally();
+}
+export async function deleteMyAccount() {
+  const id = account.user?.id;
+  await api('/api/me', { method: 'DELETE', body: { confirm: 'DELETE' } });
+  if (id) { clearLocal(id); write(pendingKey(id), null); }
+  signedOutLocally();
+}
 export const listPasskeys = () => api('/api/passkeys');
 export const removePasskey = id => api(`/api/passkeys/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const deviceLink = () => api('/api/devices/link', { method: 'POST', body: {} });

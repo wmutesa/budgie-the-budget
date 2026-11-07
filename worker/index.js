@@ -14,6 +14,7 @@ const MAX_DATA_BYTES = 1_500_000;
 const RECOVERY_CODES = 8;
 const RECOVERY_LINK_MS = 15 * 60 * 1000;
 const MAX_FAILED_RECOVERIES = 10; // per network address per hour
+const OPEN_PER_HOUR = 120; // sign-in and invite requests per network address per hour
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -73,9 +74,9 @@ async function issueRecoveryCodes(env, userId) {
 }
 
 // A simple per-address limit on failed attempts.
-async function tooManyAttempts(env, key) {
+async function tooManyAttempts(env, key, max = MAX_FAILED_RECOVERIES) {
   const row = await env.DB.prepare('SELECT count, window_start FROM attempts WHERE key = ?').bind(key).first();
-  return Boolean(row && now() - row.window_start < 3600e3 && row.count >= MAX_FAILED_RECOVERIES);
+  return Boolean(row && now() - row.window_start < 3600e3 && row.count >= max);
 }
 async function countFailure(env, key) {
   await env.DB.prepare(
@@ -188,8 +189,11 @@ async function currentUser(request, env) {
 async function startSession(request, env, userId) {
   const token = randomToken();
   const expires = now() + SESSION_DAYS * 864e5;
-  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?)')
-    .bind(await sha256(token), userId, now(), expires, (request.headers.get('User-Agent') || '').slice(0, 200)).run();
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now()),
+    env.DB.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at, user_agent) VALUES (?, ?, ?, ?, ?)')
+      .bind(await sha256(token), userId, now(), expires, (request.headers.get('User-Agent') || '').slice(0, 200)),
+  ]);
   return sessionCookie(token, SESSION_DAYS * 86400);
 }
 
@@ -226,13 +230,22 @@ async function routes(request, env, url) {
   if (method !== 'GET' && method !== 'HEAD') {
     const origin = request.headers.get('Origin');
     if (origin !== url.origin) return fail(403, 'Wrong origin');
-    const sendsBody = method === 'POST' || method === 'PUT';
+    const sendsBody = method === 'POST' || method === 'PUT' || (method === 'DELETE' && Number(request.headers.get('Content-Length') || 0) > 0);
     if (sendsBody && !(request.headers.get('Content-Type') || '').startsWith('application/json')) return fail(415, 'Send JSON');
   }
 
   if (path === '/api/me' && method === 'GET') {
     const user = await currentUser(request, env);
     return user ? json({ user }) : fail(401, 'Not signed in');
+  }
+
+  // Endpoints that work without signing in are limited per network address,
+  // so nobody can flood the database with challenges or guess at invites.
+  const OPEN = ['/api/invite', '/api/register/options', '/api/register/verify', '/api/login/options', '/api/login/verify'];
+  if (OPEN.includes(path) && method === 'POST') {
+    const key = `open:${request.headers.get('CF-Connecting-IP') || 'local'}`;
+    if (await tooManyAttempts(env, key, OPEN_PER_HOUR)) return fail(429, 'Too many tries from this network. Wait a while and try again.');
+    await countFailure(env, key);
   }
 
   // --- invites: check, then register a passkey ---
@@ -363,6 +376,28 @@ async function routes(request, env, url) {
   // Everything below needs a signed-in person.
   const user = await currentUser(request, env);
   if (!user) return fail(401, 'Not signed in');
+
+  // Sign out on every device, including this one.
+  if (path === '/api/sessions' && method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id).run();
+    return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
+  }
+
+  // Delete my account and all my data. The owner cannot, so Budgie is never left without one.
+  if (path === '/api/me' && method === 'DELETE') {
+    if (user.role === 'owner') return fail(400, 'The owner account cannot be deleted from the app.');
+    const { confirm } = await body(request).catch(() => ({}));
+    if (confirm !== 'DELETE') return fail(400, 'Type DELETE to confirm.');
+    await env.DB.batch([
+      env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(user.id),
+      env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(user.id),
+    ]);
+    return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
+  }
 
   // --- synced data ---
   if (path === '/api/data' && method === 'GET') {
