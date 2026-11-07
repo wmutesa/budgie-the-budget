@@ -2046,3 +2046,5 @@ body:has(.overlay) .notice { display: none; }
   .dock-blob { transform: translateX(calc(var(--at) * 48px)) rotate(calc(var(--at) * 90deg)); }
   .dock-mark, .dock-date, .dock-label { display: none; }
 }
+.lede-money { max-width: 62ch; font-size: .62em !important; color: #3f3f46; margin-top: 4px !important; }
+.brief-acts { margin: 0; }

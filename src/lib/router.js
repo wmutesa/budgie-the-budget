@@ -23,14 +23,16 @@ export function route(line) {
   const task = parseTask(text);
   // Money only counts when it is clear: "$25", "25 dollars", or words like spent, salary, rent.
   // ("Essay 2" and "6pm" are not prices.)
-  const moneyish = /\$\s?\d|\d\s?(usd|dollars?|bucks|rwf|eur|gbp|k)\b|\b(spent|paid|bought|cost|costs|salary|income|rent|budget|save|saving|earned|received|bill|subscription)\b/i.test(text);
+  // A label and an amount on its own ("rent 1450", "groceries maybe 400") is money too.
+  const bare = /^[\p{L}][\p{L}\s&'’.+-]*?\s+(maybe |about |around |roughly )?\$?\d[\d,]*(\.\d+)?\s*k?(\s*(a|per|\/)\s*(month|week|year|day|mo|yr|wk))?$/iu.test(text) && !/\b(am|pm)$/i.test(text);
+  const moneyish = bare || /\$\s?\d|\d\s?(usd|dollars?|bucks|rwf|eur|gbp|k)\b|\b(spent|paid|bought|cost|costs|salary|income|rent|budget|save|saving|earned|received|bill|subscription)\b/i.test(text);
   const spend = moneyish ? captureNote(text, store.base)[0] || null : null;
   const planItem = moneyish ? parseChunk(text) : null;
   const dest = new Set();
   const future = task.date && task.date >= today() && !PAST.test(text);
   const doing = future || task.time || task.repeat || TODO.test(text) || task.kind !== 'task';
   if (spend && PAST.test(text)) dest.add('money');
-  else if (planItem?.amount && RECURRING.test(text) && !task.date) dest.add('plan');
+  else if (planItem?.amount && (RECURRING.test(text) || bare || /\bby\s+[a-z]{3,9}\b/i.test(text)) && !task.date) dest.add('plan');
   if (doing && !(dest.has('plan') && !future)) dest.add('planner');
   // Something to do that costs money: a task with that cost (ticking it adds the entry).
   if (dest.has('planner') && !task.cost && spend && /\$|dollars|bucks|\bcosts?\b/i.test(text) && !dest.has('money')) task.cost = Math.abs(spend.amount);
@@ -43,7 +45,9 @@ export function route(line) {
             : 'Something to do';
   return { id: newId(), text, dest: [...dest], task, spend, planItem, why };
 }
-export const routeAll = text => splitLines(text).map(route);
+// Comma lists of amounts ("rent 1500, groceries 450") become one line each.
+const splitCommas = line => { const parts = line.split(/,(?!\d{3}\b)/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => /\d/.test(x)) ? parts : [line]; };
+export const routeAll = text => splitLines(text).flatMap(splitCommas).map(route);
 
 // A short description of what each destination will receive.
 export function preview(r, d) {
@@ -56,6 +60,7 @@ export const canSend = (r, d) => (d === 'money' ? Boolean(r.spend) : d === 'plan
 // Send the lines where they were routed. Returns counts per destination.
 export async function sendAll(list) {
   const n = { planner: 0, money: 0, plan: 0 };
+  let income = 0;
   for (const r of list) {
     for (const d of r.dest) {
       if (!canSend(r, d)) continue;
@@ -66,11 +71,13 @@ export async function sendAll(list) {
       } else if (d === 'money') {
         store.drafts.unshift({ id: newId(), ...(await enrich(r.spend)) });
       } else if (d === 'plan') {
-        store.plan.items.push({ ...r.planItem, manual: true });
-        if (r.planItem.group === 'Income' && r.planItem.monthly) store.plan.income = Math.round((Number(store.plan.income) || 0) + r.planItem.monthly);
+        // Income sets the plan's monthly income; everything else is a line in the plan.
+        if (r.planItem.group === 'Income') income += Number(r.planItem.monthly) || 0;
+        else store.plan.items.push({ ...r.planItem, manual: true });
       }
       n[d]++;
     }
   }
+  if (income) store.plan.income = Math.round(income);
   return n;
 }

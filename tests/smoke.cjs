@@ -144,7 +144,8 @@ async function run(url) {
   await page.click('.dock-btn:has-text("Overview")');
   if (process.env.SHOTS) { await page.waitForTimeout(600); await page.screenshot({ path: `${process.env.SHOTS}/overview.png` }); }
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
-  assert.match(await page.textContent('.lede'), /You hold[\s\S]*spent/, 'the brief renders from your entries');
+  assert.match(await page.textContent('.lede-money'), /You hold[\s\S]*spent/, 'the brief covers your money');
+  assert.match(await page.textContent('[data-test="brief"]'), /Nothing is planned for today yet|Today you have/, 'the brief starts with your day');
   for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Upcoming payments', 'Wallets']) {
     assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
   }
@@ -282,8 +283,10 @@ async function run(url) {
 
   // Playground: messy notes become an organised plan, then budgets.
   await page.click('.nb-pages button:has-text("Playground")');
-  await page.fill('[data-test="scratch"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
-  await page.click('[data-test="organize"]');
+  await page.fill('[data-test="inbox-text"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
+  await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 6);
+  assert.equal(await page.locator('[data-test="inbox-rows"] .inbox-dest.to-plan.on').count(), 6, 'amounts that repeat go to the money plan');
+  await page.click('[data-test="inbox-send"]');
   assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
   assert.match(await page.textContent('.lane[data-group="Wants"]'), /Netflix/, 'Netflix lands in wants');
   assert.match(await page.textContent('.lane[data-group="Goals"]'), /Laptop/i, 'the laptop goal lands in goals');

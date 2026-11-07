@@ -167,27 +167,10 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
 <template>
   <section class="card cell span-8 scratch">
     <div class="cell-head">
-      <div><p class="label">Playground</p><p class="lede-sm">Write it messy. Budgie sorts it.</p></div>
-      <div class="chips">
-        <button class="chip-btn" :class="{ on: plan.auto }" @click="plan.auto = !plan.auto">Auto-sort {{ plan.auto ? 'on' : 'off' }}</button>
-        <button class="btn small" @click="useExample"><Icon name="sparkle" :size="14" />Try an example</button>
-        <button class="btn primary small" data-test="organize" @click="runOrganize"><Icon name="sparkle" :size="14" />Organize</button>
-      </div>
+      <div><p class="label">Money plan</p><p class="lede-sm">What comes in and goes out each month</p></div>
+      <button type="button" class="btn small" data-test="plan-example" @click="useExample"><Icon name="sparkle" :size="14" />Try an example</button>
     </div>
-    <div class="scratch-wrap" :class="{ live: dict.listening.value }">
-      <textarea v-model="plan.text" class="scratch-pad" data-test="scratch" spellcheck="false"
-        placeholder="salary 4700&#10;rent 1450, groceries maybe 400&#10;netflix 15.49, github 4&#10;save 3000 for japan by june" />
-      <div v-if="canDictate" class="scratch-mic" :class="{ live: dict.listening.value }">
-        <template v-if="dict.listening.value">
-          <i class="rec-dot" aria-hidden="true" />
-          <b class="rec-time">{{ Math.floor(dict.elapsed.value / 60) }}:{{ String(dict.elapsed.value % 60).padStart(2, '0') }}</b>
-          <span class="say-wave" aria-hidden="true"><i v-for="n in 8" :key="n" :style="{ animationDelay: `${(n * 97) % 900}ms` }" /></span>
-          <span class="rec-hint">One item at a time, then pause</span>
-          <button type="button" class="say-cancel" @click="dict.cancel()">Cancel</button>
-        </template>
-        <MicButton :listening="dict.listening.value" label="Dictate your plan" @toggle="toggleDictate" />
-      </div>
-    </div>
+    <p v-if="!plan.items.length && !plan.income" class="empty-note">Write amounts that repeat in the inbox above, like “salary 4000”, “rent 1450”, “netflix 15.49” or “save 3000 for Japan by June”. Budgie sorts them into needs, wants, savings and goals here.</p>
 
     <div v-if="plan.income || totals.all" class="pg-split" data-test="pg-split">
       <div class="pg-split-bar" aria-hidden="true">

@@ -133,5 +133,9 @@ check('the Playground inbox sends each line where it belongs', () => {
   const bill = route('pay phone bill $45 on the 15th');
   assert.equal(bill.dest.join(), 'planner'); assert.equal(bill.task.cost, 45, 'a bill to pay keeps its cost');
   assert.equal(to('call mom'), 'planner');
+  assert.equal(to('netflix 15.49'), 'plan');
+  assert.equal(to('groceries maybe 400'), 'plan');
+  assert.equal(to('save 1200 for laptop by june'), 'plan');
+  assert.equal(to('rent 1500'), 'plan');
 });
 console.log(`\n${n} checks passed`);
