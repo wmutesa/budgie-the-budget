@@ -127,8 +127,8 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  // Four pages, starting with Today. The money side is gone.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Today', 'Planner', 'Digests', 'Playground'], 'the four pages');
+  // Three pages, starting with Today. No money side and no digests.
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Today', 'Planner', 'Playground'], 'the three pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -218,7 +218,7 @@ async function run(url) {
   assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Run a 10K/, 'a task shows the goal it moves forward');
   // Calendar view: click a slot, add, and the card's actions work.
-  await page.click('[data-test="view-calendar"]');
+  await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-week"]');
   assert.equal(await page.locator('.cal-dh').count(), 7, 'the week has seven days');
   const col = page.locator('.cal-col.today');
@@ -244,6 +244,7 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="view-schedule"]');
+  await page.click('[data-test="cal-day"]');
   const boxes = await page.locator('[data-test="sch-box"]').count();
   assert.ok(boxes >= 1, 'timed items sit on the time line');
   await page.click('[data-test="plan-day"]');
@@ -258,6 +259,20 @@ async function run(url) {
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
   await page.keyboard.press('Escape');
   await page.click('.sch-sheet [aria-label="Close"]').catch(() => {});
+  // Every kind of input: several lines at once; untimed things get a free slot; calendar files too.
+  const before2 = await page.locator('[data-test="sch-box"]').count();
+  await page.fill('[data-test="sch-quick"]', 'Biology lecture Mon Wed 10:00-11:15\nbuy groceries\ndentist next tuesday 3:30');
+  await page.press('[data-test="sch-quick"]', 'Enter');
+  assert.match(await page.textContent('[data-test="toasts"]'), /3 things added[\s\S]*1 given a free time/, 'pasted lines are added and the untimed one gets a slot');
+  await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n, before2);
+  assert.ok(await page.locator('[data-test="sch-box"]', { hasText: 'Buy groceries' }).count(), 'the untimed item is on the time line');
+  await page.setInputFiles('[data-test="sch-file"]', { name: 'class.ics', mimeType: 'text/calendar', buffer: Buffer.from(['BEGIN:VCALENDAR', 'X-WR-CALNAME:Uni', 'BEGIN:VEVENT', 'UID:x-1', `DTSTART:${inDays(0).replace(/-/g, '')}T150000`, `DTEND:${inDays(0).replace(/-/g, '')}T160000`, 'SUMMARY:Office hours', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')) });
+  await page.waitForSelector('[data-test="sch-box"]:has-text("Office hours")');
+  // Week and month are part of the Schedule; a day opens the day time line.
+  await page.click('[data-test="cal-week"]');
+  assert.equal(await page.locator('.cal-dh').count(), 7, 'the week is inside the Schedule');
+  await page.click('.cal-dh.today');
+  await page.waitForSelector('.sch-body');
   await page.click('[data-test="sch-next"]');
   await page.click('[data-test="sch-today"]');
   await page.click('[data-test="view-tasks"]');
@@ -274,12 +289,6 @@ async function run(url) {
   await page.keyboard.press('Escape');
   await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
 
-  // Digests: coming soon.
-  assert.match(await page.textContent(tab('Digests')), /Soon/, 'the tab says it is coming soon');
-  await page.click(tab('Digests'));
-  assert.match(await page.textContent('[data-test="digests"]'), /Coming soon[\s\S]*Digests[\s\S]*Follows your life/, 'the page explains what is coming');
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest-soon.png`, fullPage: true });
-  assert.ok(!fakeAccount.lastWrite, 'opening the page writes nothing');
 
   // Today: the day, goals and the latest digest together.
   await page.click(tab('Today'));
@@ -344,7 +353,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Four pages[\s\S]*Add anything[\s\S]*Digests, coming soon/, 'the guide covers the four pages');
+  assert.match(seen, /Three pages[\s\S]*Add anything[\s\S]*Plan your days/, 'the guide covers the three pages');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Today'));
@@ -380,7 +389,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Today', 'Planner', 'Digests', 'Playground']) {
+  for (const p of ['Today', 'Planner', 'Playground']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

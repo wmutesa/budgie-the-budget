@@ -8,7 +8,6 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
-import DigestsView from './components/DigestsView.vue';
 import PlayInbox from './components/PlayInbox.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 import Icon from './components/Icon.vue';
@@ -16,28 +15,26 @@ import Toasts from './components/Toasts.vue';
 import { toast } from './lib/toast';
 import { nav, PAGES, go } from './lib/nav';
 import { refreshFeeds } from './lib/calendar';
-import { loadDigests, DIGESTS_LIVE } from './lib/digest';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
-// Four pages: Today (your day, goals, latest digest), Planner (tasks, calendar,
-// focus), Digests (opportunities and news, twice a week) and Playground (add
-// anything; goals, routines and projects).
+// Three pages: Today (your day and goals), Planner (schedule, tasks,
+// calendar, focus) and Playground (add anything).
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Today: 'home', Planner: 'planner', Digests: 'list', Playground: 'shapes' };
+const PAGE_ICONS = { Today: 'home', Planner: 'planner', Playground: 'shapes' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
 watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immediate: true });
-// Calendars and digests refresh, and reminders run, once your data has loaded.
+// Calendars refresh, and reminders run, once your data has loaded.
 let started = false;
 watch(() => account.sync, s => {
   if (account.status !== 'signed-in' || s !== 'saved') return;
   refreshFeeds(); startReminders(); ensureColor();
-  if (!started) { started = true; loadDigests(); }
+  if (!started) { started = true; }
 });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
@@ -91,7 +88,7 @@ onUnmounted(() => clearInterval(timer));
         </div>
         <nav class="nb-pages" aria-label="Pages">
           <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" @click="active = p">
-            <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}<sup v-if="p === 'Digests' && !DIGESTS_LIVE" class="nb-soon">Soon</sup>
+            <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
           </button>
         </nav>
         <GlobalSearch />
@@ -106,9 +103,6 @@ onUnmounted(() => clearInterval(timer));
       </template>
       <template v-else-if="active === 'Planner'">
         <PlannerView />
-      </template>
-      <template v-else-if="active === 'Digests'">
-        <DigestsView />
       </template>
       <template v-else>
         <PlayInbox />

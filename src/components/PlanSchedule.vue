@@ -3,8 +3,12 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, fromIso, toMins, fromMins, KINDS, toggleDone, isDone, makeTask, score, parseTask } from '../lib/tasks';
 import TaskEditor from './TaskEditor.vue';
+import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
-import { toast } from '../lib/toast';
+import { toast, loading, finish, fail } from '../lib/toast';
+import { addAnything, placeFree, unplace, isIcs } from '../lib/schedule';
+import { useDictation, canDictate } from '../lib/dictation';
+import MicButton from './MicButton.vue';
 
 // Schedule: the day's activity on the left, grouped by category, and a time
 // line on the right with one column per category.
@@ -23,7 +27,9 @@ const hello = computed(() => {
   const h = clock.value.getHours();
   return `${h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'}${name ? `, ${name}` : ''}.`;
 });
-const openMode = m => { store.planner.cal = m; emit('view', 'Calendar'); };
+// Day is the time line by category; week and month are the calendar grid.
+const range = computed({ get: () => (['week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'day'), set: v => { store.planner.cal = v; } });
+const openDayFromCal = d => { day.value = d; range.value = 'day'; nextTick(scrollToStart); };
 
 // ---------- categories: your #projects, or the kind of thing ----------
 const PALETTE = ['#7c3aed', '#0ea5e9', '#f59e0b', '#16a34a', '#e11d48', '#6366f1'];
@@ -121,24 +127,53 @@ function addSlot() {
 
 // ---------- plan my day: give untimed things a free slot ----------
 function planDay() {
-  const open = items.value.filter(x => !x.task.time && !x.done && !x.task.repeat).map(x => x.task).sort((a, b) => score(b) - score(a));
-  if (!open.length) { toast('Everything today already has a time.', { kind: 'info' }); return; }
-  const busy = timedAll.value.map(x => [x.s, x.e]);
-  const nowM = clock.value.getHours() * 60 + clock.value.getMinutes();
-  let at = Math.max(9 * 60, isToday.value ? Math.ceil((nowM + 10) / 15) * 15 : 0);
-  const before = [];
-  for (const t of open) {
-    const len = t.mins || 30;
-    let guard = 0;
-    while (busy.some(([s, e]) => at < e && at + len > s) && guard++ < 200) at = busy.filter(([s, e]) => at < e && at + len > s).reduce((m, [, e]) => Math.max(m, e), at);
-    if (at + len > 22 * 60) break;
-    before.push([t, t.time, t.mins]);
-    t.time = hhmm(at); t.mins = len;
-    busy.push([at, at + len]); at += len + 10;
-  }
-  if (!before.length) { toast('There is no free time left today.', { kind: 'info' }); return; }
-  toast(`${before.length} ${before.length === 1 ? 'thing has' : 'things have'} a time now.`, { kind: 'success', title: 'Day planned', action: { label: 'Undo', run: () => before.forEach(([t, time, mins]) => { t.time = time; t.mins = mins; }) } });
+  const open = items.value.filter(x => !x.task.time && !x.done && !x.task.repeat).map(x => x.task);
+  if (!open.length) { toast('Everything on this day already has a time.', { kind: 'info' }); return; }
+  const moved = placeFree(open, day.value);
+  if (!moved.length) { toast('There is no free time left on this day.', { kind: 'info' }); return; }
+  toast(`${moved.length} ${moved.length === 1 ? 'thing has' : 'things have'} a time now.`, { kind: 'success', title: 'Day planned', action: { label: 'Undo', run: () => unplace(moved) } });
 }
+
+// ---------- add anything: type, paste, say it, drop a file ----------
+const quick = ref('');
+const busy = ref(false);
+async function addQuick(text = quick.value) {
+  const v = String(text || '').trim();
+  if (!v || busy.value) return;
+  busy.value = true;
+  const tid = /:\/\//.test(v) ? loading('Importing your calendar…') : null;
+  const r = await addAnything(v, day.value);
+  busy.value = false;
+  quick.value = '';
+  const n = r.made.length;
+  const bits = [n && `${n} ${n === 1 ? 'thing' : 'things'} added`, r.links && `${r.links} calendar${r.links === 1 ? '' : 's'} imported`, r.moved.length && `${r.moved.length} given a free time`].filter(Boolean).join(' · ');
+  if (r.errors?.length && !n && !r.links) { tid ? fail(tid, r.errors[0]) : toast(r.errors[0], { kind: 'error' }); return; }
+  const undo = { label: 'Undo', run: () => { const ids = new Set(r.made.map(t => t.id)); store.tasks = store.tasks.filter(t => !ids.has(t.id)); } };
+  if (tid) finish(tid, bits || 'Nothing new.', { title: 'Added' }); else toast(bits || 'Nothing new.', { kind: 'success', title: 'Added', action: n ? undo : undefined });
+}
+const onQuickKey = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addQuick(); } };
+let base = '';
+const dict = useDictation({
+  continuous: true,
+  onError: m => toast(m, { kind: 'error', title: 'Microphone' }),
+  onCancel: () => { quick.value = base; },
+  onText: t => { quick.value = `${base}${t}`; },
+  onFinal: t => { quick.value = ''; addQuick(`${base}${t}`); },
+});
+const talk = () => { if (!dict.listening.value) base = quick.value ? `${quick.value}\n` : ''; dict.toggle(); };
+// Drop or pick a calendar file (.ics) or a text timetable.
+const dragging = ref(false);
+const fileIn = ref(null);
+async function readFiles(files) {
+  dragging.value = false;
+  for (const f of [...(files || [])].slice(0, 5)) {
+    if (f.size > 2e6) { toast(`${f.name} is too big to read.`, { kind: 'error' }); continue; }
+    const text = await f.text();
+    if (isIcs(text) || /\.(txt|csv|md|ics)$/i.test(f.name) || f.type.startsWith('text')) await addQuick(text);
+    else toast(`${f.name}: drop a calendar file (.ics) or a text list.`, { kind: 'warn' });
+  }
+}
+const onDrop = e => readFiles(e.dataTransfer?.files);
 
 // ---------- editing ----------
 const editing = ref(null);
@@ -147,22 +182,30 @@ const tickX = x => toggleDone(x.task, x.date);
 </script>
 
 <template>
-  <div class="sch" :class="{ 'no-list': !listOpen }" data-test="schedule">
+  <div class="sch" :class="{ 'no-list': !listOpen, dragging }" data-test="schedule" @dragover.prevent="dragging = true" @dragleave.self="dragging = false" @drop.prevent="onDrop">
     <div class="sch-bar">
       <h2 class="sch-title">Schedule</h2>
-      <div class="sch-date">
+      <div v-if="range === 'day'" class="sch-date">
         <button type="button" class="sch-day" :title="isToday ? 'Today' : 'Back to today'" data-test="sch-today" @click="day = today()"><Icon name="calendar" :size="15" />{{ dateLabel }}</button>
         <button type="button" class="sch-step" title="Previous day" aria-label="Previous day" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
         <button type="button" class="sch-step" title="Next day" aria-label="Next day" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
       </div>
       <div class="sch-modes" role="group" aria-label="Range">
-        <button type="button" class="on" aria-pressed="true">Day</button>
-        <button type="button" aria-pressed="false" @click="openMode('week')">Week</button>
-        <button type="button" aria-pressed="false" @click="openMode('month')">Month</button>
+        <button v-for="[id, label] in [['day', 'Day'], ['week', 'Week'], ['month', 'Month']]" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`cal-${id}`" @click="range = id; id === 'day' && nextTick(scrollToStart)">{{ label }}</button>
       </div>
     </div>
 
-    <div class="sch-body">
+    <form class="sch-quick" :class="{ live: dict.listening.value }" @submit.prevent="addQuick()">
+      <Icon name="plus" :size="16" />
+      <textarea v-model="quick" rows="1" placeholder="Add to your schedule: “gym 6pm”, “MATH 101 TTh 1:30–2:45”, a pasted timetable or a calendar link" aria-label="Add to your schedule" data-test="sch-quick" @keydown="onQuickKey" />
+      <MicButton v-if="canDictate" :listening="dict.listening.value" label="Say it" @toggle="talk" />
+      <button type="button" class="sch-icon" title="Add a calendar file (.ics) or a text list" aria-label="Add a file" @click="fileIn.click()"><Icon name="download" :size="16" /></button>
+      <input ref="fileIn" type="file" accept=".ics,.txt,.csv,text/calendar,text/plain" multiple hidden data-test="sch-file" @change="readFiles($event.target.files); $event.target.value = ''" />
+      <button class="btn primary small" :disabled="!quick.trim() || busy" data-test="sch-quick-add">Add</button>
+    </form>
+
+    <PlanCalendar v-if="range !== 'day'" embedded class="sch-cal" @day="openDayFromCal" @focus="emit('view', 'Focus')" />
+    <div v-else class="sch-body">
       <section v-if="listOpen" class="sch-list" aria-label="Activity">
         <div class="sch-list-head">
           <div><h3>{{ isToday ? 'Today' : dateLabel }} activity</h3><p class="muted small">{{ hello }} {{ progress.done }} of {{ progress.all }} done.</p></div>

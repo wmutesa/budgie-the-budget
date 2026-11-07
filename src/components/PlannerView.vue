@@ -6,7 +6,6 @@ import { refreshFeeds } from '../lib/calendar';
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import PlanCalendars from './PlanCalendars.vue';
-import PlanCalendar from './PlanCalendar.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
 import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
@@ -15,10 +14,12 @@ let showDoneFirst = false;
 
 // Planner: school, work, projects, routines and events in one place.
 // Type or say anything; Budgie works out the date, time, repeat and priority.
-const VIEWS = [['Schedule', 'clock'], ['Tasks', 'list'], ['Agenda', 'agenda'], ['Calendar', 'calendar'], ['Focus', 'target']];
+const VIEWS = [['Schedule', 'clock'], ['Tasks', 'list'], ['Agenda', 'agenda'], ['Focus', 'target']];
 // The Schedule is new: show it once to everyone, then remember their choice.
 if (!store.planner.schSeen) { store.planner.schSeen = true; if (!nav.task) store.planner.view = 'Schedule'; }
-const view = computed({ get: () => (store.planner.view === 'Week' ? 'Calendar' : VIEWS.some(([v]) => v === store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
+// Schedule and calendar are one view now; it opens on the day.
+if (!store.planner.schOne) { store.planner.schOne = true; store.planner.cal = 'day'; }
+const view = computed({ get: () => (['Week', 'Calendar'].includes(store.planner.view) ? 'Schedule' : VIEWS.some(([v]) => v === store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
 const now = ref(today());
 const clock = ref(new Date());
 let tick = null;
@@ -128,7 +129,10 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
       <button type="button" class="ibtn ghost" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
     </div>
 
-    <PlanSchedule v-if="view === 'Schedule'" @view="v => view = v" />
+    <template v-if="view === 'Schedule'">
+      <PlanSchedule @view="v => view = v" />
+      <div class="sch-extras"><PlanCalendars /></div>
+    </template>
     <div v-else class="pln-body">
       <div class="pln-main">
         <!-- Tasks: grouped by when -->
@@ -154,11 +158,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
             <ul v-if="d.list.length" class="tk-list"><TaskRow v-for="x in d.list" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
             <p v-else class="muted small">Nothing planned.</p>
           </div>
-        </template>
-
-        <!-- Calendar: day, week and month, like a calendar app -->
-        <template v-else-if="view === 'Calendar'">
-          <PlanCalendar :filter="inFilter" @focus="view = 'Focus'" />
         </template>
 
         <!-- Focus: what matters now -->

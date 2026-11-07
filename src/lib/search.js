@@ -1,20 +1,17 @@
 // One search for everything in Budgie: tasks, routines and classes, goals,
-// digest stories, calendars and pages. What you type can also become an
+// calendars and pages. What you type can also become an
 // action (add a task, a routine or a goal), ranked by the shape of the text.
 import { store } from './store';
 import { parseTask, addFromText, dayLabel, timeLabel, nextOccurrence, KINDS } from './tasks';
 import { parseGoal, makeGoal, planGoal, progress, GOAL_WORDS } from './goals';
-import { digests } from './digest';
 import { go } from './nav';
 
 const PLACES = [
-  ['Today', 'Today', 'Your day, goals and the latest digest', /today|home|overview|dashboard|brief/],
+  ['Today', 'Today', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Planner', 'Planner', 'Tasks, deadlines, classes and routines', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule/],
-  ['Planner', 'Calendar', 'Day, week and month view of your plans', /calendar|week|month|day view|schedule/, 'Calendar'],
+  ['Planner', 'Schedule', 'Your day by category, plus week and month', /calendar|week|month|day view|schedule|timeline/, 'Schedule'],
   ['Planner', 'Focus', 'Top three and a focus timer', /focus|timer|pomodoro|top three/, 'Focus'],
   ['Planner', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
-  ['Digests', 'Digests', 'Your twice-weekly brief of opportunities and news', /digest|brief|news|newsletter|opportunit|intern|scholarship|event|draft|email/],
-  ['Digests', 'Digest profile', 'What your digest looks for', /profile|interests|keywords|sources|feeds?/, null, '#digest-profile'],
   ['Playground', 'Playground', 'Add anything: tasks, routines and goals', /playground|inbox|add|write|say/],
 ];
 
@@ -47,10 +44,6 @@ export function search(text, page) {
   const goals = store.goals.filter(g => has(g.title, q) || has(g.why, q)).slice(0, 4)
     .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Today') }; });
   if (goals.length) groups.push({ name: 'Goals', page: 'Today', items: goals });
-  const ed = digests.current;
-  const stories = ed ? [ed.lead, ...(ed.stories || [])].filter(s => s && (has(s.headline, q) || has(s.desc || s.dek, q) || has(s.tag, q))).slice(0, 4)
-    .map((s, i) => ({ id: `d-${i}-${s.headline}`, icon: 'list', title: s.headline, sub: `Digest · ${s.tag || 'Lead'}${s.deadline ? ` · ${s.deadline}` : ''}`, run: () => go('Digests') })) : [];
-  if (stories.length) groups.push({ name: 'Digest', page: 'Digests', items: stories });
   const feeds = store.feeds.filter(f => has(f.name, q)).map(f => ({ id: `f-${f.id}`, icon: 'calendar', title: f.name, sub: `Calendar · ${f.count} events`, run: () => go('Planner', { anchor: '#calendars' }) }));
   if (feeds.length) groups.push({ name: 'Calendars', page: 'Planner', items: feeds });
   const places = PLACES.filter(([, title, , re]) => has(title, q) || re.test(q)).slice(0, 4)
@@ -61,8 +54,7 @@ export function search(text, page) {
 
 // The search box's hint for each page.
 export const HINTS = {
-  Today: 'Search or add anything: tasks, goals, digest stories',
+  Today: 'Search or add anything: tasks and goals',
   Planner: 'Search tasks, or type one to add it',
-  Digests: 'Search digest stories, or add a task',
   Playground: 'Search goals and tasks, or add one',
 };

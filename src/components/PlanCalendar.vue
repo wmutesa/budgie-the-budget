@@ -16,8 +16,10 @@ import Icon from './Icon.vue';
 // A calendar like the ones you know: day, week and month, with a time grid.
 // Click an empty slot to add something there, click an item for its actions,
 // drag an item to move it.
-const props = defineProps({ filter: { type: Function, default: () => true } });
-const emit = defineEmits(['focus']);
+// Inside the Schedule (embedded) it shows week and month; a day opens the
+// Schedule's own day time line.
+const props = defineProps({ filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false } });
+const emit = defineEmits(['focus', 'day']);
 const MODES = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
 const mode = computed({ get: () => (['day', 'week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'week'), set: v => { store.planner.cal = v; } });
 const anchor = ref(today());
@@ -82,7 +84,7 @@ const monthOf = computed(() => fromIso(anchor.value).getMonth());
 // Habits that happen every day fold into one line so the month stays readable.
 const monthItems = d => items.value.filter(x => x.date === d && x.task.kind !== 'routine');
 const habitsOn = d => items.value.filter(x => x.date === d && x.task.kind === 'routine');
-const openDay = d => { anchor.value = d; mode.value = 'day'; nextTick(scrollToNow); };
+const openDay = d => { if (props.embedded) { emit('day', d); mode.value = 'day'; return; } anchor.value = d; mode.value = 'day'; nextTick(scrollToNow); };
 
 // ---------- the floating card ----------
 // { kind: 'new', date, time, x, y } or { kind: 'item', item, x, y, editing }
@@ -181,7 +183,7 @@ function onKey(e) {
   else if (e.key === 'ArrowLeft') step(-1);
   else if (e.key === 'ArrowRight') step(1);
   else if (e.key.toLowerCase() === 't') goToday();
-  else if (e.key.toLowerCase() === 'd') mode.value = 'day';
+  else if (e.key.toLowerCase() === 'd') { if (props.embedded) emit('day', anchor.value); mode.value = 'day'; }
   else if (e.key.toLowerCase() === 'w') mode.value = 'week';
   else if (e.key.toLowerCase() === 'm') mode.value = 'month';
 }
@@ -206,7 +208,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
         <button type="button" class="ibtn ghost" :title="`Next ${mode}`" :aria-label="`Next ${mode}`" @click="step(1)"><Icon name="right" /></button>
       </span>
       <h2 class="cal-title">{{ title }}</h2>
-      <div class="seg cal-modes" role="group" aria-label="Calendar range">
+      <div v-if="!embedded" class="seg cal-modes" role="group" aria-label="Calendar range">
         <button v-for="[id, label] in MODES" :key="id" type="button" :class="{ on: mode === id }" :aria-pressed="mode === id" :title="`${label} (${label[0]})`" :data-test="`cal-${id}`" @click="mode = id">{{ label }}</button>
       </div>
     </div>

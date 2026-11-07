@@ -2,7 +2,7 @@
 // a part of a page (#goals), or one Planner item to open.
 import { reactive } from 'vue';
 
-export const PAGES = ['Today', 'Planner', 'Digests', 'Playground'];
+export const PAGES = ['Today', 'Planner', 'Playground'];
 export const nav = reactive({ page: 'Today', anchor: '', task: '' });
 export const go = (page, { anchor = '', task = '' } = {}) => {
   if (!PAGES.includes(page)) return;

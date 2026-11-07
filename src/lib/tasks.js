@@ -65,9 +65,13 @@ const KIND_RULES = [
   ['assignment', /\b(assignment|essay|homework|hw|problem set|pset|lab report|paper|report|project due|submission|submit|reading response|discussion post)\b/i],
   ['class', /\b(class|lecture|seminar|lab|tutorial|program|workshop|course|attendance|attend|practice|rehearsal)\b/i],
   ['routine', /\b(wake up|wake|shower|breakfast|lunch|dinner|eat|gym|workout|work out|run|jog|walk|sleep|bed|meditate|journal|stretch|skincare|call (my )?(friends?|mom|dad|family|parents))\b/i],
-  ['event', /\b(meeting|meet|appointment|interview|party|event|dinner with|lunch with|date|concert|game|birthday|wedding|flight|trip)\b/i],
+  ['event', /\b(meeting|meet|appointment|dentist|doctor|interview|party|event|dinner with|lunch with|date|concert|game|birthday|wedding|flight|trip)\b/i],
 ];
+const DEFAULT_MINS = { class: 60, exam: 120, event: 60, routine: 30, assignment: 60, task: 30 };
+// Course codes like "MATH 101" or "CS101A" are classes.
+const COURSE_RE = /\b[A-Z]{2,5}\s?\d{3}[A-Z]?\b/;
 export function guessKind(text, hasRepeat = false) {
+  if (COURSE_RE.test(text) && !/\b(exam|midterm|final|quiz|test|essay|assignment|homework|hw|due)\b/i.test(text)) return 'class';
   for (const [kind, re] of KIND_RULES) {
     if (!re.test(text)) continue;
     if (kind === 'routine' && !hasRepeat) continue; // a one-off "call mom" is just a task
@@ -121,6 +125,11 @@ export function parseTask(raw, now = new Date()) {
   if (!out.repeat) take(new RegExp(`\\b(?:every|each|on)\\s+(${DAY_RE}s?(?:\\s*(?:,|and|&|\\/)\\s*${DAY_RE}s?)*)\\b`, 'i'), m => {
     const days = [...m[1].matchAll(new RegExp(DAY_RE, 'gi'))].map(x => dayIndex(x[0]));
     if (!days.length || (/^on\b/i.test(m[0]) && days.length < 2)) return false;
+    out.repeat = { every: 'week', days: [...new Set(days)].sort() };
+  });
+  if (!out.repeat) take(new RegExp(`\\b(${DAY_RE}(?:\\s*(?:,|and|&|\\/|\\s)\\s*${DAY_RE}){1,6})\\b`, 'i'), m => {
+    const days = [...m[1].matchAll(new RegExp(DAY_RE, 'gi'))].map(x => dayIndex(x[0]));
+    if (new Set(days).size < 2) return false;
     out.repeat = { every: 'week', days: [...new Set(days)].sort() };
   });
   if (!out.repeat) take(/\b(mwf|tth|tr|mw|tuth)\b/i, m => { out.repeat = { every: 'week', days: { mwf: [1, 3, 5], tth: [2, 4], tr: [2, 4], tuth: [2, 4], mw: [1, 3] }[m[1].toLowerCase()] }; });
@@ -194,7 +203,7 @@ export function parseTask(raw, now = new Date()) {
   }) ||
     take(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)(?=[\s,.]|$)/i, m => { const t = readTime(m[1], m[2], m[3]); if (!t) return false; out.time = t; }) ||
     take(/\bat\s+(\d{1,2})(?::(\d{2}))?\b/i, m => { const t = readTime(m[1], m[2], ''); if (!t) return false; out.time = t; }) ||
-    take(/\b(\d{1,2}):(\d{2})\b/, m => { const t = readTime(m[1], m[2], Number(m[1]) > 12 ? '' : null); if (!t) return false; out.time = `${pad(Number(m[1]))}:${m[2]}`; }) ||
+    take(/\b(\d{1,2}):(\d{2})\b/, m => { if (Number(m[1]) > 23 || Number(m[2]) > 59) return false; out.time = /^0/.test(m[1]) || Number(m[1]) > 6 || Number(m[1]) === 0 ? `${pad(Number(m[1]))}:${m[2]}` : readTime(m[1], m[2], ''); }) ||
     take(/\b(?:at\s+)?(noon|midday|midnight)\b/i, m => { out.time = /midnight/i.test(m[1]) ? '23:59' : '12:00'; }) ||
     take(/\b(?:in the\s+)?(morning|afternoon|evening)\b/i, m => { if (!out.time) out.time = { morning: '09:00', afternoon: '14:00', evening: '18:00' }[m[1].toLowerCase()]; });
 
@@ -207,6 +216,8 @@ export function parseTask(raw, now = new Date()) {
   if (!title) title = 'New task';
   title = title.charAt(0).toUpperCase() + title.slice(1);
   const kind = guessKind(` ${raw} `, Boolean(out.repeat));
+  // A time is enough: the usual length fills in when none is given.
+  if (out.time && !out.mins) out.mins = DEFAULT_MINS[kind] || 30;
   // Classes and routines that repeat need a start date: today.
   if (out.repeat && !out.date) out.date = base;
   // Assignments and exams due soon start as high priority.

@@ -3,15 +3,13 @@ import { computed, onMounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
 import { progress } from '../lib/goals';
-import { DIGESTS_LIVE, digests, loadDigests } from '../lib/digest';
 import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
 import { deleteGoal } from '../lib/undo';
 
 // Today: your day first (what is on, what is next, deadlines, streaks), then
-// your goals and the latest digest. Everything comes from your own planner.
-onMounted(() => { if (!digests.loaded) loadDigests(); });
+// and your goals. Everything comes from your own planner.
 const now = new Date();
 const part = now.getHours() < 12 ? 'morning' : now.getHours() < 18 ? 'afternoon' : 'evening';
 const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -24,7 +22,6 @@ const overdue = computed(() => store.tasks.filter(t => !t.repeat && !t.done && t
 const habits = computed(() => store.tasks.filter(t => t.repeat && t.kind === 'routine').map(t => ({ t, n: streak(t) })).sort((a, b) => b.n - a.n));
 const best = computed(() => habits.value.find(h => h.n >= 3) || null);
 const goals = computed(() => store.goals.map(g => ({ g, p: progress(g) })));
-const ed = computed(() => digests.viewing.main || digests.current);
 const empty = computed(() => !store.tasks.length && !store.goals.length);
 const pct = computed(() => (items.value.length ? Math.round(((items.value.length - left.value.length) / items.value.length) * 100) : 0));
 // One next step, from your own data (no AI, so nothing is made up): what is
@@ -44,7 +41,7 @@ const nextStep = computed(() => {
   <section class="card cell span-8 headline" id="today" data-test="today">
     <p class="label">{{ weekday }} brief</p>
     <p class="greet">Good <em>{{ part }}</em>.</p>
-    <p v-if="empty" class="lede">Budgie starts empty. Say or type what is on your mind in the <b>Playground</b>, import your school calendar in the <b>Planner</b>, or set up your <b>Digest</b>.</p>
+    <p v-if="empty" class="lede">Budgie starts empty. Say or type what is on your mind in the <b>Playground</b> or import your school calendar in the <b>Planner</b>.</p>
     <p v-else class="lede" data-test="brief">
       <template v-if="items.length">Today you have <mark class="m-violet">{{ items.length }} {{ items.length === 1 ? 'thing' : 'things' }}</mark> planned<template v-if="items.length - left.length">, {{ items.length - left.length }} done</template>. </template>
       <template v-else>Nothing is planned for today yet. </template>
@@ -80,7 +77,7 @@ const nextStep = computed(() => {
     <p v-else class="empty-note">No assignments or exams due this week.</p>
   </section>
 
-  <section class="card cell" :class="DIGESTS_LIVE ? 'span-6' : 'span-12'" data-test="today-goals">
+  <section class="card cell span-12" data-test="today-goals">
     <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
     <ul v-if="goals.length" class="td-goals">
       <li v-for="x in goals" :key="x.g.id">
@@ -92,14 +89,4 @@ const nextStep = computed(() => {
     <p v-else class="empty-note">No goals yet. In the Playground, write something like “I want to run a 10K by March” and Budgie plans the milestones.</p>
   </section>
 
-  <section v-if="DIGESTS_LIVE" class="card cell span-6 td-digest" data-test="today-digest">
-    <div class="cell-head"><p class="label">Latest digest</p><button type="button" class="ibtn ghost" title="Open digests" aria-label="Open digests" @click="go('Digests')"><Icon name="right" /></button></div>
-    <template v-if="ed">
-      <p class="dg-kick">{{ ed.edition }} · {{ ed.dateLong }}</p>
-      <h3 v-if="ed.lead" class="td-dg-head">{{ ed.lead.headline }}</h3>
-      <p class="muted small">{{ ed.preheader }}</p>
-      <ul v-if="ed.deadlines?.length" class="td-list"><li v-for="x in ed.deadlines.slice(0, 3)" :key="x.ctaLink" style="--k: #a3181b"><i /><span><b>{{ x.name }}</b><span class="muted small">{{ dayLabel(x.date) }}</span></span></li></ul>
-    </template>
-    <p v-else class="empty-note">Set up your digest and Budgie writes you a brief of opportunities and news every Monday and Thursday.</p>
-  </section>
 </template>
