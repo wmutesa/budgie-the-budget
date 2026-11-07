@@ -1,6 +1,6 @@
-// App state that belongs to the signed-in person: base currency, transactions,
-// subscriptions, budgets and plan. It syncs to their account (see sync.js) and
-// a copy is kept in this browser so the app opens instantly and works offline.
+// App state that belongs to the signed-in person: their planner, goals,
+// digest settings and preferences. It syncs to their account (see account.js)
+// and a copy is kept in this browser so the app opens instantly and works offline.
 import { reactive, watch } from 'vue';
 
 // Data saved before personal accounts existed; moved into the first account
@@ -14,43 +14,31 @@ function readKey(key) {
 }
 
 // Build the saved part of the state from a stored object, filling gaps with defaults.
+// Anything else in the stored object (such as money data from older versions
+// of Budgie) is left out, so it is removed from the account on the next save.
 function fromSaved(saved = {}) {
   return {
-    base: saved.base || 'USD',
-    subscriptions: Array.isArray(saved.subscriptions) ? saved.subscriptions : [],
-    // Entries from the old sample data are dropped; Budgie only shows your own.
-    transactions: Array.isArray(saved.transactions) ? saved.transactions.filter(t => t && t.source !== 'sample') : [],
-    drafts: Array.isArray(saved.drafts) ? saved.drafts : [],
-    // Monthly budgets, drafted by AI or rules (see budgets.js) and editable.
-    budgets: Array.isArray(saved.budgets) ? saved.budgets : [],
-    budgetMeta: saved.budgetMeta && typeof saved.budgetMeta === 'object' ? saved.budgetMeta : {},
-    // The month you started using Budgie (YYYY-MM); charts begin there.
-    startedAt: typeof saved.startedAt === 'string' ? saved.startedAt : new Date().toISOString().slice(0, 7),
-    dismissed: Array.isArray(saved.dismissed) ? saved.dismissed : [],
-    banks: Array.isArray(saved.banks) ? saved.banks : ['chase', 'bofa'],
-    plan: saved.plan && typeof saved.plan === 'object' ? saved.plan : { text: '', income: 0, items: [], auto: true },
-    logoOverrides: saved.logoOverrides && typeof saved.logoOverrides === 'object' ? saved.logoOverrides : {},
     guide: saved.guide && typeof saved.guide === 'object' ? saved.guide : { done: false },
-    // Playground plans saved under a name: { id, name, savedAt, plan }.
-    planScenarios: Array.isArray(saved.planScenarios) ? saved.planScenarios.slice(0, 12) : [],
+    dismissed: Array.isArray(saved.dismissed) ? saved.dismissed.slice(-400) : [],
     // Notifications already shown in the bell's dropdown.
     seenNotices: Array.isArray(saved.seenNotices) ? saved.seenNotices.slice(-200) : [],
-    // Accounts you track by hand: { id, name, kind, balance, currency }.
-    balances: Array.isArray(saved.balances) ? saved.balances : [],
-    // Savings goals: { id, name, saved, target, color }.
-    goals: Array.isArray(saved.goals) ? saved.goals : [],
-    // One net-worth reading per day, for the chart: { date, total }.
-    netHistory: Array.isArray(saved.netHistory) ? saved.netHistory.slice(-400) : [],
     // Planner: tasks, classes, assignments, events and routines (see tasks.js).
     tasks: Array.isArray(saved.tasks) ? saved.tasks.filter(t => t && t.id && t.title) : [],
     // Calendar links to import from: { id, name, url, kind, lastSync, count, error }. Private to the account.
     feeds: Array.isArray(saved.feeds) ? saved.feeds.slice(0, 12) : [],
     // What the routine was built from: { wake, sleep, text, builtAt }.
     routine: saved.routine && typeof saved.routine === 'object' ? saved.routine : { wake: '07:00', sleep: '23:00', text: '' },
+    // Planner settings: { view, cal, remind }.
+    planner: saved.planner && typeof saved.planner === 'object' ? saved.planner : { view: 'Tasks', remind: false },
+    // Life goals: { id, title, why, by, color, milestones: [{ id, title, date, taskId }] } (see goals.js).
+    // Savings goals from older versions (no milestones) are dropped.
+    goals: Array.isArray(saved.goals) ? saved.goals.filter(g => g && g.id && g.title && Array.isArray(g.milestones)) : [],
+    // Projects and categories for the planner: { name: { color } }.
+    projects: saved.projects && typeof saved.projects === 'object' ? saved.projects : {},
+    // Digests: the profile they are written for, settings and what was already used (see digest.js).
+    digest: saved.digest && typeof saved.digest === 'object' ? saved.digest : { profile: null, autoTasks: true, used: [] },
     // How you look in Budgie: { color } for your avatar, picked at random at first and editable.
     profile: saved.profile && typeof saved.profile === 'object' ? saved.profile : {},
-    // Planner settings: { view, remind }.
-    planner: saved.planner && typeof saved.planner === 'object' ? saved.planner : { view: 'Tasks', remind: false },
   };
 }
 const SAVED_FIELDS = Object.keys(fromSaved());
@@ -79,32 +67,5 @@ watch(snapshot, value => {
   try { localStorage.setItem(activeKey, JSON.stringify(value)); } catch { /* storage blocked */ }
 }, { deep: true });
 
-// Cost of a subscription per month, in its own currency.
-export function monthly(s) {
-  const a = Number(s.amount) || 0;
-  if (s.cycle === 'yearly') return a / 12;
-  if (s.cycle === 'weekly') return (a * 52) / 12;
-  return a;
-}
-
-export function daysUntil(iso) {
-  const [y, m, d] = String(iso).split('-').map(Number);
-  const due = new Date(y, m - 1, d);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  return Math.round((due - now) / 864e5);
-}
-
 export const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
-export const thisMonth = () => new Date().toISOString().slice(0, 7);
-
-// Apply a logo fix to every entry and subscription with the same name, and remember it.
-export function fixLogo(name, { domain, logo }) {
-  const key = String(name).trim().toLowerCase();
-  store.logoOverrides[key] = { domain, logo };
-  const same = x => String(x.merchant || x.name || '').trim().toLowerCase() === key;
-  store.transactions.forEach(t => { if (same(t)) Object.assign(t, { domain, logo }); });
-  store.subscriptions.forEach(s => { if (same(s)) Object.assign(s, { domain, logo }); });
-  store.drafts.forEach(d => { if (same(d)) Object.assign(d, { domain, logo }); });
-}

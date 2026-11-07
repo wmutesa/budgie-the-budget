@@ -1,7 +1,6 @@
 # Roadmap
 
-- Export and import of all data (JSON and CSV)
-- Connect real bank accounts
-- Recurring transactions detected from imports
-- More banks in the savings and investing ideas
-- Offline support for adding entries with no connection (Budgie stays a web app; no separate desktop or phone apps are planned)
+- Reminders that arrive when Budgie is closed (web push)
+- More digest sources (university event calendars, more careers boards)
+- Shared goals and plans between invited people
+- Offline adding with no connection (Budgie stays a web app; no separate desktop or phone apps are planned)

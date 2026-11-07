@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { cards } from '../lib/advice';
+import { cards } from '../lib/notices';
 import { store } from '../lib/store';
 import Icon from './Icon.vue';
 

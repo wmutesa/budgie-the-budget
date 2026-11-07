@@ -1,12 +1,11 @@
 // Task ideas Budgie offers in the Planner, from rules over your own data:
-// deadlines without a plan, exams to review for, renewals, goals, gaps in
-// your routine and the weekly review. Free and instant; the on-device AI can
+// deadlines without a plan, exams to review for, goals without a next step,
+// gaps in your routine and the weekly review. Free and instant; the on-device AI can
 // add more ideas on request (see ai.js).
 import { computed } from 'vue';
-import { store, daysUntil } from './store';
+import { store } from './store';
 import { today, addDays, dayDiff, occursOn, isDone, timeLabel, nextOccurrence } from './tasks';
 
-const usd = n => (Number(n) || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const has = re => store.tasks.some(t => re.test(t.title));
 const hasOpen = re => store.tasks.some(t => re.test(t.title) && (t.repeat ? nextOccurrence(t) : !t.done));
 
@@ -42,31 +41,21 @@ export const suggestions = computed(() => {
     });
   }
 
-  // Money: renewals soon, goals without a plan, entries waiting for a check.
-  for (const s of store.subscriptions) {
-    const n = daysUntil(s.next);
-    if (n >= 0 && n <= 3 && !has(new RegExp(s.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))) add({
-      id: `renew-${s.id}-${s.next}`, tone: 'info', title: `Keep or cancel ${s.name}?`,
-      why: `It renews ${n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`}. Decide before you are charged.`,
-      task: { title: `Keep or cancel ${s.name}`, date: now, kind: 'bill', priority: 'high' },
+  // Goals: give each one a plan, and keep a next step on the calendar.
+  for (const g of store.goals) {
+    const linked = store.tasks.filter(t => t.goalId === g.id);
+    const open = linked.filter(t => !t.repeat && !t.done);
+    if (!linked.length) add({
+      id: `goal-plan-${g.id}`, tone: 'good', title: `Break “${g.title}” into milestones`,
+      why: 'A goal with steps on the calendar is far more likely to happen. Budgie spreads them out up to your date.',
+      goal: g,
+    });
+    else if (!open.some(t => t.date && dayDiff(now, t.date) <= 7)) add({
+      id: `goal-next-${g.id}-${now}`, tone: 'info', title: `Take one step for “${g.title}” this week`,
+      why: 'Nothing for this goal is planned in the next seven days.',
+      task: { title: `Next step for ${g.title}`, date: addDays(now, 1), mins: 30, kind: 'task', goalId: g.id, project: g.title.slice(0, 40) },
     });
   }
-  for (const g of store.goals) {
-    const left = (Number(g.target) || 0) - (Number(g.saved) || 0);
-    if (left > 0 && !has(new RegExp(`(set aside|save|move).*${g.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'))) {
-      const each = Math.max(10, Math.round(left / 6 / 10) * 10);
-      add({
-        id: `goal-${g.id}`, tone: 'good', title: `Set aside ${usd(each)} for ${g.name} each month`,
-        why: `${usd(left)} to go. ${usd(each)} a month gets you there in about six months.`,
-        task: { title: `Set aside ${usd(each)} for ${g.name}`, date: now, kind: 'bill', cost: null, repeat: { every: 'month' } },
-      });
-    }
-  }
-  if (store.drafts.length) add({
-    id: `drafts-${now}-${store.drafts.length}`, tone: 'info', title: `Check ${store.drafts.length} entr${store.drafts.length === 1 ? 'y' : 'ies'} waiting in Transactions`,
-    why: 'They are not in your totals until you accept them.',
-    task: { title: 'Check entries waiting in Transactions', date: now, mins: 5, kind: 'task' },
-  });
 
   // Routine gaps, once you have a routine.
   const routine = store.tasks.filter(t => t.source === 'routine' || t.kind === 'routine');
@@ -103,6 +92,6 @@ export function plannerFacts() {
     `Coming up: ${soon.join('; ') || 'nothing'}.`,
     `Routine: ${routine.join('; ') || 'none yet'}.`,
     `Done today: ${doneToday}.`,
-    store.goals.length ? `Savings goals: ${store.goals.map(g => g.name).join(', ')}.` : '',
+    store.goals.length ? `Goals: ${store.goals.map(g => `${g.title}${g.by ? ` by ${g.by}` : ''}`).join('; ')}.` : '',
   ].filter(Boolean);
 }

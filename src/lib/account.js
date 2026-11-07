@@ -281,3 +281,6 @@ export const invitePerson = name => api('/api/invites', { method: 'POST', body: 
 export const cancelInvite = id => api(`/api/invites/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const removePerson = id => api(`/api/people/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const readCalendar = url => api('/api/calendar', { method: 'POST', body: { url } });
+export const readDigests = () => api('/api/digests');
+export const readDigest = id => api(`/api/digests/${encodeURIComponent(id)}`);
+export const writeDigest = (profile, timeZone) => api('/api/digests', { method: 'POST', body: { profile, timeZone } });

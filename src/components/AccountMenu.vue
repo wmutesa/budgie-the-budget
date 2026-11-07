@@ -158,7 +158,7 @@ const tour = () => { open.value = false; emit('tour'); };
 
         <section class="acct-sec t-a">
           <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData"><Icon name="download" :size="14" />Download a copy</button></div>
-          <p class="small muted">Everything you have added, as one file: entries, budgets, accounts, goals, subscriptions and plans.</p>
+          <p class="small muted">Everything you have added, as one file: tasks, routines, goals, calendars and your digest profile.</p>
         </section>
         </div>
 

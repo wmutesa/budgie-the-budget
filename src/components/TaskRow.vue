@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
+import { store } from '../lib/store';
 import { nav } from '../lib/nav';
 import { KINDS, DAY_SHORT, isDone, toggleDone, streak, timeLabel, dayLabel, today, urgency, nextOccurrence } from '../lib/tasks';
 import { breakDown } from '../lib/breakdown';
@@ -34,6 +35,7 @@ const repeatText = computed(() => {
   if (r.every === 'month') return 'Monthly';
   return (r.days?.length ? r.days : []).map(d => DAY_SHORT[d]).join(' ') || 'Weekly';
 });
+const goal = computed(() => (t.goalId ? store.goals.find(g => g.id === t.goalId) : null));
 const subDone = computed(() => (t.subtasks || []).filter(s => s.done).length);
 const tick = () => toggleDone(t, day.value);
 // Opened from search: expand and bring into view.
@@ -57,7 +59,7 @@ async function split() { splitting.value = true; await breakDown(t); splitting.v
         <span v-if="t.project" class="tk-proj">#{{ t.project }}</span>
         <span v-if="repeatText" class="tk-i tk-rep"><Icon name="repeat" :size="12" />{{ repeatText }}</span>
         <span v-if="fire > 1" class="tk-i tk-fire" :title="`${fire} in a row`"><Icon name="flame" :size="12" />{{ fire }}</span>
-        <span v-if="t.cost" class="tk-i tk-cost"><Icon name="money" :size="12" />{{ t.cost }}</span>
+        <span v-if="goal" class="tk-i tk-goal" :style="{ color: goal.color }"><Icon name="target" :size="12" />{{ goal.title }}</span>
         <span v-if="t.subtasks?.length" class="tk-i"><Icon name="steps" :size="12" />{{ subDone }}/{{ t.subtasks.length }}</span>
         <span v-if="t.source === 'calendar'" class="tk-i tk-src"><Icon name="calendar" :size="12" />Calendar</span>
       </span>

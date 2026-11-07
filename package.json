@@ -2,7 +2,7 @@
   "name": "budgie",
   "version": "0.1.0",
   "private": true,
-  "description": "Budgie: budgeting, subscriptions and savings tracking with live exchange rates. Vue + Vite, deployed on Cloudflare Workers.",
+  "description": "Budgie: planner, life goals and a twice-weekly digest of opportunities. Vue + Vite, deployed on Cloudflare Workers.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -24,10 +24,7 @@
     "@mlc-ai/web-llm": "0.2.86",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
-    "pdfjs-dist": "^6.5.438",
     "qrcode-generator": "^2.0.4",
-    "read-excel-file": "^9.3.14",
-    "tesseract.js": "^7.0.0",
     "vue": "^3.5.44"
   },
   "type": "module"

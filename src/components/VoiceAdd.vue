@@ -6,7 +6,7 @@ import { go } from '../lib/nav';
 import Icon from './Icon.vue';
 
 // Say it from anywhere. Budgie splits what you said into separate things and
-// sends each where it belongs: the Planner, Transactions or your money plan.
+// sends each where it belongs: a task, a routine or a goal.
 // No form to fill; a note shows what went where, with Undo.
 const live = ref('');
 const result = ref(null);
@@ -27,7 +27,7 @@ const dict = useDictation({
 });
 const start = () => { error.value = ''; result.value = null; live.value = ''; dict.toggle(); };
 const undo = () => { undoSend(result.value); result.value = null; };
-const open = to => { go(to === 'planner' ? 'Planner' : to === 'money' ? 'Transactions' : 'Playground', { anchor: to === 'money' ? '#review' : '' }); result.value = null; };
+const open = to => { go(to === 'goal' ? 'Playground' : 'Planner', { anchor: to === 'goal' ? '#goals' : '' }); result.value = null; };
 onUnmounted(() => clearTimeout(hide));
 </script>
 
@@ -40,7 +40,7 @@ onUnmounted(() => clearTimeout(hide));
     <Teleport to="body">
       <div v-if="dict.listening.value" class="voice-live" role="status" aria-live="polite" data-test="voice-live">
         <i class="rec-dot" aria-hidden="true" />
-        <span class="voice-text">{{ live || 'Listening… say one or more things, like “essay due Friday at 5, then spent 9 on coffee yesterday”' }}</span>
+        <span class="voice-text">{{ live || 'Listening… say one or more things, like “essay due Friday at 5, then gym every Monday at 6”' }}</span>
         <button type="button" class="ibtn" title="Cancel" aria-label="Cancel" @click="dict.cancel()"><Icon name="x" /></button>
         <button type="button" class="ibtn primary" title="Done" aria-label="Done" data-test="voice-stop" @click="dict.stop()"><Icon name="check" /></button>
       </div>

@@ -2,7 +2,7 @@
 
 # Budgie
 
-Budgie is a personal assistant for your money and your time: spending, subscriptions, budgets, savings goals and the markets, plus a planner for school, work, projects and daily routines, with an AI helper that runs on your own device. It is invite-only. Each person signs in with a passkey, and their data syncs to their own private account.
+Budgie is a personal planner: your days, your goals and a twice-weekly digest of opportunities, with an AI helper that runs on your own device. It is invite-only. Each person signs in with a passkey, and their data syncs to their own private account.
 
 ## About
 
@@ -11,7 +11,8 @@ Budgie is a personal assistant for your money and your time: spending, subscript
 | | Where it lives | Who can see it |
 | --- | --- | --- |
 | The source code in this repository | GitHub | Anyone |
-| Your entries, budgets, accounts, goals, plans, tasks, calendar links and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
+| Your tasks, routines, goals, calendar links, digest profile and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
+| Your digests | Your account in Cloudflare D1 | Only you |
 | Passkeys | Your device or your Apple, Google or Microsoft password manager | Only you; Budgie keeps the public half |
 | AI | Runs on your device (in the browser, or Ollama on your computer) | Nobody: no cloud AI service, no API keys |
 
@@ -22,10 +23,11 @@ Nothing personal is ever committed here: no profiles, links, tokens, addresses o
 - **Invite-only accounts with passkeys.** No passwords to steal or reuse. Invite and device links work once and expire. Optional single-use recovery codes.
 - **Hashes only.** The database stores hashes of session cookies, invite links and recovery codes, never the values.
 - **Locked-down sessions.** `__Host-` cookies that are HttpOnly, Secure and SameSite. Requests that change data must come from the site itself. Sign out of one device or every device.
-- **Your data is yours.** Each person can reach only their own data. Members can delete their account and all of its data; anyone can download a full copy.
-- **Rate limits.** Sign-in, invite and recovery requests are limited per network address.
-- **Strict browser policy.** A Content Security Policy that allows only the services Budgie uses, down to the exact package versions loaded from jsDelivr; no framing; HSTS; a minimal Permissions Policy.
-- **Checked on every change.** CodeQL scanning, Dependabot for packages and GitHub Actions (all actions pinned to exact commits), a browser smoke test run with the production security headers, and an end-to-end test of sign-in, invites, recovery, sessions and rate limits against the real Worker and a local database.
+- **Your data is yours.** Each person can reach only their own data and digests. Members can delete their account and all of its data; anyone can download a full copy.
+- **Rate limits.** Sign-in, invite, recovery, calendar and digest requests are limited.
+- **Safe fetching.** Calendar links and digest sources must be public https addresses; private and local addresses are refused, and sizes are capped. AI models come only from an allow-list of exact files.
+- **Strict browser policy.** A Content Security Policy that allows only the services Budgie uses, down to the exact package version loaded from jsDelivr; no framing; HSTS; a minimal Permissions Policy.
+- **Checked on every change.** CodeQL scanning, Dependabot for packages and GitHub Actions (all pinned to exact commits), unit tests, a browser smoke test run with the production security headers, and an end-to-end test against the real Worker and a local database.
 
 See [SECURITY.md](SECURITY.md) for details and how to report a problem privately.
 
@@ -33,13 +35,14 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 
 | Page | What it is for |
 | --- | --- |
-| **Overview** | Your month in a sentence, net worth, plan, cash flow, savings goals, live exchange rates, subscriptions, upcoming payments and wallets |
-| **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Week, Focus). Type or say anything and Budgie reads the date, time, repeat, project, priority and cost. Imports Canvas, Google, Apple and Outlook calendars, builds a daily routine, suggests what to prepare for, keeps streaks, and sends ticked costs to Transactions |
-| **Transactions** | Add spending by typing, speaking, scanning a receipt, or importing a PDF, CSV or Excel statement; review it; AI-drafted budgets; recent activity; your accounts |
-| **Markets** | A daily brief: the day's headline, what it means for you, indexes, top stories, markets to watch, a growth calculator and savings ideas for your banks |
-| **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sends each line to the Planner, Transactions, your money plan or more than one. Below it, messy money notes become a plan with scenarios to compare |
+| **Today** | Your day in a sentence, what is on today, deadlines this week, goal progress and the latest digest |
+| **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Calendar with day, week and month, and Focus). Imports Canvas, Google, Apple and Outlook calendars, suggests what to prepare for, breaks tasks into steps, keeps streaks |
+| **Digests** | A short newspaper written for you every Monday and Thursday from free sources: opportunities that fit, deadlines, outreach drafts to copy, a topic you watch, and one thing to do this week. Deadlines go to your Planner |
+| **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sorts tasks, routines and goals. Life goals get milestones on your calendar; build a daily routine; name and colour projects |
 
-Budgie starts empty: every number comes from what you add. The top bar has the pages, one search that finds anything (tasks, spending, subscriptions, goals, pages) and turns what you type into an action (press `/`), and a microphone: say several things at once and Budgie adds each where it belongs, with Undo.
+Anywhere in the app: the microphone in the top bar takes several things at once and adds each where it belongs, with Undo; the search finds anything and turns what you type into an action (press `/`).
+
+Budgie starts empty: everything comes from what you add. It costs nothing to run: digests use free sources and rules, and the AI runs on your device. An optional "Research deeper" uses your own free Gemini key.
 
 ## Run it locally
 
@@ -62,32 +65,33 @@ OLLAMA_ORIGINS="http://localhost:8787,<your Budgie address>" ollama serve
 ## Test
 
 ```bash
+npm run test:unit      # planner rules, goals, the inbox, calendar and digest readers; no browser
 npm run build
-npm run test:unit      # Planner rules and the calendar reader, no browser
-npm test               # browser smoke test; live services and the account server are faked
+npm test               # browser smoke test; the account server is faked
 npm run test:accounts  # the real Worker and a local database, with virtual passkeys
 ```
 
 ## How it ships
 
-1. Work goes to `main`, where GitHub Actions runs the build, both tests and CodeQL.
+1. Work goes to `main`, where GitHub Actions runs the build, the tests and CodeQL.
 2. Cloudflare's GitHub integration deploys `main`: `npx wrangler deploy` builds the site (see `wrangler.jsonc`) and publishes `dist/` with the Worker.
-3. `public/_headers` sets the security headers for every page; `worker/index.js` handles `/api/*` (sign-in, invites, sync, markets).
+3. `public/_headers` sets the security headers for every page; `worker/index.js` handles `/api/*` (sign-in, invites, sync, calendars, digests, model files) and the Monday and Thursday digest schedule.
 4. Database changes live in `migrations/` and are applied with `npx wrangler d1 migrations apply budgie --remote`.
 
 ## Project layout
 
 ```
-worker/index.js           account server: passkeys, invites, sessions, sync, markets, calendar import
+worker/index.js           account server: passkeys, invites, sessions, sync, digests, schedule
+worker/digest.js          digests from free sources: news, careers boards, feeds
 worker/ical.js            calendar link checks and the iCal reader
+worker/models.js          AI model files through Budgie's own address
 migrations/               database tables
 src/
   App.vue                 navigation and the pages
   components/             cards and pages
-  lib/                    parsing, capture, AI, sync, budgets, savings and more
-  data/                   company directory, banks, defaults
+  lib/                    tasks, goals, the inbox router, calendars, digests, AI, sync
 public/                   icons and security headers
-tests/                    smoke test and accounts test
+tests/                    unit, smoke and accounts tests
 docs/wiki/                pages for the GitHub wiki
 ```
 

@@ -15,7 +15,7 @@ const input = ref(null);
 const actions = computed(() => actionsFor(q.value, nav.page));
 const groups = computed(() => search(q.value, nav.page));
 const flat = computed(() => [...actions.value, ...groups.value.flatMap(g => g.items)]);
-watch(q, v => { at.value = 0; open.value = Boolean(v.trim()); if (nav.page === 'Transactions') store.query = v; });
+watch(q, v => { at.value = 0; open.value = Boolean(v.trim()); });
 watch(() => nav.page, () => { open.value = false; });
 async function choose(item) {
   if (!item) return;

@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import { store, newId } from '../lib/store';
 import { KINDS, DAY_SHORT, removeTask, today } from '../lib/tasks';
 import { breakDown } from '../lib/breakdown';
-import { CATEGORIES } from '../lib/categorize';
 import Icon from './Icon.vue';
 
 // Every detail of one Planner item. Changes save as you type.
@@ -47,9 +46,8 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
     </div>
     <label class="tk-f"><span>Project</span><input v-model="t.project" list="tk-projects" maxlength="40" placeholder="e.g. English 101" /></label>
     <datalist id="tk-projects"><option v-for="p in projects" :key="p" :value="p" /></datalist>
-    <label class="tk-f"><span>Costs ($)</span><input v-model.number="t.cost" type="number" min="0" step="0.01" placeholder="—" data-test="task-cost" /></label>
-    <label v-if="t.cost" class="tk-f"><span>Category</span>
-      <select v-model="t.costCategory"><option value="">Guess for me</option><option v-for="c in CATEGORIES.filter(c => c !== 'Income')" :key="c" :value="c">{{ c }}</option></select>
+    <label v-if="store.goals.length" class="tk-f"><span>Goal</span>
+      <select v-model="t.goalId" data-test="task-goal"><option :value="undefined">No goal</option><option v-for="g in store.goals" :key="g.id" :value="g.id">{{ g.title }}</option></select>
     </label>
     <label class="tk-f wide"><span>Notes</span><textarea v-model="t.notes" rows="2" maxlength="1000" /></label>
     <div class="tk-f wide">
@@ -62,7 +60,6 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
       </ul>
       <input v-model="newSub" placeholder="Add a step, then press Enter" maxlength="120" @keydown.enter.prevent="addSub" />
     </div>
-    <p v-if="t.cost" class="muted small wide">When you tick this, ${{ t.cost }} goes to Transactions to review.</p>
     <div class="tk-acts wide">
       <a v-if="t.link" class="ibtn ghost" :href="t.link" target="_blank" rel="noopener noreferrer" title="Open in calendar" aria-label="Open in calendar"><Icon name="external" /></a>
       <button type="button" class="ibtn danger" title="Delete" aria-label="Delete" @click="remove"><Icon name="trash" /></button>

@@ -48,16 +48,16 @@ check('repeats: daily, MWF, weekdays, 3x a week, sundays', () => {
   assert.deepEqual(p('call friends sundays').repeat, { every: 'week', days: [0] });
   assert.deepEqual(p('piano every tue and thu at 4').repeat.days, [2, 4]);
 });
-check('costs and durations', () => {
-  const t = p('haircut sat $25 for 45 min');
-  assert.equal(t.cost, 25); assert.equal(t.mins, 45); assert.equal(t.title, 'Haircut');
+check('durations', () => {
+  const t = p('haircut sat for 45 min');
+  assert.equal(t.mins, 45); assert.equal(t.title, 'Haircut');
   assert.equal(t.date, '2026-11-07');
 });
 check('plain words are not mistaken for dates', () => {
   const t = p('Read chapter 3 of the sun also rises');
   assert.equal(t.date, ''); assert.equal(t.time, '');
 });
-check('repeats, streaks and money from ticking', () => {
+check('repeats and streaks', () => {
   const today = isoDay();
   const t = makeTask({ title: 'Gym', repeat: { every: 'day' }, date: addDays(today, -5) });
   assert.ok(occursOn(t, today));
@@ -65,12 +65,6 @@ check('repeats, streaks and money from ticking', () => {
   assert.equal(streak(t), 3);
   const w = makeTask({ title: 'Class', repeat: { every: 'week', days: [1, 3] }, date: '2026-11-02' });
   assert.ok(occursOn(w, '2026-11-04')); assert.ok(!occursOn(w, '2026-11-05'));
-  const paid = makeTask({ title: 'Haircut', cost: 25 });
-  store.tasks.push(paid);
-  toggleDone(paid);
-  assert.equal(store.drafts[0].amount, -25, 'a task with a cost becomes an entry to review');
-  toggleDone(paid); toggleDone(paid);
-  assert.equal(store.drafts.filter(d => d.merchant === 'Haircut').length, 1, 'only once');
 });
 check('overdue and due-today work comes first', () => {
   const today = isoDay();
@@ -124,25 +118,56 @@ check('calendar links: only public https addresses', () => {
   assert.equal(feedKind('https://outlook.office365.com/owa/calendar/x/reachcalendar.ics'), 'outlook');
 });
 const { route, splitSpoken, routeSpoken } = await import('../../src/lib/router.js');
-check('the Playground inbox sends each line where it belongs', () => {
-  const to = t => route(t).dest.sort().join('+');
-  assert.equal(to('Essay due Fri 5pm #English'), 'planner');
-  assert.equal(to('spent 12.50 on lunch at Chipotle yesterday'), 'money');
-  assert.equal(to('salary 4000 a month'), 'plan');
-  assert.equal(to('gym MWF 6pm'), 'planner');
-  const bill = route('pay phone bill $45 on the 15th');
-  assert.equal(bill.dest.join(), 'planner'); assert.equal(bill.task.cost, 45, 'a bill to pay keeps its cost');
-  assert.equal(to('call mom'), 'planner');
-  assert.equal(to('netflix 15.49'), 'plan');
-  assert.equal(to('groceries maybe 400'), 'plan');
-  assert.equal(to('save 1200 for laptop by june'), 'plan');
-  assert.equal(to('rent 1500'), 'plan');
+check('the Playground inbox tells tasks, routines and goals apart', () => {
+  const to = t => route(t).dest;
+  assert.equal(to('Essay due Fri 5pm #English'), 'task');
+  assert.equal(to('gym MWF 6pm'), 'routine');
+  assert.equal(to('call mom every Sunday 5pm'), 'routine');
+  assert.equal(to('I want to land a summer internship by March'), 'goal');
+  assert.equal(to('learn Spanish this year'), 'goal');
+  assert.equal(to('call mom'), 'task');
+  assert.equal(to('dentist tomorrow at 3'), 'task');
 });
 check('speech is split into separate things', () => {
-  assert.deepEqual(splitSpoken('essay due friday at 5pm then spent 9 on coffee yesterday and remind me to call mom and dad tomorrow'),
-    ['essay due friday at 5pm', 'spent 9 on coffee yesterday', 'call mom and dad tomorrow']);
-  assert.deepEqual(splitSpoken('Gym on Monday. Salary 4000 a month'), ['Gym on Monday', 'Salary 4000 a month']);
-  assert.deepEqual(routeSpoken('rent 1500 and spent 20 on lunch today').map(r => r.dest.join()), ['plan', 'money']);
+  assert.deepEqual(splitSpoken('essay due friday at 5pm then gym every monday at 6 and remind me to call mom and dad tomorrow'),
+    ['essay due friday at 5pm', 'gym every monday at 6', 'call mom and dad tomorrow']);
+  assert.deepEqual(splitSpoken('Gym on Monday. I want to read 12 books this year'), ['Gym on Monday', 'I want to read 12 books this year']);
+  assert.deepEqual(routeSpoken('study for the midterm tomorrow and gym every day at 7am').map(r => r.dest), ['task', 'routine']);
+});
+const { parseGoal, ruleMilestones } = await import('../../src/lib/goals.js');
+check('goals: titles, dates and milestones', () => {
+  const g = parseGoal('I want to run a 10K by March', NOW);
+  assert.equal(g.title, 'Run a 10K'); assert.equal(g.by, '2027-03-31');
+  assert.equal(parseGoal('goal: land a summer internship by summer', NOW).by, '2027-06-01');
+  assert.equal(parseGoal('read 12 books this year', NOW).by, '2026-12-31');
+  assert.ok(ruleMilestones({ title: 'Land a summer internship' }).some(m => /CV/.test(m)), 'internship goals get CV steps');
+});
+const { parseFeed, findDeadline, tagFor, writeEdition, cleanProfile } = await import('../../worker/digest.js');
+const RSS = `<rss><channel><item><title>NVIDIA opens first-year research internships - NVIDIA Blog</title><link>https://blogs.nvidia.com/a</link><pubDate>Fri, 06 Nov 2026 10:00:00 GMT</pubDate><description><![CDATA[<p>Robotics and embedded systems roles for undergraduates. Apply by December 1.</p>]]></description><source url="https://blogs.nvidia.com">NVIDIA Blog</source></item>
+<item><title>Free hackathon for students in Boston &amp; online</title><link>https://example.org/hack</link><description>Register by Nov 15. Open to international students.</description></item>
+<item><title>Defense program for US citizens only</title><link>https://example.org/x</link><description>Clearance required.</description></item>
+<item><title>No link</title><link>javascript:alert(1)</link></item></channel></rss>`;
+check('digests: feeds are read safely, deadlines and tags found', () => {
+  const items = parseFeed(RSS);
+  assert.equal(items.length, 3, 'items without an https link are dropped');
+  assert.equal(items[0].title, 'NVIDIA opens first-year research internships', 'the source is taken off the title');
+  assert.doesNotMatch(items[0].desc, /<p>/, 'HTML is removed');
+  assert.equal(findDeadline(items[0].desc, NOW), '2026-12-01');
+  assert.equal(findDeadline('Register by Nov 15', NOW), '2026-11-15');
+  assert.equal(tagFor('Free hackathon for students'), 'EVENT');
+  assert.equal(tagFor('Software engineering intern', 'job'), 'INTERNSHIP');
+});
+check('digests: an edition with a lead, deadlines, drafts and no excluded items', () => {
+  const profile = cleanProfile({ name: 'Sam Lee', school: 'State University', study: 'Electrical Engineering', interests: ['robotics', 'embedded systems'], exclude: ['US citizens only'], watch: 'student visa' });
+  const ed = writeEdition({ items: parseFeed(RSS), watch: parseFeed(RSS).slice(1), profile }, null, NOW);
+  assert.match(ed.lead.headline, /NVIDIA/, 'the best match leads');
+  assert.ok(!JSON.stringify(ed).includes('Defense program'), 'excluded items are left out');
+  assert.deepEqual(ed.deadlines.map(d => d.date), ['2026-11-15'], 'only deadlines in the next 14 days');
+  assert.equal(ed.drafts[0].no, '1');
+  assert.match(ed.drafts[0].body, /Sam Lee$/, 'drafts are signed with your name');
+  assert.ok(ed.watch && ed.watch.topic === 'student visa');
+  const again = writeEdition({ items: parseFeed(RSS), watch: [], profile }, ed, NOW);
+  assert.ok(!again.lead || !/NVIDIA/.test(again.lead.headline), 'stories are not repeated in the next edition');
 });
 const { modelSource } = await import('../../worker/models.js');
 check('model downloads: only the exact files Budgie uses', () => {

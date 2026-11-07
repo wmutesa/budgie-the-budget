@@ -5,7 +5,6 @@ import {
   occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, timeLabel, KINDS, toggleDone, isDone,
   parseTask, makeTask, skipDay, duplicateTask, removeTask, score, dayLabel,
 } from '../lib/tasks';
-import { guessCategory } from '../lib/categorize';
 import { breakDown } from '../lib/breakdown';
 import { startFocus } from '../lib/focus';
 import { ai, aiSuggestTasks } from '../lib/ai';
@@ -123,7 +122,7 @@ function addHere() {
   const p = parseTask(text);
   const at = pop.value;
   store.tasks.unshift(makeTask({
-    title: p.title, kind: p.kind, priority: p.priority, project: p.project, cost: p.cost, costCategory: p.cost ? guessCategory(p.title, -1) : '',
+    title: p.title, kind: p.kind, priority: p.priority, project: p.project,
     repeat: p.repeat, mins: p.mins || (at.time ? 60 : null), date: p.date && p.date !== today() ? p.date : at.date, time: p.time || at.time,
   }));
   pop.value = null;

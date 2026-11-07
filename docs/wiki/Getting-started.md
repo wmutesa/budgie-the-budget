@@ -7,6 +7,7 @@ Budgie is a web app. There is nothing to download or install: open the Budgie ad
 1. Open the invite link you were sent and create a passkey. Your device asks for your fingerprint, face or PIN.
 2. Save your recovery codes, or skip them if your passkey syncs with iCloud Keychain or Google Password Manager.
 3. Follow the short tour. Your data syncs to your account, so you can open Budgie on any of your devices.
+4. On the **Digests** page, fill in your digest profile to get your first edition.
 
 To use another device, open the account menu (your initial in the top bar), choose **Add a device**, and scan the QR code with that device.
 
@@ -14,9 +15,9 @@ To use another device, open the account menu (your initial in the top bar), choo
 
 ## AI on your device (optional, no API key)
 
-Budgie works without AI. For smarter receipt reading and suggestions, it can use a free open-source model that runs on your own device, so nothing goes to a cloud AI service.
+Budgie works without AI. For routines, goal milestones, task steps, ideas and better-written digests, it can use a free open-source model that runs on your own device, so nothing goes to a cloud AI service.
 
-**In the browser, on by default:** after you sign in, Budgie downloads Qwen 2.5 (about 300 MB) and, on capable devices, Llama 3.2 (about 900 MB) from Hugging Face, once. It picks the best ready model for each job: Qwen for reading receipts, Llama for writing suggestions. On slow or data-saving connections the download waits until you choose **Download now** in the account menu. You can turn AI off on a device from the same place, which deletes the downloads. It needs an up-to-date Chrome, Edge or Safari on a recent device; otherwise Budgie uses its built-in rules.
+**In the browser, on by default:** after you sign in, Budgie downloads Qwen 2.5 (about 300 MB) and, on capable devices, Llama 3.2 (about 900 MB) from Hugging Face, once. It picks the best ready model for each job: Qwen for quick structured answers, Llama for writing. The models download through Budgie's own address, so content blockers and strict networks do not stop them. On slow or data-saving connections the download waits until you choose **Download now** in the account menu. You can turn AI off on a device from the same place, which deletes the downloads. It needs an up-to-date Chrome, Edge or Safari on a recent device; otherwise Budgie uses its built-in rules.
 
 **With Ollama:** if you run [Ollama](https://ollama.com) on your computer, Budgie uses it first for every job.
 

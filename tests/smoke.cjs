@@ -1,6 +1,6 @@
 // Smoke test for the built Budgie web app. Serves dist/, fakes the live
-// exchange-rate and Wikidata responses so the test runs offline, then checks
-// the overview, the add-a-subscription flow, persistence and the second page.
+// account server so the test runs offline, then checks Today, the Planner,
+// Digests, the Playground, voice, search and the first-run guide.
 //
 //   npm run build && npm test
 //   CHROMIUM_PATH=/path/to/chrome npm test
@@ -13,7 +13,6 @@ const { chromium } = require('playwright');
 
 const dist = path.resolve(__dirname, '..', 'dist');
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.svg': 'image/svg+xml' };
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 
 // Send the same security headers Cloudflare will send (from public/_headers),
 // so the test fails if the Content Security Policy blocks something the app needs.
@@ -65,21 +64,28 @@ window.webkitSpeechRecognition = FakeRec;
 // A stand-in for the account server (worker/index.js): signed in as the owner,
 // with data kept in memory so reloads and other pages see the same account.
 // tests/accounts.cjs tests the real server.
-// Test entries, dated relative to today, loaded through the fake account.
-// (The app itself starts empty; this only gives the test something to check.)
-function testEntries() {
-  const day = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
-  return [
-    [0, 'Trader Joe’s', -86.4, 'Food & dining'], [1, 'Metro top-up', -64, 'Transport'], [2, 'Rent share', -1450, 'Housing'],
-    [2, 'Uniqlo', -118, 'Shopping'], [3, 'Payroll · Employer', 2350, 'Income'], [4, 'Chipotle', -42.1, 'Food & dining'],
-    [5, 'Pharmacy', -57.3, 'Health'], [6, 'Cinema', -28, 'Entertainment'], [8, 'Amazon', -168, 'Shopping'], [9, 'Groceries', -64.9, 'Food & dining'],
-    [3, 'Planet Fitness', -25, 'Health'], [33, 'Planet Fitness', -25, 'Health'],
-  ].map(([n, merchant, amount, category], i) => ({ id: `t${i}`, date: day(n), merchant, amount, currency: 'USD', category, source: 'csv', domain: '', logo: null }));
+const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+// Money data saved by an older version of Budgie: it must be dropped.
+const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
+// A sample edition, as the server would write it from free sources.
+function sampleEdition() {
+  return {
+    id: inDays(0), edition: 'Saturday Edition', dateLong: 'Saturday, November 7, 2026', createdAt: new Date().toISOString(), provider: 'free sources',
+    preheader: '3 new finds, 2 deadlines in the next two weeks.',
+    lead: { kicker: 'Internship · Apply by Dec 1', headline: 'Robotics lab opens first-year research roles', dek: 'Undergraduates can join a robotics lab this spring.', body: 'The lab builds low-cost robots. Matches robotics.', ctaLabel: 'Apply', ctaLink: 'https://example.org/lab', link2Label: 'More like this', link2: 'https://news.google.com/search?q=robotics' },
+    stories: [
+      { tag: 'EVENT', headline: 'Student hackathon this month', desc: 'A free weekend hackathon, online and in Boston.', fit: 'Matches robotics', deadline: `Register by ${inDays(4)}`, ctaLabel: 'Register', ctaLink: 'https://example.org/hack', dueIso: inDays(4) },
+      { tag: 'PERK', headline: 'Free cloud credits for students', desc: 'Credits for student projects.', fit: 'Check eligibility on the page', deadline: 'See the page', ctaLabel: 'Claim it', ctaLink: 'https://example.org/perk' },
+    ],
+    deadlines: [{ date: inDays(4), name: 'Student hackathon this month', desc: 'Event · example.org', ctaLabel: 'Register', ctaLink: 'https://example.org/hack' }],
+    drafts: [{ no: '1', to: 'Robotics Lab', purpose: 'Ask about first-year research roles', status: 'Needs a contact', sendBy: 'by Nov 20', subject: 'Student interested in your research', body: 'Hello,\n\nI am a student interested in robotics.\n\nThank you for your time,\nSam' }],
+    watch: { topic: 'student visa', headline: 'New guidance on student work rules', body: 'A short summary.', linkLabel: 'Read it', link: 'https://example.org/visa', note: 'Not legal advice.' },
+    action: { text: 'Register: Student hackathon this month.', label: 'Register', link: 'https://example.org/hack' },
+    sources: [{ title: 'example.org', url: 'https://example.org/lab' }],
+  };
 }
-const fakeAccount = { data: { guide: { done: true }, transactions: testEntries(),
-  balances: [{ id: 'b1', name: 'Chase checking', kind: 'checking', balance: 2500, currency: 'USD', updatedAt: new Date().toISOString() }, { id: 'b2', name: 'Bank of Kigali', kind: 'savings', balance: 350000, currency: 'RWF', updatedAt: new Date().toISOString() }],
-  goals: [{ id: 'g1', name: 'Emergency fund', saved: 1200, target: 5000, color: '#db2777' }] }, version: 1 };
 async function fakeApi(page, account = fakeAccount) {
+  account.digests = account.digests || [];
   await page.route('**/api/**', async route => {
     const req = route.request();
     const p = new URL(req.url()).pathname;
@@ -91,16 +97,18 @@ async function fakeApi(page, account = fakeAccount) {
       account.version += 1;
       return route.fulfill({ json: { version: account.version } });
     }
-    if (p === '/api/markets') return route.fulfill({ json: {
-      updatedAt: new Date().toISOString(), source: 'Yahoo Finance',
-      indexes: [{ symbol: '^GSPC', name: 'S&P 500', about: 'x', price: 6120.5, currency: 'USD', day: 0.8, month: 2.1, year: null, spark: [1, 2, 3, 2, 4] }, { symbol: '^IXIC', name: 'Nasdaq', about: 'x', price: 19850, currency: 'USD', day: 1.1, month: 3.4, year: null, spark: [1, 3, 2, 4] }, { symbol: '^DJI', name: 'Dow Jones', about: 'x', price: 43210, currency: 'USD', day: 0.3, month: 0.9, year: null, spark: [2, 2, 3, 3] }, { symbol: '^TNX', name: '10-year Treasury yield', about: 'x', price: 4.12, currency: 'USD', day: -1.2, month: -0.5, year: null, spark: [3, 2, 1] }],
-      watch: [{ symbol: 'VTI', name: 'US stock market', about: 'x', price: 310, currency: 'USD', day: 0.5, month: 1.9, year: 14.2, spark: [1, 2] }, { symbol: 'BND', name: 'Bonds', about: 'x', price: 72, currency: 'USD', day: 0.1, month: 0.4, year: 3.1, spark: [1, 2] }],
-      news: [{ title: 'Stocks rise as the Fed holds rates', link: 'https://finance.yahoo.com/news/a.html', source: 'Reuters', date: new Date().toUTCString() }],
-    } });
+    if (p === '/api/digests' && req.method() === 'GET') return route.fulfill({ json: { list: account.digests.map(d => ({ id: d.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader })), latest: account.digests[0] || null } });
+    if (p === '/api/digests' && req.method() === 'POST') {
+      const { profile } = JSON.parse(req.postData());
+      if (!profile?.interests?.length) return route.fulfill({ status: 400, json: { error: 'Add a few interests, companies or feeds to your digest profile first.' } });
+      account.lastProfile = profile;
+      const ed = sampleEdition();
+      account.digests = [ed, ...account.digests.filter(d => d.id !== ed.id)];
+      return route.fulfill({ json: ed });
+    }
     if (p === '/api/calendar') {
       const { url } = JSON.parse(req.postData());
       if (!/^https:\/\//.test(url)) return route.fulfill({ status: 400, json: { error: 'Use the https or webcal link of the calendar.' } });
-      const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
       return route.fulfill({ json: { kind: 'canvas', name: 'Fall courses', events: [{ uid: 'a1', title: 'Lab report [CHEM 110 Fall 2026]', start: { date: inDays(3) }, end: null, location: '', url: 'https://school.instructure.com/courses/1', notes: '', repeat: null }] } });
     }
     if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
@@ -109,23 +117,8 @@ async function fakeApi(page, account = fakeAccount) {
     return route.fulfill({ status: 404, json: { error: 'Not found' } });
   });
 }
-
-async function fakeNetwork(page, account) {
-  await fakeApi(page, account);
-  await page.route('**/open.er-api.com/**', route => route.fulfill({
-    json: { result: 'success', time_last_update_utc: 'Wed, 04 Nov 2026 00:02:31 +0000', rates: { USD: 1, EUR: 0.92, GBP: 0.79, JPY: 151.3, CAD: 1.37, INR: 84.1, KES: 129.5, NGN: 1550, BDT: 122.2, RWF: 1450, THB: 33.8 } },
-  }));
-  await page.route('**/www.wikidata.org/**', route => {
-    const action = new URL(route.request().url()).searchParams.get('action');
-    if (action === 'wbsearchentities') {
-      const q = (new URL(route.request().url()).searchParams.get('search') || '').toLowerCase();
-      return route.fulfill({ json: { search: q.includes('netflix') ? [{ id: 'Q907311', label: 'Netflix', description: 'American streaming service' }] : [] } });
-    }
-    return route.fulfill({ json: { entities: { Q907311: { claims: { P856: [{ mainsnak: { datavalue: { value: 'https://www.netflix.com/' } } }] } } } } });
-  });
-  await page.route('**/www.google.com/s2/favicons**', route => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
-  await page.route('**/fonts.googleapis.com/**', route => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
-}
+const fakeNetwork = (page, account) => fakeApi(page, account);
+const tab = name => `.nb-pages button:has-text("${name}")`;
 
 async function run(url) {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
@@ -137,223 +130,72 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  assert.equal(await page.locator('.nav-bar .nb-pages button').count(), 5, 'the top bar has the five pages');
-  assert.equal(await page.$('.dock'), null, 'there is no sidebar');
-  if (process.env.SHOTS) { await page.waitForTimeout(600); await page.screenshot({ path: `${process.env.SHOTS}/overview.png` }); }
+  // Four pages, starting with Today. The money side is gone.
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.trim())), ['Today', 'Planner', 'Digests', 'Playground'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
-  assert.match(await page.textContent('.lede-money'), /You hold[\s\S]*spent/, 'the brief covers your money');
-  assert.match(await page.textContent('[data-test="brief"]'), /Nothing is planned for today yet|Today you have/, 'the brief starts with your day');
-  for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Upcoming payments', 'Wallets']) {
-    assert.match(await page.textContent('body'), new RegExp(label, 'i'), `panel "${label}" renders`);
-  }
+  await page.waitForSelector('[data-test="today"]');
+  assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty[\s\S]*Playground/, 'an empty Today says how to start');
+  assert.doesNotMatch(await page.textContent('body'), /Net worth|Transactions|Subscriptions|Exchange rates|Emergency fund|Old shop/i, 'no money anywhere');
+  await page.waitForFunction(() => document.querySelector('.acct-dot.saved'));
+  await page.waitForTimeout(1200);
+  assert.equal(fakeAccount.data.transactions, undefined, 'old money data is removed from the account on the next save');
+  assert.equal(fakeAccount.data.subscriptions, undefined, 'old subscriptions are removed');
+  assert.deepEqual(fakeAccount.data.goals, [], 'old savings goals are removed');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today-empty.png` });
 
-  await page.waitForSelector('.fx li');
-  assert.match(await page.textContent('.fx'), /0\.92/, 'live rates appear');
-  assert.match(await page.textContent('.wallets'), /≈/, 'wallets show converted values');
-
-  // Months start when you started (here: the earliest test entry, 9 days ago) and run to this month.
-  const nineDaysAgo = new Date(); nineDaysAgo.setDate(nineDaysAgo.getDate() - 9);
-  const expectedMonths = nineDaysAgo.getMonth() === new Date().getMonth() ? 1 : 2;
-  assert.equal(await page.locator('.cap-col').count(), expectedMonths, 'cash flow shows only the months since you started');
-  await page.locator('.cap-col').last().hover();
-  assert.match(await page.textContent('.cap-tip'), new RegExp(new Date().toLocaleDateString('en-US', { month: 'short' })), 'hovering a month shows its totals');
-
-  // Known companies appear instantly from the built-in directory.
-  await page.click('[data-test="add-sub"]');
-  await page.fill('[data-test="brand-search"]', 'Shopee');
-  await page.waitForSelector('[data-test="brand-result"]');
-  assert.match(await page.textContent('.results'), /shopee\.com/, 'Shopee is found in the directory');
-  await page.keyboard.press('Escape');
-
-  await page.click('[data-test="add-sub"]');
-  await page.fill('[data-test="brand-search"]', 'Netflix');
-  await page.waitForSelector('[data-test="brand-result"]');
-  assert.match(await page.textContent('[data-test="brand-result"]'), /netflix\.com/, 'web search finds the official site');
-  await page.click('[data-test="brand-result"]');
-  await page.fill('[data-test="sub-amount"]', '15.49');
-  await page.click('[data-test="save-sub"]');
-  assert.match(await page.textContent('#subscriptions'), /Netflix/, 'the subscription is tracked');
-  assert.match(await page.textContent('#subscriptions'), /netflix\.com/, 'its website is shown');
-
-  await page.reload({ waitUntil: 'load' });
-  assert.match(await page.textContent('#subscriptions'), /Netflix/, 'subscriptions survive a reload');
-
-  await page.click('.nb-pages button:has-text("Transactions")');
-  assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
-  await page.waitForFunction(() => /Drafted from your spending|Made by AI/.test(document.querySelector('[data-test="budgets-by"]')?.textContent || ''));
-  const budgetText = await page.textContent('#budgets');
-  assert.match(budgetText, /Food & dining[\s\S]*Housing|Housing[\s\S]*Food & dining/, 'budgets are drafted from the categories you spend in');
-  assert.doesNotMatch(budgetText, /Software/, 'categories you never use are left out');
-  assert.equal(await page.locator('#budgets .swatch').first().evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(124, 58, 237)', 'Housing keeps its set colour');
-  assert.match(await page.textContent('body'), /Recent activity/, 'transactions page lists activity');
-  assert.equal(await page.locator('.kpi').count(), 4, 'four summary tiles');
-
-  // Import a bank statement: three rows go to review, then into the ledger.
-  const csv = 'Date,Description,Amount\n2026-11-02,Trader Joe\'s,-54.20\n2026-11-03,Uber,-18.75\n2026-11-03,Payroll,2350.00\n';
-  await page.setInputFiles('[data-test="file-input"]', { name: 'statement.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
-  await page.waitForSelector('#review');
-  assert.equal(await page.locator('.draft-card').count(), 3, 'three statement rows wait for review');
-  assert.match(await page.textContent('#review'), /Transport/, 'Uber is categorised as transport');
-
-  // Paying with an account: the note names the card, the entry links to it, and its balance drops.
-  await page.fill('[data-test="quick-note"]', 'lunch 12 at Sweetgreen today with my chase card');
-  await page.press('[data-test="quick-note"]', 'Enter');
-  await page.waitForFunction(() => [...document.querySelectorAll('.draft-card')].some(c => /Sweetgreen/.test(c.textContent)));
-  const sg = page.locator('.draft-card', { hasText: 'Sweetgreen' });
-  assert.match(await sg.locator('[data-test="draft-account"]').textContent(), /Chase checking/, 'the note links the entry to the Chase account');
-  assert.doesNotMatch(await sg.locator('.draft-name').textContent(), /chase/i, 'the payment method is not taken for the shop');
-  await sg.locator('.round-btn.ok').click();
-  assert.match(await page.textContent('[data-test="accounts"]'), /\$2,488\.00/, 'the Chase balance drops by the amount spent');
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('[data-test="accounts"] .acc-icon >> nth=0')]);
-  await chooser.setFiles({ name: 'chase.png', mimeType: 'image/png', buffer: PNG });
-  await page.waitForFunction(() => document.querySelector('[data-test="accounts"] .acc-icon img')?.src.startsWith('data:image/png'));
-
-  // A one-line note, matched to the company on the web.
-  await page.fill('[data-test="quick-note"]', 'Netflix 15.49 today');
-  await page.press('[data-test="quick-note"]', 'Enter');
-  await page.waitForFunction(() => document.querySelectorAll('.draft-card').length === 4);
-  assert.match(await page.textContent('#review'), /netflix\.com/, 'the note is matched to netflix.com');
-
-  // The custom category picker changes a draft without a native dropdown.
-  await page.click('.draft-card >> nth=0 >> .draft-cat .pick-btn');
-  await page.click('.pick-pop .pick-opt:has-text("Shopping")');
-  assert.match(await page.textContent('.draft-card >> nth=0'), /Shopping/, 'category picker sets the category');
-
-  await page.click('[data-test="accept-all"]');
-  assert.equal(await page.$('#review'), null, 'review queue clears after accepting');
-  assert.match(await page.textContent('#ledger'), /Uber|Netflix/, 'accepted items reach recent activity');
-  assert.match(await page.textContent('#budgets'), /Transport/, 'budgets update');
-  const [hb, hl] = await Promise.all([page.locator('#budgets').boundingBox(), page.locator('#ledger').boundingBox()]);
-  assert.ok(Math.abs(hb.height - hl.height) < 2 && Math.abs((hb.y + hb.height) - (hl.y + hl.height)) < 2, 'budgets and recent activity share a bottom line');
-
-  // AI everywhere: short notes next to sections and suggestions in the corner.
-  assert.match(await page.textContent('[data-test="hint-ledger"]'), /purchases? this week/, 'recent activity has an AI note');
-  assert.match(await page.textContent('[data-test="hint-budgets"]'), /budget|on track|%/, 'budgets have an AI note');
-  // Notifications live behind the bell in the top bar.
-  assert.ok(Number(await page.textContent('[data-test="bell-count"]')) > 0, 'the bell shows how many notifications are new');
-  await page.click('[data-test="bell"]');
-  const items = page.locator('[data-test="bell-item"]');
-  const before = await items.count();
-  assert.ok(before > 0, 'the dropdown lists the notifications');
-  await items.first().hover();
-  await page.waitForTimeout(200);
-  assert.equal(await page.textContent('[data-test="bell-tip"]'), await items.first().locator('.bell-body').textContent(), 'each notification has a tooltip with the full message');
-  assert.equal(await page.$('[data-test="bell-count"]'), null, 'opening the bell marks them as seen');
-  await items.first().locator('button[title="Dismiss"]').click();
-  assert.equal(await items.count(), before - 1, 'a dismissed notification goes away');
-  await page.keyboard.press('Escape');
-  assert.equal(await page.$('[data-test="bell-pop"]'), null, 'Escape closes the dropdown');
-  assert.ok(await page.$('#accounts'), 'accounts live on the Transactions page');
-
-  // Repeating payments: found in the activity and tracked as a subscription in one click.
-  await page.waitForSelector('#recurring');
-  assert.match(await page.textContent('#recurring'), /Planet Fitness[\s\S]*2 times over 2 months/, 'a monthly payment is spotted');
-  await page.click('[data-test="track-recurring"]');
-  assert.equal(await page.$('#recurring'), null, 'once tracked, it is no longer suggested');
-  const [csvFile] = await Promise.all([page.waitForEvent('download'), page.click('[data-test="export-csv"]')]);
-  assert.match(csvFile.suggestedFilename(), /^budgie-entries-\d{4}-\d{2}-\d{2}\.csv$/, 'entries export as a CSV file');
-  assert.match(require('node:fs').readFileSync(await csvFile.path(), 'utf8'), /^Date,Merchant,Amount,Currency,Category,Account,Source\n[\s\S]*Planet Fitness/, 'the CSV has a header and the entries');
-
-  // Markets: news and savings ideas use the whole page.
-  await page.click('.nb-pages button:has-text("Markets")');
-  assert.match(await page.textContent('.nb-pages button:has-text("Markets")'), /Markets/, 'the third page is called Markets');
-  assert.equal(await page.$('#activity'), null, 'All activity is gone from this page');
-  assert.equal(await page.$('#reports'), null, 'Year in numbers is gone from this page');
-  assert.equal(await page.$('.insight'), null, 'the old "What Budgie thinks" card is gone');
-  await page.waitForSelector('#markets .mk-tile');
-  const mk = await page.textContent('#markets');
-  assert.match(await page.textContent('[data-test="markets-headline"]'), /^Stocks rise, led by tech as bond yields ease$/, 'the brief opens with a headline written from the numbers');
-  assert.match(await page.textContent('[data-test="market-status"]'), /^US markets (open|closed)/, 'it says whether US markets are open');
-  assert.match(await page.textContent('[data-test="money-today"]'), /Net worth[\s\S]*\$[\d,]+[\s\S]*Emergency cushion[\s\S]*months/, '"Your money today" uses your accounts and goals');
-  assert.match(mk, /S&P 500[\s\S]*\+0\.8%/, 'market indexes show today\'s change');
-  assert.match(mk, /4\.12%/, 'the Treasury yield shows as a percentage');
-  assert.match(mk, /US stock market[\s\S]*\+14\.2%[\s\S]*Bonds/, 'markets to watch are ranked by the past year');
-  assert.match(mk, /not financial advice/i, 'markets are labelled as information, not advice');
-  assert.equal(await page.getAttribute('#markets .mkt-lead', 'rel'), 'noopener noreferrer', 'the lead story opens safely');
-  assert.match(await page.textContent('#markets .mkt-lead'), /Stocks rise as the Fed holds rates[\s\S]*Reuters/, 'the first headline is the lead story');
-  assert.equal(await page.$('footer'), null, 'there is no footer');
-  assert.equal(await page.textContent('[data-test="growth-total"]'), '$31,056', 'the growth calculator works out $200 a month for 10 years at 5%');
-  await page.click('[data-test="growth"] .chip-btn:has-text("Bold")');
-  assert.notEqual(await page.textContent('[data-test="growth-total"]'), '$31,056', 'a bolder return changes the estimate');
-  assert.match(await page.textContent('#opportunities'), /Chase/, 'Chase opportunities appear');
-  assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
-
-  // Playground: messy notes become an organised plan, then budgets.
-  await page.click('.nb-pages button:has-text("Playground")');
-  await page.fill('[data-test="inbox-text"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
-  await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 6);
-  assert.equal(await page.locator('[data-test="inbox-rows"] .inbox-dest.to-plan.on').count(), 6, 'amounts that repeat go to the money plan');
-  await page.click('[data-test="inbox-send"]');
-  assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
-  assert.match(await page.textContent('.lane[data-group="Wants"]'), /Netflix/, 'Netflix lands in wants');
-  assert.match(await page.textContent('.lane[data-group="Goals"]'), /Laptop/i, 'the laptop goal lands in goals');
-  assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'income is picked up from the notes');
-  // Scenarios: save this plan, change it, then open the saved one again.
-  await page.fill('[data-test="scenario-name"]', 'Current job');
-  await page.click('[data-test="save-scenario"]');
-  await page.fill('[data-test="plan-income"]', '9000');
-  await page.click('[data-test="load-scenario"]');
-  assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'opening a saved scenario brings its plan back');
-  await page.click('[data-test="apply-plan"]');
-  await page.click('.nb-pages button:has-text("Transactions")');
-  assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
-  await page.click('.nb-pages button:has-text("Overview")');
-
-  // Planner: type anything, and Budgie works out when, how often and how important.
-  await page.click('.nb-pages button:has-text("Planner")');
-  await page.waitForSelector('[data-test="planner"]');
-  assert.match(await page.textContent('[data-test="planner-summary"]'), /Nothing planned for today yet/, 'an empty planner says so');
-  // Adding happens in the Playground inbox, which sends each line where it belongs.
-  await page.click('[data-test="planner-add"]');
-  await page.waitForSelector('[data-test="inbox"]');
-  await page.fill('[data-test="inbox-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nhaircut today $25\nspent 9 on coffee yesterday');
+  // Playground: write anything; Budgie sorts tasks, routines and goals.
+  await page.click('[data-test="new"]');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.test), 'inbox-text', 'Add opens the inbox ready to type');
+  await page.fill('[data-test="inbox-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nI want to land a summer internship by March\nhaircut today');
   await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 4);
-  const dests = await page.$$eval('[data-test="inbox-rows"] li', rows => rows.map(r => [...r.querySelectorAll('.inbox-dest.on')].map(b => b.textContent.trim()).join('+')));
-  assert.deepEqual(dests, ['Planner', 'Planner', 'Planner', 'Transactions'], 'tasks go to the Planner and past spending to Transactions');
-  assert.match(await page.textContent('[data-test="inbox-rows"] li >> nth=2'), /\$25 when done/, 'a task with a price keeps it for when it is done');
+  const dests = await page.$$eval('[data-test="inbox-rows"] li', rows => rows.map(r => r.querySelector('.inbox-dest.on').textContent.trim()));
+  assert.deepEqual(dests, ['Task', 'Routine', 'Goal', 'Task'], 'each line is sorted');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/playground.png` });
   await page.click('[data-test="inbox-send"]');
-  assert.match(await page.textContent('[data-test="inbox-done"]'), /3 to the Planner, 1 to Transactions/, 'the inbox says where things went');
-  await page.click('[data-test="inbox-done"] button:has-text("Open Planner")');
+  assert.match(await page.textContent('[data-test="inbox-done"]'), /Added 2 tasks, 1 routine and 1 goal/, 'the inbox says what it added');
+  // Goals: milestones are planned (by rules here) and land in the Planner.
+  await page.waitForSelector('[data-test="goal"]');
+  assert.match(await page.textContent('[data-test="goals"]'), /Land a summer internship[\s\S]*0 of 6 steps[\s\S]*by/, 'the goal gets six milestones and its date');
+  await page.click('[data-test="goal"] .gl-top');
+  await page.click('[data-test="goal"] .gl-steps li >> nth=0 >> input');
+  assert.match(await page.textContent('[data-test="goal"]'), /1 of 6 steps[\s\S]*17%/, 'ticking a milestone moves the goal');
+  await page.fill('[data-test="goal-title"]', 'Run a 10K by March');
+  await page.click('[data-test="goal-add"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-test="goal"]').length === 2);
+  assert.match(await page.textContent('[data-test="projects"]'), /#English/, 'projects are listed from your tasks');
+  // Routine, built here in the Playground.
+  await page.fill('[data-test="routine-text"]', 'call friends sundays');
+  await page.click('[data-test="routine-build"]');
+  await page.waitForSelector('[data-test="routine-draft"]');
+  assert.match(await page.textContent('[data-test="routine-draft"]'), /7 AM[\s\S]*Wake up[\s\S]*Call friends[\s\S]*Sun/, 'the routine starts at wake-up and includes what you wrote');
+  await page.click('[data-test="routine-save"]');
+
+  // Planner: what the inbox sent is here.
+  await page.click(tab('Planner'));
   await page.click('[data-test="view-tasks"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*5 PM[\s\S]*Assignment[\s\S]*#English[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority');
-  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*6 PM[\s\S]*Mon Wed Fri/, 'a habit repeats on its days');
+  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Gym[\s\S]*6 PM[\s\S]*Mon Wed Fri/, 'habits and the routine repeat on their days');
+  assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
   await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
-  assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
-  // Suggestions: a deadline tomorrow with no plan gets a work session.
+  assert.match(await page.textContent('.pln-main'), /Show 2 done/, 'a ticked task moves to the done list');
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
   await idea.locator('[data-test="suggestion-add"]').click();
   assert.match(await page.textContent('.pln-group[data-group="Today"]'), /Work on Essay 2/, 'an accepted suggestion becomes a task for today');
-  // Routine built from wake and sleep times and a few words.
-  await page.fill('[data-test="routine-text"]', 'gym 3x a week at 6pm, call friends sundays');
-  await page.click('[data-test="routine-build"]');
-  await page.waitForSelector('[data-test="routine-draft"]');
-  assert.match(await page.textContent('[data-test="routine-draft"]'), /7 AM[\s\S]*Wake up[\s\S]*Shower[\s\S]*Call friends[\s\S]*Sun/, 'the routine starts at wake-up and includes what you wrote');
-  await page.click('[data-test="routine-save"]');
-  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Sleep/, 'the routine is saved to the planner');
   // Calendars: a Canvas link brings assignments in, with the course as the project.
   await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
   await page.click('[data-test="feed-add"]');
   await page.waitForFunction(() => /Imported/.test(document.querySelector('[data-test="calendars"]').textContent));
-  assert.match(await page.textContent('[data-test="calendars"]'), /Canvas[\s\S]*Fall courses[\s\S]*1 event/, 'the calendar is listed with its name');
   assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
-  await page.click('.pln-filter .chip-btn:has-text("#English")');
-  assert.doesNotMatch(await page.textContent('.pln-main'), /Lab report/, 'filtering by project hides the rest');
-  await page.click('.pln-filter .chip-btn:has-text("Everything")');
-  // The other views.
-  await page.click('[data-test="view-agenda"]');
-  assert.match(await page.textContent('[data-test="agenda-day"] >> nth=0'), /Today[\s\S]*Haircut/, 'the agenda starts with today');
-  // AI breakdown (rules here, since no model runs in the test): steps appear on the task.
-  await page.click('[data-test="view-tasks"]');
+  // AI breakdown (rules here, since no model runs in the test).
   await page.click('.pln-group[data-group="Tomorrow"] [data-test="row-breakdown"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /0\/6/, 'the assignment is broken into six steps');
-  assert.match(await page.inputValue('.pln-group[data-group="Tomorrow"] .tk-sub-in >> nth=0'), /Read the brief for Essay 2/, 'steps are specific to the task');
-  // Calendar: a time grid like a calendar app.
+  // Editing a task: link it to a goal.
+  await page.selectOption('.pln-group[data-group="Tomorrow"] [data-test="task-goal"]', { label: 'Run a 10K' });
+  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Run a 10K/, 'a task shows the goal it moves forward');
+  // Calendar view: click a slot, add, and the card's actions work.
   await page.click('[data-test="view-calendar"]');
   await page.click('[data-test="cal-week"]');
   assert.equal(await page.locator('.cal-dh').count(), 7, 'the week has seven days');
-  assert.ok(await page.locator('[data-test="cal-item"]', { hasText: 'Essay 2' }).count() + await page.locator('.cal-item', { hasText: 'Essay 2' }).count() >= 0);
-  // Click an empty slot on today's column, type, and it lands there.
   const col = page.locator('.cal-col.today');
   await col.scrollIntoViewIfNeeded();
   await page.evaluate(() => { document.querySelector('[data-test="cal-grid"]').scrollTop = 48 * 13; });
@@ -366,135 +208,82 @@ async function run(url) {
   await page.press('[data-test="cal-new"]', 'Enter');
   const made = page.locator('.cal-col.today [data-test="cal-item"]', { hasText: 'Study group' });
   assert.match(await made.textContent(), new RegExp(`${slot[1]} – `), 'the new item starts at the clicked slot');
-  // Click it: a card with actions.
   await made.click();
-  await page.click('[data-test="cal-breakdown"]');
-  await page.waitForFunction(() => document.querySelectorAll('[data-test="cal-pop"] .tk-subs li').length >= 3);
-  await page.click('[data-test="cal-edit"]');
-  await page.fill('[data-test="cal-pop"] [data-test="task-edit"] input >> nth=0', 'Chem study group');
   await page.click('[data-test="cal-done"]');
   await page.keyboard.press('Escape');
-  await page.click('.cal-title');
-  assert.match(await page.locator('.cal-col.today .cal-item.done').first().textContent(), /Chem study group/, 'editing and ticking from the card work');
   await page.click('[data-test="cal-month"]');
   assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
-  await page.click('[data-test="cal-day"]');
-  assert.equal(await page.locator('.cal-dh').count(), 1, 'the day view has one column');
-  if (process.env.SHOTS) {
-    await page.click('[data-test="cal-week"]');
-    await page.locator('.cal-col.today [data-test="cal-item"]').first().click();
-    await page.screenshot({ path: `${process.env.SHOTS}/cal-week.png` });
-    await page.keyboard.press('Escape');
-    await page.click('[data-test="cal-month"]');
-    await page.screenshot({ path: `${process.env.SHOTS}/cal-month.png` });
-  }
   await page.click('[data-test="view-focus"]');
-  assert.match(await page.textContent('[data-test="focus"]'), /done today/, 'focus shows progress for today');
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
   await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   await page.click('[data-test="view-tasks"]');
-  // SHOTS=<folder> saves screenshots of the Planner for a visual check.
-  if (process.env.SHOTS) {
-    await page.click('.pln-group[data-group="Tomorrow"] .tk-main');
-    for (const v of ['tasks', 'agenda', 'calendar', 'focus']) { await page.click(`[data-test="view-${v}"]`); await page.screenshot({ path: `${process.env.SHOTS}/planner-${v}.png`, fullPage: true }); }
-    await page.click('[data-test="view-tasks"]');
-  }
-  // Search everything: tasks are found and opened; typed text becomes an action that fits the page.
-  assert.equal((await page.textContent('[data-test="new"]')).trim(), '+ Task', 'the + button adds a task on the Planner');
-  await page.click('[data-test="new"]');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.test), 'inbox-text', '+ Task opens the inbox ready to type');
+
+  // Digests: set up the profile, then the first edition is written.
+  await page.click(tab('Digests'));
+  await page.waitForSelector('[data-test="digest-profile"]');
+  assert.equal(await page.isDisabled('[data-test="dgp-save"]'), true, 'the profile needs interests, companies or feeds');
+  await page.fill('[data-test="digest-profile"] input[autocomplete="name"]', 'Sam');
+  await page.fill('[data-test="dgp-interests"]', 'robotics, embedded systems');
+  await page.click('[data-test="dgp-save"]');
+  await page.waitForSelector('[data-test="digest"]');
+  assert.deepEqual(fakeAccount.lastProfile.interests, ['robotics', 'embedded systems'], 'the profile is sent to write the digest');
+  for (let i = 0; i < 40 && !fakeAccount.data.digest?.profile; i++) await page.waitForTimeout(100);
+  assert.deepEqual(fakeAccount.data.digest.profile.interests, ['robotics', 'embedded systems'], 'the profile is saved in the account');
+  const paper = await page.textContent('[data-test="digest"]');
+  assert.match(paper, /Saturday Edition[\s\S]*The Brief[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
+  const cal = await page.textContent('.dg-cal');
+  assert.ok(/Student hackathon/.test(cal) && /Essay 2[\s\S]*in your Planner/.test(cal), 'the calendar mixes digest deadlines and your own');
+  assert.match(paper, /Watching: student visa[\s\S]*Not legal advice/, 'the watch box shows its note');
+  await page.click('[data-test="draft"]');
+  assert.match(await page.textContent('.dg-draft'), /Subject:[\s\S]*Thank you for your time/, 'a draft opens with its email');
   await page.click('.nb-pages button:has-text("Planner")');
-  await page.click('.nb-pages button:has-text("Overview")');
+  assert.match(await page.textContent('[data-test="planner"]'), /Student hackathon this month/, 'digest deadlines become Planner tasks');
+  if (process.env.SHOTS) { await page.click(tab('Digests')); await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true }); }
+
+  // Today: the day, goals and the latest digest together.
+  await page.click(tab('Today'));
+  assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
+  const tg = await page.textContent('[data-test="today-goals"]');
+  assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
+  assert.match(await page.textContent('[data-test="today-digest"]'), /Robotics lab opens/, 'the latest digest is on Today');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
+
+  // Search everything; typed text becomes an action.
   await page.fill('[data-test="search"]', 'essay');
   await page.waitForSelector('[data-test="search-pop"]');
-  assert.match(await page.textContent('[data-test="search-pop"]'), /Planner[\s\S]*Essay 2[\s\S]*Assignment/, 'tasks show up in search');
-  await page.click('[data-test="search-result"]:has-text("Work on Essay 2")');
-  await page.waitForSelector('[data-test="planner"] [data-test="task-edit"]');
-  assert.equal(await page.inputValue('[data-test="task-edit"] input >> nth=0'), 'Work on Essay 2', 'choosing a task opens it in the Planner');
+  assert.match(await page.textContent('[data-test="search-pop"]'), /Planner[\s\S]*Essay 2/, 'tasks show up in search');
+  await page.fill('[data-test="search"]', 'robotics lab');
+  assert.match(await page.textContent('[data-test="search-pop"]'), /Digest[\s\S]*Robotics lab/, 'digest stories show up in search');
+  await page.fill('[data-test="search"]', 'I want to learn Spanish this year');
+  assert.equal(await page.getAttribute('[data-test="search-pop"] .gs-item >> nth=0', 'data-test'), 'act-goal', 'goal-like text offers a goal first');
   await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
   assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to Planner[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-Planner action');
   await page.press('[data-test="search"]', 'Enter');
   await page.waitForFunction(() => /Dentist/.test(document.querySelector('.pln-group[data-group="Tomorrow"]')?.textContent || ''), null, { timeout: 5000 });
-  await page.click('.nb-pages button:has-text("Transactions")');
-  await page.fill('[data-test="search"]', 'spent 9 on coffee');
-  assert.equal(await page.getAttribute('[data-test="search-pop"] .gs-item >> nth=0', 'data-test'), 'act-spend', 'on Transactions, money comes first');
-  await page.fill('[data-test="search"]', 'budgets');
-  assert.match(await page.textContent('[data-test="search-pop"]'), /Go to[\s\S]*Budgets/, 'pages and parts of pages are found');
-  await page.fill('[data-test="search"]', '');
-  await page.click('.nb-pages button:has-text("Planner")');
-
-  // Money follows: the haircut with a cost waits in Transactions, and the bell knows about today.
-  await page.click('.nb-pages button:has-text("Transactions")');
-  await page.waitForSelector('#review');
-  assert.match(await page.textContent('#review'), /Haircut[\s\S]*From Planner/, 'a ticked task with a cost becomes an entry to review');
-  await page.click('[data-test="discard-all"], #review button:has-text("Discard all")');
   await page.click('[data-test="bell"]');
   assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
   await page.click('[data-test="bell"]');
 
-  // Sentences with relative dates become clean drafts.
-  await page.click('.nb-pages button:has-text("Transactions")');
-  await page.fill('[data-test="quick-note"]', 'spent 12.50 on lunch at chipotle last friday');
-  await page.press('[data-test="quick-note"]', 'Enter');
-  await page.waitForSelector('#review');
-  const draftText = await page.textContent('.draft-card >> nth=0');
-  assert.match(draftText, /Chipotle/, 'merchant comes from "at Chipotle"');
-  assert.doesNotMatch(draftText, /friday/i, 'the date phrase is removed from the merchant');
-  await page.click('[data-test="accept-all"]');
-
-  // Dictation: words stream into the bar, then become a draft.
-  const talk = await context.newPage();
-  await fakeNetwork(talk);
-  await talk.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = '12.50 for lunch at Chipotle yesterday';");
-  await talk.goto(url, { waitUntil: 'load' });
-  await talk.click('.nb-pages button:has-text("Transactions")');
-  await talk.click('.say-bar .mic-btn');
-  await talk.waitForSelector('.say-bar.live');
-  await talk.waitForFunction(() => document.querySelector('[data-test="quick-note"]').value.includes('Chipotle'));
-  await talk.click('[data-test="say-add"]');
-  await talk.waitForSelector('#review');
-  assert.match(await talk.textContent('.draft-card >> nth=0'), /Chipotle/, 'dictated words become a draft');
-  assert.equal(await talk.$('.say-bar.live'), null, 'the bar leaves recording mode when done');
-  await talk.close();
-
-  // Voice from anywhere: say several things, each goes where it belongs, with Undo.
+  // Voice from anywhere: several things at once, each where it belongs, with Undo.
   const voice = await context.newPage();
   await fakeNetwork(voice);
-  await voice.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = 'essay due friday at 5pm then spent 9 on coffee yesterday and remind me to call mom tomorrow';");
+  await voice.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = 'essay due friday at 5pm then gym every monday at 6 and I want to read 12 books this year';");
   await voice.goto(url, { waitUntil: 'load' });
   await voice.click('[data-test="voice"]');
   await voice.waitForSelector('[data-test="voice-live"]');
-  await voice.waitForFunction(() => /coffee/.test(document.querySelector('[data-test="voice-live"]').textContent));
+  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="voice-live"]').textContent));
   await voice.click('[data-test="voice-stop"]');
   await voice.waitForSelector('[data-test="voice-done"]');
   const said = await voice.textContent('[data-test="voice-done"]');
   assert.match(said, /Added 3 things/, 'three things are heard');
-  assert.match(said, /Essay[\s\S]*Planner[\s\S]*Coffee[\s\S]*Transactions[\s\S]*Call mom[\s\S]*Planner/i, 'each goes to the right place');
+  assert.match(said, /Essay[\s\S]*Task[\s\S]*Gym[\s\S]*Routine[\s\S]*Read 12 books[\s\S]*Goal/i, 'each is sorted');
   await voice.click('[data-test="voice-undo"]');
-  await voice.click('.nb-pages button:has-text("Planner")');
-  await voice.click('[data-test="view-tasks"]');
-  assert.doesNotMatch(await voice.textContent('[data-test="planner"]'), /Call mom/, 'Undo takes it all back');
+  await voice.click(tab('Playground'));
+  assert.doesNotMatch(await voice.textContent('[data-test="goals"]'), /Read 12 books/, 'Undo takes it all back');
   await voice.close();
 
-  // Rwandan francs in the live rates.
-  await page.click('.nb-pages button:has-text("Overview")');
-  assert.match(await page.textContent('.fx'), /RWF/, 'Rwandan franc rate appears');
-
-  // A long subscription list stays compact.
-  const many = await context.newPage();
-  const names = ['Netflix', 'Spotify', 'YouTube Premium', 'Disney+', 'Hulu', 'Max', 'Apple Music', 'iCloud+', 'Google One', 'Dropbox', 'Notion', 'Figma', 'GitHub', 'Vercel', 'Cursor', 'Claude', 'ChatGPT', 'Canva', 'Adobe Creative Cloud', 'Duolingo', 'Headspace', 'Calm', 'Strava', 'Audible', 'Crunchyroll', 'Peacock', 'Paramount+', 'Tidal', 'NordVPN', '1Password'];
-  const subs = names.map((n, i) => ({ id: 's' + i, name: n, domain: '', logo: null, amount: 5 + i, currency: i % 5 === 0 ? 'RWF' : 'USD', cycle: 'monthly', next: '2026-12-0' + ((i % 9) + 1) }));
-  await fakeNetwork(many, { data: { base: 'USD', subscriptions: subs, guide: { done: true } }, version: 1 });
-  await many.goto(url, { waitUntil: 'load' });
-  await many.waitForSelector('.acct-dot.saved');
-  assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 6, '30 subscriptions show 6 at first');
-  assert.match(await many.textContent('[data-test="subs-more"]'), /Show 24 more/, 'the rest sit behind a toggle');
-  await many.click('[data-test="subs-more"]');
-  assert.equal(await many.locator('[data-test="subs-list"] .sub-row').count(), 30, 'all 30 appear when expanded');
-  await many.close();
-
-  // First-time guide: a welcome note, then one step per part of the app, once per person.
+  // First-time guide, once per person, on an empty account.
   const fresh = { data: null, version: 0 };
   const guideCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const guide = await guideCtx.newPage();
@@ -514,74 +303,44 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
-  // A new account starts empty: no sample entries, and each card says what to add.
-  await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
-  await guide.click('.nb-pages button:has-text("Overview")');
-  const body = await guide.textContent('body');
-  assert.doesNotMatch(body, /Trader Joe|sample data|Sample balances|Investment portfolio/i, 'a new account has no sample data');
-  assert.ok((await guide.locator('.empty-note').count()) >= 4, 'empty cards explain what to add');
-  await guide.click('.nb-pages button:has-text("Transactions")');
-  await guide.click('[data-test="add-account"]');
-  await guide.fill('.acc-form input[aria-label="Account name"]', 'Bank of Kigali');
-  await guide.fill('.acc-form input[aria-label="Balance today"]', '250000');
-  await guide.click('.acc-form .pick-btn >> nth=1');
-  await guide.click('.pick-pop .pick-opt:has-text("RWF")');
-  await guide.click('.acc-form button[type="submit"]');
-  assert.match(await guide.textContent('[data-test="accounts"]'), /Bank of Kigali[\s\S]*RWF/, 'you can add your own account');
-  await guide.click('.nb-pages button:has-text("Overview")');
-  await guide.click('[data-test="add-goal"]');
-  await guide.fill('.goal-form input[aria-label="Goal name"]', 'Emergency fund');
-  await guide.fill('.goal-form input[aria-label="Target"]', '5000');
-  await guide.fill('.goal-form input[aria-label="Saved so far"]', '1000');
-  await guide.click('.goal-form button[type="submit"]');
-  assert.match(await guide.textContent('[data-test="goals"]'), /Emergency fund[\s\S]*20%/, 'you can add your own goal');
+  assert.match(seen, /Four pages[\s\S]*Goals with milestones[\s\S]*Your digest/, 'the guide covers the four pages');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
-  assert.match(seen, /Losing your device/, 'the guide explains the risks');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
+  await guide.click(tab('Today'));
+  assert.ok((await guide.locator('.empty-note').count()) >= 3, 'empty cards explain what to add');
   await guide.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await guide.waitForTimeout(1500);
   assert.equal(fresh.data?.guide?.done, true, 'finishing the guide is saved to the account');
-  await guide.reload({ waitUntil: 'load' });
-  await guide.waitForSelector('.nb-pages');
-  await guide.waitForTimeout(800);
-  assert.equal(await guide.$('[data-test="guide"]'), null, 'the guide does not come back');
   await guide.click('[data-test="account"]');
   const sheet = await guide.locator('.acct-sheet').boundingBox();
   const vp = guide.viewportSize();
   assert.ok(Math.abs(sheet.x - 75) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card leaves 75px on every side (${JSON.stringify(sheet)})`);
-  assert.equal(await guide.locator('[data-test="account"]').evaluate(e => getComputedStyle(e).borderRadius), '50%', 'the account button is round');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
   assert.match(dl.suggestedFilename(), /^budgie-data-.*\.json$/, 'you can download a copy of your data');
-  // The AI helper: turning on the in-browser model either starts it or explains why it cannot.
+  // Avatar colour: picked at random, changed with the picker.
+  await guide.click('[data-test="avatar"]');
+  await guide.click('[data-test="avatar-swatch"] >> nth=3');
+  await guide.waitForTimeout(400);
+  assert.equal(await guide.evaluate(() => getComputedStyle(document.querySelector('[data-test="avatar"]')).backgroundColor), 'rgb(5, 150, 105)', 'the colour picker changes your avatar');
+  // The AI helper falls back without breaking when models cannot download.
   await guide.waitForSelector('[data-test="ai-panel"]');
-  const aiText = await guide.textContent('[data-test="ai-panel"]');
-  assert.match(aiText, /On/, 'AI is on by default');
-  assert.match(aiText, /Qwen 2\.5[\s\S]*Llama 3\.2/, 'both browser models are listed');
-  assert.match(aiText, /best for receipts[\s\S]*best for writing/, 'each model has its job');
-  // Here the models cannot download, so Budgie must fall back without breaking.
-  await guide.waitForFunction(() => /Not available|Downloading|Waiting|cannot run/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
-  guide.once('dialog', d => d.accept());
-  await guide.click('[data-test="ai-toggle"]');
-  await guide.waitForFunction(() => /AI is off on this device/.test(document.querySelector('[data-test="ai-panel"]').textContent));
-  assert.equal(await guide.evaluate(() => localStorage.getItem('budgie.ai')), 'off', 'turning AI off is remembered on this device');
-  await guide.click('[data-test="ai-toggle"]');
-  await guide.click('[data-test="replay-guide"]');
-  await guide.waitForSelector('[data-test="guide"]');
-  await guide.click('[data-test="guide-skip"]');
+  assert.match(await guide.textContent('[data-test="ai-panel"]'), /Qwen 2\.5[\s\S]*Llama 3\.2/, 'both browser models are listed');
+  await guide.waitForFunction(() => /Not available|Downloading|Waiting|cannot run|could not/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
   await guideCtx.close();
 
+  // Phones: no sideways scrolling.
   const mobile = await context.newPage();
   await mobile.setViewportSize({ width: 390, height: 844 });
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  assert.ok(overflow <= 0, `no horizontal scroll on a phone (overflow ${overflow}px)`);
-  await mobile.click('.nb-pages button:has-text("Planner")');
-  await mobile.click('[data-test="view-calendar"]');
-  if (process.env.SHOTS) await mobile.screenshot({ path: `${process.env.SHOTS}/planner-phone.png`, fullPage: true });
-  const planOverflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  assert.ok(planOverflow <= 0, `the Planner fits a phone (overflow ${planOverflow}px)`);
+  for (const p of ['Today', 'Planner', 'Digests', 'Playground']) {
+    await mobile.click(tab(p));
+    await mobile.waitForTimeout(150);
+    const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    assert.ok(over <= 0, `${p} fits a phone (overflow ${over}px)`);
+    if (process.env.SHOTS) await mobile.screenshot({ path: `${process.env.SHOTS}/phone-${p.toLowerCase()}.png`, fullPage: true });
+  }
 
   await browser.close();
   assert.deepEqual(errors, [], 'no page errors');

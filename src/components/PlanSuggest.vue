@@ -5,13 +5,15 @@ import { suggestions, plannerFacts } from '../lib/suggest';
 import { makeTask, today } from '../lib/tasks';
 import { ai, aiSuggestTasks } from '../lib/ai';
 import Icon from './Icon.vue';
+import { planGoal } from '../lib/goals';
 
-// Ideas Budgie spots from your planner, money and goals. One tap to add.
+// Ideas Budgie spots from your planner and goals. One tap to add.
 const extra = ref([]);
 const asking = ref(false);
 const note = ref('');
 function accept(s) {
   if (s.run) s.run();
+  if (s.goal) planGoal(s.goal);
   if (s.task) store.tasks.unshift(makeTask({ ...s.task, source: 'suggestion' }));
   store.dismissed.push(s.id);
 }

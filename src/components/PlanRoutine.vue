@@ -33,7 +33,7 @@ function save() {
 </script>
 
 <template>
-  <section class="pln-card" id="routine" data-test="routine">
+  <section class="pln-card card cell" id="routine" data-test="routine">
     <div class="pln-card-head"><h3>Routine</h3><span class="muted small">{{ has ? `${has} daily habits` : labelFor('plan') }}</span></div>
     <div class="pln-routine-in">
       <label class="tk-f"><span>Wake up</span><input v-model="r.wake" type="time" /></label>

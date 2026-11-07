@@ -43,13 +43,12 @@ npm run dev
 - Vue 3 single-file components with `<script setup>`.
 - Plain CSS in `src/styles.css`; reuse the existing tokens and patterns.
 - Write user-facing text in plain language. Prefer short sentences, active voice and specific wording.
-- Keep data processing in the browser. Budgie has no backend by design.
+- Keep personal data in the person's account. The Worker fetches only what the person asked for (calendars, digest sources) and never logs links or profiles.
 
-## Adding companies, banks or currencies
+## Adding digest sources or goal templates
 
-- **Companies:** add a line to `src/data/directory.js` as `Name|domain|Category|aliases`. Leave the domain empty for places without a website.
-- **Banks:** add an entry to `src/data/banks.js` with links to the bank's own pages. Do not hard-code interest rates.
-- **Currencies:** add the code to the pickers in `RatesCell.vue`, `ReviewQueue.vue` and `SubscriptionSearch.vue`, and to `detectCurrency` in `src/lib/parse.js`.
+- **Digest sources:** add free, public sources in `worker/digest.js` (`collect`). Every address must pass `checkFeedUrl`; keep sizes capped and do not add sources that need an API key.
+- **Goal milestones:** add a rule to `ruleMilestones` in `src/lib/goals.js`, with a unit test in `tests/unit/run.mjs`.
 
 ## Reporting security issues
 

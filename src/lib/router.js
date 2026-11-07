@@ -1,58 +1,36 @@
-// The Playground's inbox: write or say anything, one thing per line, and
-// Budgie decides where each line goes: the Planner (things to do), Transactions
-// (money already spent or received), the money plan (amounts that repeat), or
-// more than one. You can change any choice before sending.
+// The Playground's inbox (and voice): write or say anything, one thing per
+// line, and Budgie decides what each line is: a task (or event, class,
+// deadline), a routine (something that repeats), or a life goal. You can
+// change any choice before sending.
 import { store, newId } from './store';
-import { parseTask, makeTask, splitLines, dayLabel, timeLabel, today, KINDS } from './tasks';
-import { captureNote, enrich } from './capture';
-import { parseChunk } from './plan';
-import { guessCategory } from './categorize';
+import { parseTask, makeTask, splitLines, dayLabel, timeLabel, today, KINDS, DAY_SHORT } from './tasks';
+import { parseGoal, makeGoal, planGoal, GOAL_WORDS } from './goals';
 
 export const DESTS = {
-  planner: { label: 'Planner', icon: 'planner' },
-  money: { label: 'Transactions', icon: 'wallet' },
-  plan: { label: 'Money plan', icon: 'shapes' },
+  task: { label: 'Task', icon: 'planner' },
+  routine: { label: 'Routine', icon: 'repeat' },
+  goal: { label: 'Goal', icon: 'target' },
 };
-const PAST = /\b(spent|paid|bought|got paid|received|earned|cost me|yesterday|last (night|week)|this morning|today i|just)\b/i;
-const RECURRING = /\b(salary|rent|income|per month|a month|monthly|a week|weekly|a year|yearly|every month|subscription|save \d|saving|budget|fund)\b/i;
-const TODO = /^(remember|remind|todo|to do|need to|have to|call|email|text|finish|submit|study|review|buy|book|clean|pay|renew|cancel|apply|send|pick up|meet|go to|plan)\b/i;
 
-// Read one line three ways and pick where it belongs.
+// Read one line and pick what it is.
 export function route(line) {
   const text = line.trim();
   const task = parseTask(text);
-  // Money only counts when it is clear: "$25", "25 dollars", or words like spent, salary, rent.
-  // ("Essay 2" and "6pm" are not prices.)
-  // A label and an amount on its own ("rent 1450", "groceries maybe 400") is money too.
-  const bare = /^[\p{L}][\p{L}\s&'’.+-]*?\s+(maybe |about |around |roughly )?\$?\d[\d,]*(\.\d+)?\s*k?(\s*(a|per|\/)\s*(month|week|year|day|mo|yr|wk))?$/iu.test(text) && !/\b(am|pm)$/i.test(text);
-  const moneyish = bare || /\$\s?\d|\d\s?(usd|dollars?|bucks|rwf|eur|gbp|k)\b|\b(spent|paid|bought|cost|costs|salary|income|rent|budget|save|saving|earned|received|bill|subscription)\b/i.test(text);
-  const spend = moneyish ? captureNote(text, store.base)[0] || null : null;
-  const planItem = moneyish ? parseChunk(text) : null;
-  const dest = new Set();
-  const future = task.date && task.date >= today() && !PAST.test(text);
-  const doing = future || task.time || task.repeat || TODO.test(text) || task.kind !== 'task';
-  if (spend && PAST.test(text)) dest.add('money');
-  else if (planItem?.amount && (RECURRING.test(text) || bare || /\bby\s+[a-z]{3,9}\b/i.test(text)) && !task.date) dest.add('plan');
-  if (doing && !(dest.has('plan') && !future)) dest.add('planner');
-  // Something to do that costs money: a task with that cost (ticking it adds the entry).
-  if (dest.has('planner') && !task.cost && spend && /\$|dollars|bucks|\bcosts?\b/i.test(text) && !dest.has('money')) task.cost = Math.abs(spend.amount);
-  if (!dest.size) dest.add(spend ? 'money' : 'planner');
-  const why = dest.has('money') && dest.has('planner') ? 'Done and spent: logged, and kept in your planner'
-    : dest.has('money') ? 'Money already spent or received'
-      : dest.has('plan') && dest.has('planner') ? 'A repeating amount and something to do'
-        : dest.has('plan') ? 'An amount that repeats: goes in your money plan'
-          : task.cost ? 'Something to do that costs money: logged when you tick it'
-            : 'Something to do';
-  return { id: newId(), text, dest: [...dest], task, spend, planItem, why };
+  const goal = parseGoal(text);
+  let dest = 'task';
+  if (task.repeat) dest = 'routine';
+  else if (GOAL_WORDS.test(text) && !task.time) dest = 'goal';
+  const why = { task: task.date ? 'Something to do on a day' : 'Something to do', routine: 'Something that repeats', goal: 'Something you are working towards: Budgie adds milestones' }[dest];
+  return { id: newId(), text, dest, task, goal, why };
 }
-// Comma lists of amounts ("rent 1500, groceries 450") become one line each.
-const splitCommas = line => { const parts = line.split(/,(?!\d{3}\b)/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => /\d/.test(x)) ? parts : [line]; };
+// Comma lists ("gym mwf 6pm, call mom sundays") become one line each when every part has a time or day.
+const splitCommas = line => { const parts = line.split(/,\s*/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => parseTask(x).date || parseTask(x).repeat || parseTask(x).time) ? parts : [line]; };
 export const routeAll = text => splitLines(text).flatMap(splitCommas).map(route);
 
 // Speech has no line breaks. Split at sentence ends, "then", "also", "after
-// that", and at "and" when what follows starts a new thing ("and spent 9 on
-// coffee", "and remind me to..."), but not inside "call mom and dad".
-const STARTS = "(?:i |i've |i have |i need |i spent|spent|paid|bought|got |remind|remember|need to|have to|call|email|text|pay|buy|book|study|finish|submit|start|go to|meet|meeting|gym|my |add|schedule|salary|rent|save)";
+// that", and at "and" when what follows starts a new thing ("and remind me
+// to…", "and gym on Monday"), but not inside "call mom and dad".
+const STARTS = "(?:i |i've |i have |i need |i want |remind|remember|need to|have to|call|email|text|pay|buy|book|study|finish|submit|start|go to|meet|meeting|gym|my |add|schedule|learn|read|run|clean)";
 const AND_SPLIT = new RegExp(`,?\\s+and\\s+(?=${STARTS})`, 'gi');
 export function splitSpoken(text) {
   return String(text)
@@ -63,53 +41,39 @@ export function splitSpoken(text) {
     .map(s => s.trim().replace(/^(add|remind me to|remember to)\s+/i, '').replace(/[.,;]+$/, ''))
     .filter(s => s.length > 1);
 }
-export const routeSpoken = text => splitSpoken(text).flatMap(splitCommas).map(route);
+export const routeSpoken = text => splitSpoken(text).map(route);
 
-// A short description of what each destination will receive.
+// What each choice will create.
 export function preview(r, d) {
-  if (d === 'planner') return [KINDS[r.task.kind].label, r.task.title, r.task.date && dayLabel(r.task.date), r.task.time && timeLabel(r.task.time), r.task.repeat && 'repeats', r.task.cost && `$${r.task.cost} when done`].filter(Boolean).join(' · ');
-  if (d === 'money') return r.spend ? `${r.spend.merchant || 'Entry'} · ${Math.abs(r.spend.amount)} ${r.spend.currency} · ${r.spend.category}` : 'No amount found';
-  return r.planItem ? `${r.planItem.label} · ${r.planItem.group} · $${Math.round(r.planItem.monthly || 0)} a month` : 'No amount found';
+  const t = r.task;
+  if (d === 'goal') return [r.goal.title, r.goal.by ? `by ${dayLabel(r.goal.by)}` : 'no date', 'milestones added for you'].join(' · ');
+  const when = t.repeat ? (t.repeat.every === 'day' ? 'every day' : t.repeat.every === 'weekdays' ? 'weekdays' : t.repeat.every === 'month' ? 'monthly' : t.repeat.days?.map(x => DAY_SHORT[x]).join(' ')) : t.date && dayLabel(t.date);
+  return [d === 'routine' ? 'Routine' : KINDS[t.kind].label, t.title, when, t.time && timeLabel(t.time), t.project && `#${t.project}`].filter(Boolean).join(' · ');
 }
-export const canSend = (r, d) => (d === 'money' ? Boolean(r.spend) : d === 'plan' ? Boolean(r.planItem?.amount) : true);
 
-// Send the lines where they were routed. Returns counts per destination.
+// Send the lines. Returns what was made, for the note and for Undo.
 export async function sendAll(list) {
-  const n = { planner: 0, money: 0, plan: 0, made: [], incomeBefore: store.plan.income };
-  let income = 0;
+  const n = { task: 0, routine: 0, goal: 0, made: [] };
   for (const r of list) {
-    for (const d of r.dest) {
-      if (!canSend(r, d)) continue;
-      if (d === 'planner') {
-        const p = r.task;
-        const done = r.dest.includes('money');
-        const t = makeTask({ title: p.title, date: p.date || (done ? today() : ''), time: p.time, mins: p.mins, repeat: p.repeat, priority: p.priority, project: p.project, kind: p.kind, cost: done ? null : p.cost, costCategory: p.cost ? guessCategory(p.title, -1) : '', done: done && !p.repeat, doneAt: done ? new Date().toISOString() : null, source: 'playground' });
-        store.tasks.unshift(t);
-        n.made.push({ to: 'planner', id: t.id, label: t.title, sub: [t.date && dayLabel(t.date), t.time && timeLabel(t.time), t.repeat && 'repeats'].filter(Boolean).join(' · ') });
-      } else if (d === 'money') {
-        const e = { id: newId(), ...(await enrich(r.spend)) };
-        store.drafts.unshift(e);
-        n.made.push({ to: 'money', id: e.id, label: e.merchant || 'Entry', sub: `${Math.abs(e.amount)} ${e.currency} · ${e.category}` });
-      } else if (d === 'plan') {
-        // Income sets the plan's monthly income; everything else is a line in the plan.
-        if (r.planItem.group === 'Income') income += Number(r.planItem.monthly) || 0;
-        else {
-          store.plan.items.push({ ...r.planItem, manual: true });
-          n.made.push({ to: 'plan', id: r.planItem.id, label: r.planItem.label, sub: `$${Math.round(r.planItem.monthly || 0)} a month` });
-        }
-      }
-      n[d]++;
+    const p = r.task;
+    if (r.dest === 'goal') {
+      const g = makeGoal({ title: r.goal.title, by: r.goal.by });
+      await planGoal(g);
+      n.made.push({ to: 'goal', id: g.id, label: g.title, sub: `${g.milestones.length} milestones${g.by ? ` · by ${dayLabel(g.by)}` : ''}` });
+    } else {
+      const routine = r.dest === 'routine';
+      const t = makeTask({ title: p.title, date: p.date || (routine ? today() : ''), time: p.time, mins: p.mins, repeat: routine ? (p.repeat || { every: 'day' }) : null, priority: p.priority, project: p.project, kind: routine && p.kind === 'task' ? 'routine' : p.kind, source: 'playground' });
+      store.tasks.unshift(t);
+      n.made.push({ to: r.dest, id: t.id, label: t.title, sub: preview({ ...r, task: { ...p, repeat: t.repeat } }, r.dest).split(' · ').slice(2).join(' · ') });
     }
+    n[r.dest]++;
   }
-  if (income) store.plan.income = Math.round(income);
   return n;
 }
 
-// Take back everything one send created.
+// Take back everything one send created (goals take their milestone tasks with them).
 export function undoSend(n) {
   const ids = new Set(n.made.map(m => m.id));
-  store.tasks = store.tasks.filter(t => !ids.has(t.id));
-  store.drafts = store.drafts.filter(d => !ids.has(d.id));
-  store.plan.items = store.plan.items.filter(i => !ids.has(i.id));
-  store.plan.income = n.incomeBefore;
+  store.goals = store.goals.filter(g => !ids.has(g.id));
+  store.tasks = store.tasks.filter(t => !ids.has(t.id) && !ids.has(t.goalId));
 }

@@ -88,12 +88,11 @@ async function main() {
     await owner.page.waitForSelector('.nb-pages');
     assert.equal(new URL(owner.page.url()).hash, '', 'the invite token is removed from the address bar');
 
-    // Spending added on one device is saved to the account.
-    await owner.page.click('.nb-pages button:has-text("Transactions")');
-    await owner.page.fill('[data-test="quick-note"]', 'coffee 4.50 at Blue Bottle today');
-    await owner.page.press('[data-test="quick-note"]', 'Enter');
-    await owner.page.waitForSelector('[data-test="accept-all"]');
-    await owner.page.click('[data-test="accept-all"]');
+    // A task added on one device is saved to the account.
+    await owner.page.click('.nb-pages button:has-text("Playground")');
+    await owner.page.fill('[data-test="inbox-text"]', 'Call Blue Bottle about the internship tomorrow');
+    await owner.page.waitForSelector('[data-test="inbox-rows"] li');
+    await owner.page.click('[data-test="inbox-send"]');
     await owner.page.waitForFunction(async () => {
       const r = await fetch('/api/data');
       return JSON.stringify((await r.json()).data || {}).includes('Blue Bottle');
@@ -107,8 +106,8 @@ async function main() {
     assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'the session ends on sign-out');
     await owner.page.click('[data-test="sign-in"]');
     await owner.page.waitForSelector('.nb-pages');
-    await owner.page.click('.nb-pages button:has-text("Transactions")');
-    await owner.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
+    await owner.page.click('.nb-pages button:has-text("Planner")');
+    await owner.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
 
     // The owner invites someone.
     await owner.page.click('[data-test="account"]');
@@ -138,10 +137,17 @@ async function main() {
     const alexData = await getJSON(alex.page, '/api/data');
     assert.ok(!JSON.stringify(alexData.body).includes('Blue Bottle'), 'people do not see each other\'s data');
     assert.equal((await getJSON(alex.page, '/api/people')).status, 403, 'members cannot manage people');
-    const markets = await getJSON(alex.page, '/api/markets');
-    assert.equal(markets.status, 200, 'signed-in people get market data');
-    assert.ok(Array.isArray(markets.body.indexes) && Array.isArray(markets.body.news), 'market data has indexes and news, even when Yahoo cannot be reached');
-    assert.equal((await fetch(`${base}/api/markets`)).status, 401, 'market data is only for signed-in people');
+    // Digests: each person has their own; a profile is needed to write one.
+    const none = await getJSON(alex.page, '/api/digests');
+    assert.equal(none.status, 200, 'signed-in people can list their digests');
+    assert.deepEqual(none.body, { list: [], latest: null }, 'a new person has no digests');
+    const send = body => alex.page.evaluate(async b => { const r = await fetch('/api/digests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return { status: r.status, body: await r.json() }; }, body);
+    assert.equal((await send({ profile: {} })).status, 400, 'an empty profile is refused');
+    const wrote = await send({ profile: { name: 'Alex', interests: ['robotics'], lookingFor: ['events'], feeds: ['https://localhost/feed'] }, timeZone: 'America/New_York' });
+    assert.equal(wrote.status, 200, 'a digest is written even when sources cannot be reached');
+    assert.match(wrote.body.edition, /Edition$/, 'the edition is named after the day');
+    assert.equal((await getJSON(alex.page, '/api/digests')).body.list.length, 1, 'the edition is stored');
+    assert.equal((await fetch(`${base}/api/digests`)).status, 401, 'digests are only for signed-in people');
 
     // An invite works only once.
     const late = await personPage(browser);
@@ -159,8 +165,8 @@ async function main() {
     await laptop.page.waitForSelector('text=Add this device, Willy');
     await laptop.page.click('[data-test="create-passkey"]');
     await laptop.page.waitForSelector('.nb-pages');
-    await laptop.page.click('.nb-pages button:has-text("Transactions")');
-    await laptop.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
+    await laptop.page.click('.nb-pages button:has-text("Planner")');
+    await laptop.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
     await laptop.context.close();
 
     // Lost every device: a recovery code leads to a new passkey.
@@ -175,8 +181,8 @@ async function main() {
     await lost.page.waitForSelector('text=Recovery code accepted. 7 codes left');
     await lost.page.click('[data-test="create-passkey"]');
     await lost.page.waitForSelector('.nb-pages');
-    await lost.page.click('.nb-pages button:has-text("Transactions")');
-    await lost.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
+    await lost.page.click('.nb-pages button:has-text("Planner")');
+    await lost.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
     await lost.page.click('[data-test="account"]');

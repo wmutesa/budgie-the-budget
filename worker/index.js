@@ -7,6 +7,7 @@ import {
 } from '@simplewebauthn/server';
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
+import { makeDigest, cleanProfile } from './digest.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -18,6 +19,8 @@ const RECOVERY_LINK_MS = 15 * 60 * 1000;
 const MAX_FAILED_RECOVERIES = 10; // per network address per hour
 const OPEN_PER_HOUR = 120; // sign-in and invite requests per network address per hour
 const CALENDAR_PER_HOUR = 60; // calendar imports per person per hour
+const DIGESTS_PER_HOUR = 6; // "Generate now" per person per hour
+const DIGESTS_KEPT = 30; // editions kept per person
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -90,92 +93,29 @@ async function countFailure(env, key) {
   ).bind(key, now()).run();
 }
 
-// ---------- markets and news (Yahoo Finance) ----------
-// Fetched here because Yahoo does not allow browsers to call it directly.
-// Cached for 15 minutes so Budgie asks Yahoo rarely.
-const MARKET_TTL = 15 * 60;
-const INDEXES = [
-  ['^GSPC', 'S&P 500', 'The 500 largest US companies'],
-  ['^IXIC', 'Nasdaq', 'US tech-heavy index'],
-  ['^DJI', 'Dow Jones', '30 large US companies'],
-  ['^TNX', '10-year Treasury yield', 'What the US government pays to borrow; moves mortgage and savings rates'],
-  ['GC=F', 'Gold', 'Often rises when markets are nervous'],
-  ['BTC-USD', 'Bitcoin', 'Very volatile'],
-];
-const WATCH = [
-  ['VTI', 'US stock market', 'One fund that owns almost every US company'],
-  ['VXUS', 'International stocks', 'Companies outside the US'],
-  ['EEM', 'Emerging markets', 'Faster-growing economies such as India, Brazil and Taiwan; higher risk'],
-  ['QQQ', 'Tech leaders', 'The 100 largest Nasdaq companies'],
-  ['VNQ', 'Real estate', 'Property companies that pay rent-based dividends'],
-  ['BND', 'Bonds', 'Steadier, lower growth; balances stocks'],
-];
-const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; Budgie/1.0)', Accept: 'application/json,text/xml;q=0.9,*/*;q=0.8' };
-
-async function yahooChart(symbol, range) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=${range}&interval=1d`;
-  const res = await fetch(url, { headers: YAHOO_HEADERS, cf: { cacheTtl: MARKET_TTL } });
-  if (!res.ok) throw new Error(`Yahoo ${res.status}`);
-  const r = (await res.json())?.chart?.result?.[0];
-  const closes = (r?.indicators?.quote?.[0]?.close || []).filter(v => typeof v === 'number');
-  if (!closes.length) throw new Error('no data');
-  const price = r.meta?.regularMarketPrice ?? closes[closes.length - 1];
-  const prev = r.meta?.chartPreviousClose ?? closes[0];
-  return { closes, price, prev, currency: r.meta?.currency || 'USD' };
-}
-const pctChange = (a, b) => (b ? Math.round(((a - b) / b) * 1000) / 10 : null);
-
-async function marketRow([symbol, name, about], withYear) {
-  try {
-    const month = await yahooChart(symbol, '1mo');
-    const year = withYear ? await yahooChart(symbol, '1y').catch(() => null) : null;
-    const c = month.closes;
-    const day = pctChange(month.price, c.length > 1 ? c[c.length - 2] : month.prev);
-    return {
-      symbol, name, about, price: Math.round(month.price * 100) / 100, currency: month.currency,
-      day, month: pctChange(month.price, c[0]), year: year ? pctChange(year.price, year.closes[0]) : null,
-      spark: c.slice(-22).map(v => Math.round(v * 100) / 100),
-    };
-  } catch { return null; }
-}
-
-function parseRss(xml) {
-  const out = [];
-  const tag = (s, t) => (s.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '';
-  const clean = s => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
-  for (const item of xml.split('<item').slice(1)) {
-    const title = clean(tag(item, 'title'));
-    const link = clean(tag(item, 'link'));
-    if (!title || !/^https:\/\/[^\s]+$/.test(link)) continue;
-    out.push({ title: title.slice(0, 200), link, source: clean(tag(item, 'source')).slice(0, 60) || 'Yahoo Finance', date: clean(tag(item, 'pubDate')) });
-  }
-  return out;
-}
-
-async function yahooNews() {
-  const feeds = [
-    'https://finance.yahoo.com/news/rssindex',
-    'https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC,%5EIXIC,VTI&region=US&lang=en-US',
-  ];
-  const seen = new Set();
-  const items = [];
-  for (const url of feeds) {
-    try {
-      const res = await fetch(url, { headers: YAHOO_HEADERS, cf: { cacheTtl: MARKET_TTL } });
-      if (!res.ok) continue;
-      for (const n of parseRss(await res.text())) if (!seen.has(n.title)) { seen.add(n.title); items.push(n); }
-    } catch { /* try the next feed */ }
-  }
-  return items.sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)).slice(0, 12);
-}
-
-async function marketsPayload() {
-  const [indexes, watch, news] = await Promise.all([
-    Promise.all(INDEXES.map(r => marketRow(r, false))),
-    Promise.all(WATCH.map(r => marketRow(r, true))),
-    yahooNews(),
+// ---------- digests ----------
+// Write one edition for a person and keep the latest few.
+async function writeDigestFor(env, userId, profile, timeZone = 'UTC') {
+  const prev = await env.DB.prepare('SELECT data FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT 1').bind(userId).first();
+  const edition = await makeDigest(profile, prev ? JSON.parse(prev.data) : null, { timeZone });
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO digests (user_id, id, data, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at').bind(userId, edition.id, JSON.stringify(edition), now()),
+    env.DB.prepare('DELETE FROM digests WHERE user_id = ? AND id NOT IN (SELECT id FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT ?)').bind(userId, userId, DIGESTS_KEPT),
   ]);
-  return { indexes: indexes.filter(Boolean), watch: watch.filter(Boolean), news, updatedAt: new Date().toISOString(), source: 'Yahoo Finance' };
+  return edition;
+}
+// Mondays and Thursdays (see wrangler.jsonc): a new edition for everyone whose
+// digest profile is set up and on automatic. The profile lives in their own
+// account data.
+async function scheduledDigests(env) {
+  const rows = await env.DB.prepare('SELECT user_id, data FROM user_data').all();
+  for (const r of (rows.results || []).slice(0, 50)) {
+    try {
+      const d = JSON.parse(r.data)?.digest;
+      if (!d?.profile || d.profile.auto === false) continue;
+      await writeDigestFor(env, r.user_id, cleanProfile(d.profile), d.timeZone || 'UTC');
+    } catch (e) { console.error('digest failed', e?.message); }
+  }
 }
 
 // ---------- sessions ----------
@@ -396,6 +336,7 @@ async function routes(request, env, url) {
       env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM digests WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(user.id),
       env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(user.id),
     ]);
@@ -436,6 +377,29 @@ async function routes(request, env, url) {
     return source ? modelResponse(request, source) : fail(404, 'Not found');
   }
 
+  // --- digests: list, read, generate now ---
+  if (path === '/api/digests' && method === 'GET') {
+    const rows = await env.DB.prepare('SELECT id, data FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT ?').bind(user.id, DIGESTS_KEPT).all();
+    const list = (rows.results || []).map(r => { const d = JSON.parse(r.data); return { id: r.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader }; });
+    const latest = rows.results?.[0] ? JSON.parse(rows.results[0].data) : null;
+    return json({ list, latest });
+  }
+  const one = path.match(/^\/api\/digests\/(\d{4}-\d{2}-\d{2})$/);
+  if (one && method === 'GET') {
+    const row = await env.DB.prepare('SELECT data FROM digests WHERE user_id = ? AND id = ?').bind(user.id, one[1]).first();
+    return row ? json(JSON.parse(row.data)) : fail(404, 'No such edition');
+  }
+  if (path === '/api/digests' && method === 'POST') {
+    const key = `digest:${user.id}`;
+    if (await tooManyAttempts(env, key, DIGESTS_PER_HOUR)) return fail(429, 'You made several digests this hour. Try again later.');
+    await countFailure(env, key);
+    const { profile, timeZone } = await body(request);
+    const p = cleanProfile(profile || {});
+    if (!p.interests.length && !p.companies.length && !p.feeds.length) return fail(400, 'Add a few interests, companies or feeds to your digest profile first.');
+    const edition = await writeDigestFor(env, user.id, p, timeZone);
+    return json(edition);
+  }
+
   // --- calendar import for the Planner: the link stays in the person's data; it is never logged ---
   if (path === '/api/calendar' && method === 'POST') {
     const key = `cal:${user.id}`;
@@ -449,20 +413,6 @@ async function routes(request, env, url) {
       if (e.name === 'TimeoutError' || e instanceof TypeError) return fail(502, 'The calendar could not be reached. Check the link and try again.');
       return fail(e.status || 400, String(e.message || 'The calendar could not be read.'));
     }
-  }
-
-  // --- markets and news ---
-  if (path === '/api/markets' && method === 'GET') {
-    const cache = caches.default;
-    const key = new Request(`${url.origin}/__cache/markets-v1`);
-    const hit = await cache.match(key);
-    if (hit) return new Response(hit.body, { headers: { ...API_HEADERS } });
-    const payload = await marketsPayload();
-    const res = json(payload);
-    if (payload.indexes.length || payload.news.length) {
-      await cache.put(key, new Response(JSON.stringify(payload), { headers: { 'Content-Type': 'application/json', 'Cache-Control': `max-age=${MARKET_TTL}` } }));
-    }
-    return res;
   }
 
   // --- recovery codes ---
@@ -540,6 +490,7 @@ async function routes(request, env, url) {
         env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(id),
+        env.DB.prepare('DELETE FROM digests WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(id),
         env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(id),
       ]);
@@ -562,5 +513,8 @@ export default {
       }
     }
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(scheduledDigests(env));
   },
 };

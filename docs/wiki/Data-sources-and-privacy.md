@@ -1,23 +1,15 @@
 # Data sources and privacy
 
-## Where your data lives
-In your account, in Budgie's Cloudflare D1 database, with a copy in your browser so the app opens instantly and works offline. Budgie is invite-only and each person sees only their own data. Sign-in uses passkeys; only hashes of session cookies and invite links are stored. Signing out removes this device's copy.
+Budgie reaches these services. Nothing else is allowed by the site's security policy.
 
-## What Budgie connects to
-
-| Service | Why |
+| Service | What it is for |
 | --- | --- |
-| Budgie's own server (Cloudflare Worker and D1) | Sign-in, invites and syncing your data |
-| ExchangeRate-API (open.er-api.com) | Live exchange rates |
-| Frankfurter (ECB rates) | Backup exchange rates |
-| Wikidata | Looking up companies and their websites |
-| Google favicon service | Company logos |
-| Google Fonts | Fonts |
-| jsDelivr | Files for reading receipt photos |
-| Hugging Face and GitHub | One-time download of the optional in-browser AI model |
-| Ollama on your computer (localhost) | Optional AI for receipts and suggestions |
+| Budgie's own server (Cloudflare) | Your account, sync, calendar imports, digests and AI model files |
+| Google News (RSS), Greenhouse and Lever job boards, feeds you add | Digest sources, fetched by Budgie's server with your interests as search words |
+| Calendar links you add (Canvas, Google, Apple, Outlook) | Planner imports, fetched by Budgie's server |
+| Hugging Face and GitHub (through Budgie's server) | The in-browser AI models, downloaded once |
+| jsDelivr (one exact package version) | The processor engine for the in-browser AI |
+| Google Gemini (only if you add your own key) | "Research deeper" in Digests |
+| Ollama on your computer (localhost) | Optional AI |
 
-The site's Content Security Policy blocks every other destination.
-
-## Sample data
-Account balances and the year's history are sample data until real accounts are connected. Rates and company details are always live.
+Your digest profile and calendar links are saved in your private account. Search words built from your interests are sent to Google News when a digest is written; nothing else about you is sent to the digest sources.

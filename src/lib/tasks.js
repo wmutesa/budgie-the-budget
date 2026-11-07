@@ -1,18 +1,17 @@
 // The Planner's engine: tasks, routines, classes, assignments and events, with
-// repeats, streaks, a priority score and links to money. Everything here is
+// repeats, streaks, a priority score and links to goals. Everything here is
 // plain rules that run on the device; the AI only adds on top (see ai.js).
 //
 // A task: {
-//   id, title, notes, kind: task | assignment | exam | class | event | routine | bill,
+//   id, title, notes, kind: task | assignment | exam | class | event | routine,
 //   date: 'YYYY-MM-DD' or '', time: 'HH:MM' or '', mins: number or null,
 //   priority: high | medium | low, project: '',
 //   repeat: null or { every: day | weekdays | week | month, days: [0-6], until: 'YYYY-MM-DD' },
 //   done, doneAt, doneDates: [dates done, for repeating tasks],
-//   subtasks: [{ id, title, done }], cost: number or null, costCategory: '',
+//   subtasks: [{ id, title, done }], goalId: the life goal it moves forward,
 //   source: you | ai | routine | calendar | suggestion, feedId, uid, createdAt,
 // }
 import { store, newId } from './store';
-import { guessCategory } from './categorize';
 
 export const KINDS = {
   task: { label: 'Task', color: '#52525b' },
@@ -21,7 +20,6 @@ export const KINDS = {
   class: { label: 'Class', color: '#2563eb' },
   event: { label: 'Event', color: '#d97706' },
   routine: { label: 'Routine', color: '#16a34a' },
-  bill: { label: 'Bill', color: '#0d9488' },
 };
 export const PRIORITIES = ['high', 'medium', 'low'];
 const DAY_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -56,7 +54,7 @@ export function makeTask(fields = {}) {
   return {
     id: newId(), title: 'New task', notes: '', kind: 'task', date: '', time: '', mins: null,
     priority: 'medium', project: '', repeat: null, done: false, doneAt: null, doneDates: [],
-    subtasks: [], cost: null, costCategory: '', source: 'you', createdAt: new Date().toISOString(),
+    subtasks: [], source: 'you', createdAt: new Date().toISOString(),
     ...fields,
   };
 }
@@ -66,7 +64,6 @@ const KIND_RULES = [
   ['exam', /\b(exam|midterm|final exam|finals|quiz|test)\b/i],
   ['assignment', /\b(assignment|essay|homework|hw|problem set|pset|lab report|paper|report|project due|submission|submit|reading response|discussion post)\b/i],
   ['class', /\b(class|lecture|seminar|lab|tutorial|program|workshop|course|attendance|attend|practice|rehearsal)\b/i],
-  ['bill', /\b(pay|bill|rent|invoice|renew)\b/i],
   ['routine', /\b(wake up|wake|shower|breakfast|lunch|dinner|eat|gym|workout|work out|run|jog|walk|sleep|bed|meditate|journal|stretch|skincare|call (my )?(friends?|mom|dad|family|parents))\b/i],
   ['event', /\b(meeting|meet|appointment|interview|party|event|dinner with|lunch with|date|concert|game|birthday|wedding|flight|trip)\b/i],
 ];
@@ -97,10 +94,10 @@ function readTime(h, m, ap) {
   return `${pad(hour)}:${pad(min)}`;
 }
 
-// Parse one line into task fields. Returns { title, date, time, mins, repeat, priority, project, cost, kind, found: [...chips] }.
+// Parse one line into task fields. Returns { title, date, time, mins, repeat, priority, project, kind, found: [...chips] }.
 export function parseTask(raw, now = new Date()) {
   let text = ` ${String(raw).trim()} `;
-  const out = { date: '', time: '', end: '', mins: null, repeat: null, priority: 'medium', project: '', cost: null };
+  const out = { date: '', time: '', end: '', mins: null, repeat: null, priority: 'medium', project: '' };
   const found = [];
   const take = (re, fn) => { const m = text.match(re); if (!m) return false; const keep = fn(m); if (keep !== false) text = text.replace(m[0], ' '); return keep !== false; };
   const base = isoDay(now);
@@ -110,10 +107,6 @@ export function parseTask(raw, now = new Date()) {
   take(/\b(low priority|someday|whenever|no rush)\b/i, () => { out.priority = 'low'; found.push('Low priority'); });
   // Project: "#english" or "#side-project".
   take(/\s#([\p{L}\d][\p{L}\d_-]*)/u, m => { out.project = m[1].replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase()); found.push(`#${out.project}`); });
-  // Money: "$20", "20 dollars", "costs 15".
-  take(/(?:\b(?:costs?|for|about)\s+)?\$\s?(\d+(?:\.\d{1,2})?)|\b(\d+(?:\.\d{1,2})?)\s?(?:dollars|usd|bucks)\b|\bcosts?\s+(\d+(?:\.\d{1,2})?)\b/i, m => {
-    out.cost = Number(m[1] || m[2] || m[3]); found.push(`$${out.cost}`);
-  });
   // Duration: "for 30 min", "1.5h", "2 hours".
   take(/\b(?:for\s+)?(\d+(?:\.\d+)?)\s*(h|hrs?|hours?|m|mins?|minutes?)\b/i, m => {
     out.mins = Math.round(Number(m[1]) * (/^h/i.test(m[2]) ? 60 : 1));
@@ -227,7 +220,7 @@ export const splitLines = text => String(text).split(/\n|;|\s+•\s+|\bthen\b/i)
 export function addFromText(text, extra = {}) {
   const made = splitLines(text).map(line => {
     const p = parseTask(line);
-    return makeTask({ title: p.title, date: p.date, time: p.time, mins: p.mins, repeat: p.repeat, priority: p.priority, project: p.project, cost: p.cost, kind: p.kind, costCategory: p.cost ? guessCategory(p.title, -1) : '', ...extra });
+    return makeTask({ title: p.title, date: p.date, time: p.time, mins: p.mins, repeat: p.repeat, priority: p.priority, project: p.project, kind: p.kind, ...extra });
   });
   store.tasks.unshift(...made);
   return made;
@@ -279,31 +272,19 @@ export function occurrences(from, to, list = store.tasks) {
 }
 
 // ---------- doing things ----------
-// Tick a task (or one day of a repeating one). Things with a cost add an entry
-// to the Transactions review list, so money follows what you did.
+// Tick a task (or one day of a repeating one).
 export function toggleDone(t, iso = today()) {
   if (t.repeat) {
     const set = new Set(t.doneDates || []);
     const was = set.has(iso);
     was ? set.delete(iso) : set.add(iso);
     t.doneDates = [...set].sort().slice(-400);
-    if (!was) logCost(t, iso);
     return !was;
   }
   t.done = !t.done;
   t.doneAt = t.done ? new Date().toISOString() : null;
-  if (t.done) { (t.subtasks || []).forEach(s => { s.done = true; }); logCost(t, iso); }
+  if (t.done) (t.subtasks || []).forEach(s => { s.done = true; });
   return t.done;
-}
-function logCost(t, iso) {
-  const cost = Number(t.cost);
-  if (!cost) return;
-  const key = `task:${t.id}:${t.repeat ? iso : 'once'}`;
-  if (store.drafts.some(d => d.fromTask === key) || store.transactions.some(x => x.fromTask === key)) return;
-  store.drafts.unshift({
-    id: newId(), merchant: t.title, amount: -Math.abs(cost), currency: store.base || 'USD', date: iso,
-    category: t.costCategory || guessCategory(t.title, -1), source: 'planner', confidence: 0.9, domain: '', logo: null, fromTask: key,
-  });
 }
 // Skip one day of a repeating item ("not today").
 export function skipDay(t, iso) { t.skipDates = [...new Set([...(t.skipDates || []), iso])].sort().slice(-200); }
@@ -322,7 +303,6 @@ export function ruleSteps(t) {
     exam: ['List every topic that will be tested', 'Make a one-page summary per topic', 'Do practice questions', 'Review what you got wrong', 'Quick final review the day before'],
     class: ['Do the reading or prep', 'Pack what you need', 'Review notes afterwards'],
     event: ['Confirm the time and place', 'Prepare what to bring or say', 'Plan how to get there'],
-    bill: ['Check the amount and due date', 'Pay it', 'Save the receipt'],
     routine: ['Get ready', 'Do it', 'Tick it off'],
   }[t.kind];
   if (by) return by;
@@ -393,7 +373,7 @@ export function buildRoutine({ wake = '07:00', sleep = '23:00', text = '' } = {}
   ].filter(([, , , re]) => !has(re));
   const items = base.map(([title, at, mins]) => ({ title, time: fromMins(at), mins, repeat: { every: 'day' }, kind: 'routine' }));
   for (const p of extras) {
-    items.push({ title: p.title, time: p.time || '', mins: p.mins, repeat: p.repeat || { every: 'day' }, kind: p.kind === 'task' ? 'routine' : p.kind, project: p.project, cost: p.cost });
+    items.push({ title: p.title, time: p.time || '', mins: p.mins, repeat: p.repeat || { every: 'day' }, kind: p.kind === 'task' ? 'routine' : p.kind, project: p.project });
   }
   return items.sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
 }

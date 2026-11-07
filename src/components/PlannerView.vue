@@ -5,7 +5,6 @@ import { parseTask, addFromText, occurrences, openTasks, summary, today, addDays
 import { refreshFeeds } from '../lib/calendar';
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
-import PlanRoutine from './PlanRoutine.vue';
 import PlanCalendars from './PlanCalendars.vue';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
@@ -199,7 +198,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
 
       <aside class="pln-side">
         <PlanSuggest />
-        <PlanRoutine />
         <PlanCalendars />
       </aside>
     </div>

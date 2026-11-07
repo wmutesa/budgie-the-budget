@@ -1,15 +1,14 @@
-// AI for reading receipts and writing suggestions. It is on by default and runs
+// AI for planning, goals and digests. It is on by default and runs
 // on the person's own device: no cloud AI service, no API key.
 //
 // Models, best first, and Budgie picks per task from whichever are ready:
 //   - Ollama, if it is running on this computer (usually the largest model).
 //   - In the browser (WebLLM on the graphics chip), downloaded once and kept:
-//       Qwen 2.5 small: quick and good at structured answers (receipts).
+//       Qwen 2.5 small: quick and good at structured answers (steps, routines).
 //       Llama 3.2 medium: better writing (suggestions), on capable devices.
 //   - Budgie's built-in rules, when no model is ready.
 // If a model fails, the next one takes over.
 import { reactive } from 'vue';
-import { CATEGORIES } from './categorize';
 // The processor engine's WebAssembly file, from the jsDelivr CDN (same pinned
 // version as the package), so the site itself stays small.
 const wllamaWasm = 'https://cdn.jsdelivr.net/npm/@wllama/wllama@3.8.1/esm/wasm/wllama.wasm';
@@ -22,7 +21,7 @@ const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
 // half-precision maths (most Chrome and Edge devices) and one for the rest
 // (often Safari).
 export const MODELS = {
-  small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', mb: 450, good: 'receipts' },
+  small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', mb: 450, good: 'quick answers' },
   medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', id32: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', mb: 1300, good: 'writing' },
   // Runs on the processor (llama.cpp in WebAssembly), so it works in any modern
   // browser, including those without WebGPU. Slower, used when the others cannot run.
@@ -33,12 +32,9 @@ const FAIL_KEY = 'budgie.aiFailed'; // when the last automatic start failed, to 
 const STALL_MS = 90 * 1000;          // give up if a download makes no progress for this long
 // For each task, which models to try, in order.
 const ROUTES = {
-  receipt: ['ollama', 'small', 'medium', 'cpu'],
   advice: ['ollama', 'medium', 'small', 'cpu'],
-  budget: ['ollama', 'medium', 'small', 'cpu'],
-  news: ['ollama', 'medium', 'small', 'cpu'],
-  account: ['ollama', 'small', 'medium', 'cpu'],
   plan: ['ollama', 'medium', 'small', 'cpu'],
+  digest: ['ollama', 'medium', 'small', 'cpu'],
 };
 
 const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '', detail: '' }); // idle | loading | ready | error | skipped | waiting
@@ -50,7 +46,7 @@ export const ai = reactive({
   cpu: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { receipt: '', advice: '', budget: '', news: '', account: '', plan: '' }, // which model last did each task
+  used: { advice: '', plan: '', digest: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -346,59 +342,10 @@ function firstJSON(text) {
   try { return JSON.parse(s.slice(a, b + 1)); } catch { return null; }
 }
 
-// Read receipt text into { merchant, date, total, currency, category }. Returns null when no model is ready.
-export async function aiReadReceipt(text) {
-  const reply = await route('receipt', [
-    { role: 'system', content: `Read receipt text. Reply with JSON only: {"merchant": string, "date": "YYYY-MM-DD" or null, "total": number, "currency": ISO 4217 code, "category": one of ${JSON.stringify(CATEGORIES)}}. Use only facts in the text.` },
-    { role: 'user', content: text.slice(0, 4000) },
-  ], { json: true, temperature: 0, max_tokens: 200 });
-  const out = firstJSON(reply);
-  return out && typeof out.total === 'number' ? out : null;
-}
-
-// Draft monthly budgets from income and spending. Returns [{ name, budget }] or null.
-export async function aiDraftBudgets(input) {
-  const subs = Object.fromEntries(Object.entries(input.subs).map(([k, v]) => [k, Math.round(v)]));
-  const facts = [
-    `Monthly income: ${input.income ? `$${input.income}` : 'unknown'}.`,
-    `Average monthly spending by category: ${JSON.stringify(input.spend)}.`,
-    `Subscriptions per month by category: ${JSON.stringify(subs)}.`,
-    `Planned monthly amounts: ${JSON.stringify(input.planned)}.`,
-  ].join(' ');
-  const reply = await route('budget', [
-    { role: 'system', content: `You set realistic monthly budgets in US dollars. Choose 4 to 8 categories, only from this list: ${JSON.stringify(input.allowed)}. Base amounts on the facts: cover real spending with a little room, follow planned amounts, and keep the total under 90% of income when income is known. Reply with JSON only: {"budgets": [{"category": string, "amount": number}]}` },
-    { role: 'user', content: facts },
-  ], { json: true, temperature: 0.1, max_tokens: 300 });
-  const out = firstJSON(reply);
-  const list = Array.isArray(out?.budgets) ? out.budgets : null;
-  return list ? list.map(b => ({ name: String(b.category || b.name || ''), budget: Number(b.amount ?? b.budget) })) : null;
-}
-
-// Two plain sentences on what today's market headlines mean for someone saving.
-export async function aiNewsBrief(headlines, situation) {
-  if (!headlines.length) return null;
-  const reply = await route('news', [
-    { role: 'system', content: 'You explain market news to a careful saver. In two short sentences, say what these headlines mean for someone building savings, using only the headlines and situation given. Do not recommend specific investments, do not predict prices, and do not invent numbers.' },
-    { role: 'user', content: `Situation: ${situation}\nHeadlines:\n${headlines.slice(0, 8).map(h => `- ${h}`).join('\n')}` },
-  ], { temperature: 0.2, max_tokens: 140 });
-  return reply ? reply.trim() : null;
-}
-
-// Which of the person's accounts a note says they paid with. Returns the account text or null.
-export async function aiPickAccount(text, accounts) {
-  if (!ai.ready || accounts.length < 2) return null;
-  const reply = await route('account', [
-    { role: 'system', content: `Which account paid for this? Accounts: ${JSON.stringify(accounts)}. Reply with JSON only: {"account": one of the accounts exactly, or null if the text does not say}.` },
-    { role: 'user', content: String(text).slice(0, 300) },
-  ], { json: true, temperature: 0, max_tokens: 40 });
-  const out = firstJSON(reply);
-  return typeof out?.account === 'string' && accounts.includes(out.account) ? out.account : null;
-}
-
-// A short read on the month from the given facts. Returns null when no model is ready.
+// A short, warm read on the day from the given facts. Returns null when no model is ready.
 export async function aiAdvise(facts) {
   const reply = await route('advice', [
-    { role: 'system', content: 'You are a careful budgeting assistant. In three short sentences, say how the month is going and the single most useful next step. Use only the facts given. No made-up numbers, no bank rates.' },
+    { role: 'system', content: 'You are a calm planning coach. In two short sentences, say how the day and week look and the single most useful next step. Use only the facts given. Do not invent tasks, times or numbers.' },
     { role: 'user', content: facts.join('\n') },
   ], { temperature: 0.2, max_tokens: 160 });
   return reply ? reply.trim() : null;
@@ -442,10 +389,33 @@ export async function aiBreakdown(task) {
 // Up to three task ideas the person has not listed. Returns [{ title, why }] or null.
 export async function aiSuggestTasks(facts) {
   const reply = await route('plan', [
-    { role: 'system', content: 'You help a student and young professional plan their life. Suggest up to 3 useful tasks they have not listed: preparation for what is coming, healthy habits, people to keep in touch with, or small money chores. Each must be specific and doable in one sitting. Use only the facts given. Reply with JSON only: {"tasks": [{"title": string under 60 characters, "why": one short sentence}]}' },
+    { role: 'system', content: 'You help a student and young professional plan their life. Suggest up to 3 useful tasks they have not listed: preparation for what is coming, healthy habits, people to keep in touch with, or steps toward their goals. Each must be specific and doable in one sitting. Use only the facts given. Reply with JSON only: {"tasks": [{"title": string under 60 characters, "why": one short sentence}]}' },
     { role: 'user', content: facts.join('\n') },
   ], { json: true, temperature: 0.4, max_tokens: 300 });
   const list = firstJSON(reply)?.tasks;
   if (!Array.isArray(list)) return null;
   return list.slice(0, 3).map(x => ({ title: String(x.title || '').replace(/[<>]/g, '').trim().slice(0, 60), why: String(x.why || '').replace(/[<>]/g, '').trim().slice(0, 160) })).filter(x => x.title);
+}
+
+// Milestones for a life goal: 3 to 6 ordered, concrete checkpoints. Returns [string] or null.
+export async function aiMilestones(goal) {
+  const reply = await route('plan', [
+    { role: 'system', content: 'Break a personal goal into 3 to 6 ordered milestones a student or young professional can reach one by one. Each starts with a verb and is under 60 characters. Reply with JSON only: {"milestones": [string]}' },
+    { role: 'user', content: `Goal: ${goal.title}.${goal.by ? ` By ${goal.by}.` : ''}${goal.why ? ` Why: ${String(goal.why).slice(0, 200)}` : ''}` },
+  ], { json: true, temperature: 0.2, max_tokens: 260 });
+  const list = firstJSON(reply)?.milestones;
+  if (!Array.isArray(list)) return null;
+  const clean = list.map(x => String(x || '').replace(/[<>]/g, '').replace(/^\s*\d+[.)]\s*/, '').trim().slice(0, 80)).filter(Boolean).slice(0, 6);
+  return clean.length >= 2 ? clean : null;
+}
+
+// Rewrite a digest's lead and a draft email more naturally, keeping every fact.
+// Returns { dek, body } or null.
+export async function aiPolishLead(lead, profileLine) {
+  const reply = await route('digest', [
+    { role: 'system', content: 'You are a newspaper editor. Rewrite the dek (one sentence) and body (two or three sentences) of this story for the reader described. Keep every fact, name, date and link exactly; add nothing new. Plain text. Reply with JSON only: {"dek": string, "body": string}' },
+    { role: 'user', content: `Reader: ${String(profileLine).slice(0, 300)}\nHeadline: ${lead.headline}\nDek: ${lead.dek}\nBody: ${lead.body}` },
+  ], { json: true, temperature: 0.3, max_tokens: 300 });
+  const out = firstJSON(reply);
+  return out && typeof out.dek === 'string' && typeof out.body === 'string' ? { dek: out.dek.replace(/[<>]/g, '').slice(0, 300), body: out.body.replace(/[<>]/g, '').slice(0, 900) } : null;
 }
