@@ -25,7 +25,7 @@ const nowItem = computed(() => {
   return next ? { label: `Next at ${timeLabel(next.task.time)}`, item: next } : null;
 });
 const top3 = computed(() => openTasks(now.value).filter(t => t.kind !== 'routine' && !(t.repeat && t.kind === 'class')).filter(t => !t.date || t.date <= addDays(now.value, 3) || t.priority === 'high').slice(0, 3));
-const routineToday = computed(() => todayItems.value.filter(x => x.task.kind === 'routine'));
+const routineToday = computed(() => todayItems.value.filter(x => x.task.kind === 'routine').sort((a, b) => a.done - b.done));
 const best = computed(() => Math.max(0, ...routineToday.value.map(x => streak(x.task))));
 const greeting = computed(() => { const h = clock.value.getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; });
 </script>

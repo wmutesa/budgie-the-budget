@@ -50,7 +50,9 @@ const showDone = ref(showDoneFirst);
 const groups = computed(() => {
   const d = now.value;
   const one = store.tasks.filter(t => !t.repeat && !t.done && inFilter(t));
-  const sorted = list => [...list].sort((a, b) => (a.date || '9').localeCompare(b.date || '9') || (a.time || '99').localeCompare(b.time || '99') || ({ high: 0, medium: 1, low: 2 }[a.priority] - { high: 0, medium: 1, low: 2 }[b.priority]));
+  // Done things go last (a routine ticked today), then by date, time and priority.
+  const doneNow = t => (isDone(t, d) ? 1 : 0);
+  const sorted = list => [...list].sort((a, b) => doneNow(a) - doneNow(b) || (a.date || '9').localeCompare(b.date || '9') || (a.time || '99').localeCompare(b.time || '99') || ({ high: 0, medium: 1, low: 2 }[a.priority] - { high: 0, medium: 1, low: 2 }[b.priority]));
   const all = [...one.filter(t => !t.date || t.date >= addDays(d, -60)), ...store.tasks.filter(t => t.repeat && inFilter(t))];
   const m = new Map();
   for (const t of all) { const k = catKey(t); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
@@ -73,7 +75,7 @@ const agenda = computed(() => {
   const days = [];
   for (let i = 0; i < 14; i++) {
     const d = addDays(now.value, i);
-    days.push({ name: d, date: d, list: items.filter(x => x.date === d) });
+    days.push({ name: d, date: d, list: items.filter(x => x.date === d).sort((a, b) => a.done - b.done) });
   }
   return days;
 });

@@ -105,7 +105,7 @@ onUpdated(measureOver);
 // ---------- month layout ----------
 const monthOf = computed(() => fromIso(anchor.value).getMonth());
 // Habits that happen every day fold into one line so the month stays readable.
-const monthItems = d => items.value.filter(x => x.date === d && x.task.kind !== 'routine');
+const monthItems = d => items.value.filter(x => x.date === d && x.task.kind !== 'routine').sort((a, b) => a.done - b.done);
 const habitsOn = d => items.value.filter(x => x.date === d && x.task.kind === 'routine');
 const openDay = d => { if (props.embedded) { emit('day', d); mode.value = 'day'; return; } anchor.value = d; mode.value = 'day'; nextTick(scrollToNow); };
 

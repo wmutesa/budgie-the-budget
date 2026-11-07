@@ -456,10 +456,14 @@ async function run(url) {
   assert.ok(await full.locator('.pln-col').count() >= 4, 'tasks sit in side-by-side columns');
   assert.ok(await full.locator('.pln-col[data-group="#Chemistry"]').count(), 'tasks have a column per project');
   assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() <= 7, 'a long column shows only the first few');
+  assert.equal(await full.$$eval('.pln-col', cols => cols.filter(c => { const rows = [...c.querySelectorAll('[data-test="task"]')]; const i = rows.findIndex(r => r.classList.contains('done')); return i >= 0 && rows.slice(i).some(r => !r.classList.contains('done')); }).length), 0, 'in Tasks, done things come last in each column');
   await full.click('.pln-col[data-group="#Chemistry"] .pln-more');
   assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() > 7, 'Show more opens the rest');
   await full.click('[data-test="view-agenda"]');
   assert.equal(await full.locator('[data-test="agenda-day"]').count(), 14, 'the agenda is a column per day');
+  // Done things sit at the bottom of every list.
+  const doneFirst = sel => full.$$eval(sel, cols => cols.filter(c => { const rows = [...c.querySelectorAll('[data-test="task"]')]; const i = rows.findIndex(r => r.classList.contains('done')); return i >= 0 && rows.slice(i).some(r => !r.classList.contains('done')); }).length);
+  assert.equal(await doneFirst('[data-test="agenda-day"]'), 0, 'in the agenda, done things come last each day');
   await full.click(tab('Overview'));
   assert.ok(await full.locator('[data-test="today-list"] [data-test="task"]').count() <= 5, 'Overview shows only what is next');
   assert.match(await full.textContent('[data-test="today-more"]'), /\d+ more today/, 'the rest is one tap away');
