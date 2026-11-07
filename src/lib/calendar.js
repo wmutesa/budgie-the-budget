@@ -5,10 +5,11 @@
 import { store, newId } from './store';
 import { readCalendar } from './account';
 import { makeTask, isoDay, toMins, guessKind, today, dayDiff } from './tasks';
+import { linkAdvice } from '../../worker/ical.js';
 
 export const FEED_KINDS = {
   canvas: { name: 'Canvas', help: 'Canvas → Calendar → Calendar Feed (bottom right) → copy the link.' },
-  google: { name: 'Google Calendar', help: 'Google Calendar → Settings → your calendar → Integrate calendar → Secret address in iCal format.' },
+  google: { name: 'Google Calendar', help: 'On a computer, open calendar.google.com → Settings (gear) → under "Settings for my calendars" pick the calendar → Integrate calendar → copy "Secret address in iCal format". The phone app does not show it. It contains /private-…/basic.ics.' },
   apple: { name: 'Apple Calendar', help: 'iCloud Calendar → share the calendar → Public Calendar → copy the link.' },
   outlook: { name: 'Outlook', help: 'Outlook → Settings → Calendar → Shared calendars → Publish a calendar → ICS link.' },
   other: { name: 'Calendar', help: 'Any calendar that gives an iCal (.ics) or webcal link.' },
@@ -94,6 +95,8 @@ export async function syncFeed(feed) {
 
 export async function addFeed(raw, name = '') {
   const url = raw.trim().replace(/^webcals?:\/\//i, 'https://');
+  const advice = linkAdvice(url);
+  if (advice) throw new Error(advice);
   if (store.feeds.some(f => f.url === url)) throw new Error('That calendar is already imported.');
   const kind = guessFeed(url);
   const feed = { id: newId(), name: name || FEED_KINDS[kind].name, url, kind, lastSync: null, count: 0, error: '' };

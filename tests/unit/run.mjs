@@ -199,6 +199,15 @@ await check('digests: Gemini answers are checked before use', async () => {
     assert.equal(r.action.link, '', 'odd links are removed');
   } finally { globalThis.fetch = real; }
 });
+const { linkAdvice } = await import('../../worker/ical.js');
+await check('calendar links: Google links that are not feeds get the right advice', () => {
+  assert.match(linkAdvice('https://calendar.google.com/calendar/u/0/r'), /link for opening Google Calendar[\s\S]*Secret address in iCal format/);
+  assert.match(linkAdvice('https://calendar.google.com/calendar/embed?src=a%40gmail.com'), /embedding/);
+  assert.equal(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/private-123/basic.ics'), '', 'the secret address is fine');
+  assert.match(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/public/basic.ics', 404), /public address[\s\S]*secret/);
+  assert.match(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/private-123/basic.ics', 404), /reset[\s\S]*school or work/);
+  assert.equal(linkAdvice('https://school.instructure.com/feeds/calendars/user_x.ics'), '', 'other services are tried first');
+});
 const { modelSource } = await import('../../worker/models.js');
 await check('model downloads: only the exact files Budgie uses', () => {
   assert.equal(modelSource('/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin'), 'https://huggingface.co/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin');

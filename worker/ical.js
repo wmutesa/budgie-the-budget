@@ -22,6 +22,27 @@ export function checkFeedUrl(raw) {
   return url;
 }
 
+// Plain advice for links that are not calendar feeds, or that a service refused.
+// Google shows several links per calendar and only the secret iCal address
+// works for a private calendar. Returns a message, or '' when nothing is known.
+const GOOGLE_STEPS = 'On a computer, open calendar.google.com → Settings (gear) → under "Settings for my calendars" pick the calendar → Integrate calendar → copy "Secret address in iCal format". The phone app does not show it.';
+export function linkAdvice(raw, status = 0) {
+  let u;
+  try { u = new URL(String(raw || '').trim().replace(/^webcals?:\/\//i, 'https://')); } catch { return ''; }
+  const h = u.hostname.toLowerCase();
+  const p = u.pathname;
+  if (/(^|\.)google\.com$/.test(h)) {
+    if (/\/ical\//.test(p) && /\/private-[^/]+\//.test(p)) return status ? `Google refused this secret address. It may have been reset, or your school or work account may block it. Copy it again: ${GOOGLE_STEPS}` : '';
+    if (/\/ical\//.test(p) && /\/public\//.test(p)) return status ? `This is the calendar's public address, which only works when the calendar is public. Use the secret one instead: ${GOOGLE_STEPS}` : '';
+    if (/\/embed/.test(p)) return `That is the link for embedding the calendar in a web page, not its calendar feed. ${GOOGLE_STEPS}`;
+    return `That is the link for opening Google Calendar, not its calendar feed. ${GOOGLE_STEPS}`;
+  }
+  if (status && /outlook\.|office365\.com$|live\.com$/.test(h)) return 'Outlook refused this link. In Outlook on the web: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link again.';
+  if (status && /instructure\.com$|canvas/.test(h)) return 'Canvas refused this link. In Canvas: Calendar → Calendar Feed (bottom right) → copy the link again.';
+  if (status && /icloud\.com$/.test(h)) return 'iCloud refused this link. In iCloud Calendar, share the calendar as a Public Calendar and copy the link again.';
+  return '';
+}
+
 // Which service a link is from, for labels and how events are read.
 export function feedKind(url) {
   const h = new URL(url).hostname.toLowerCase();
@@ -124,10 +145,16 @@ export function parseIcs(text, now = Date.now()) {
 // Fetch a calendar link, following up to three redirects that are also checked.
 export async function fetchFeed(raw) {
   let url = checkFeedUrl(raw);
+  // Catch links that are pages, not feeds, before asking the service.
+  const before = linkAdvice(raw);
+  if (before) throw Object.assign(new Error(before), { status: 422 });
   for (let hop = 0; hop < 4; hop++) {
-    const res = await fetch(url.toString(), { redirect: 'manual', headers: { Accept: 'text/calendar, text/plain;q=0.8', 'User-Agent': 'Budgie calendar import' }, signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url.toString(), { redirect: 'manual', headers: { Accept: 'text/calendar, text/plain;q=0.9, */*;q=0.5', 'User-Agent': 'Mozilla/5.0 (compatible; Budgie calendar import)' }, signal: AbortSignal.timeout(12000) });
     if (res.status >= 300 && res.status < 400 && res.headers.get('Location')) { url = checkFeedUrl(new URL(res.headers.get('Location'), url).toString()); continue; }
-    if (!res.ok) throw Object.assign(new Error(res.status === 404 || res.status === 401 || res.status === 403 ? 'That calendar link no longer works. Copy it again from the calendar\'s settings.' : `The calendar did not answer (${res.status}). Try again later.`), { status: 502 });
+    if (!res.ok) {
+      const refused = res.status === 404 || res.status === 401 || res.status === 403 || res.status === 410;
+      throw Object.assign(new Error(refused ? (linkAdvice(raw, res.status) || 'That calendar link no longer works. Copy it again from the calendar\'s settings.') : `The calendar did not answer (${res.status}). Try again later.`), { status: 502 });
+    }
     // Read at most 3 MB.
     const reader = res.body.getReader();
     const chunks = [];
