@@ -2828,3 +2828,18 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .pln-col .tk:hover .tk-tools, .pln-col .tk:focus-within .tk-tools, .pln-col .tk.open .tk-tools { display: flex !important; opacity: 1 !important; }
 @media (hover: none) { .pln-col .tk-tools { display: flex !important; opacity: 1 !important; } }
 .pln-col .tk { min-height: 0 !important; }
+/* Columns grow with their content: no scrolling inside a column; Show more keeps them short. */
+.pln-col { max-height: none !important; overflow: visible !important; }
+.pln-col .pln-gh { position: static !important; }
+.pln-cols { align-items: start; }
+@media (max-width: 640px) { .pln-col { max-height: none !important; } }
+/* Columns wrap onto new rows: no sideways scrolling, on any screen */
+.pln-cols { grid-auto-flow: row !important; grid-auto-columns: auto !important; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important; overflow: visible !important; gap: 1px !important; background: var(--line); scroll-snap-type: none !important; }
+.pln-col { border-right: 0 !important; height: 100%; }
+@media (max-width: 640px) { .pln-cols { grid-template-columns: minmax(0, 1fr) !important; } }
+/* Suggestions: a tick to accept and a cross to dismiss, both perfect circles */
+.pln-idea-acts .ibtn { width: 34px !important; height: 34px !important; min-width: 34px; padding: 0 !important; border-radius: 50% !important; display: inline-grid; place-items: center; }
+.pln-idea-acts .ibtn.ghost { border: 1px solid #e4e4e7 !important; }
+.pln-idea-acts .ibtn.primary { background: #18181b !important; border-color: #18181b !important; color: #fff !important; }
+.pln-cols { background: #fff !important; gap: 0 !important; border: 1px solid var(--line); border-width: 1px 0 0 1px !important; }
+.pln-col { box-shadow: inset -1px -1px 0 var(--line); }

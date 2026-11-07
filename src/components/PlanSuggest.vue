@@ -40,11 +40,11 @@ const acceptAI = x => { store.tasks.unshift(makeTask({ title: x.title, notes: x.
     <ul v-if="suggestions.length || extra.length" class="pln-ideas">
       <li v-for="s in shownIdeas" :key="s.id" :class="s.tone" data-test="suggestion">
         <div><b>{{ s.title }}</b><span class="muted small">{{ s.why }}</span></div>
-        <div class="pln-idea-acts"><button type="button" class="ibtn primary" :title="s.run ? 'Do it' : 'Add to planner'" :aria-label="s.run ? `Do it: ${s.title}` : `Add: ${s.title}`" data-test="suggestion-add" @click="accept(s)"><Icon :name="s.run ? 'check' : 'plus'" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${s.title}`" @click="dismiss(s)"><Icon name="x" /></button></div>
+        <div class="pln-idea-acts"><button type="button" class="ibtn primary" :title="s.run ? 'Do it' : 'Add to planner'" :aria-label="s.run ? `Do it: ${s.title}` : `Add: ${s.title}`" data-test="suggestion-add" @click="accept(s)"><Icon name="check" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${s.title}`" @click="dismiss(s)"><Icon name="x" /></button></div>
       </li>
       <li v-for="x in extra" :key="x.id" class="ai">
         <div><b><span class="pln-ai-tag">AI</span> {{ x.title }}</b><span class="muted small">{{ x.why }}</span></div>
-        <div class="pln-idea-acts"><button type="button" class="ibtn primary" title="Add to planner" :aria-label="`Add: ${x.title}`" @click="acceptAI(x)"><Icon name="plus" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${x.title}`" @click="extra = extra.filter(y => y !== x)"><Icon name="x" /></button></div>
+        <div class="pln-idea-acts"><button type="button" class="ibtn primary" title="Add to planner" :aria-label="`Add: ${x.title}`" @click="acceptAI(x)"><Icon name="check" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${x.title}`" @click="extra = extra.filter(y => y !== x)"><Icon name="x" /></button></div>
       </li>
     </ul>
     <button v-if="unique.length > 3" type="button" class="pln-more" @click="allIdeas = !allIdeas">{{ allIdeas ? 'Show fewer' : `Show all ${unique.length}` }}</button>
