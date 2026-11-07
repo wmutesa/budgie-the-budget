@@ -178,9 +178,16 @@ async function run(url) {
   // Planner: what the inbox sent is here.
   await page.click(tab('Planner'));
   await page.click('[data-test="view-tasks"]');
-  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*5 PM[\s\S]*Assignment[\s\S]*#English[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority');
-  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Gym[\s\S]*6 PM[\s\S]*Mon Wed Fri/, 'habits and the routine repeat on their days');
+  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority, with its time on the right');
+  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits and the routine repeat on their days');
   assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
+  // Deleting is one click, with Undo in a notification.
+  const before = await page.locator('[data-test="task"]').count();
+  await page.locator('.pln-group[data-group="Today"] [data-test="task"]', { hasText: 'Haircut' }).locator('[data-test="task-delete"]').click();
+  assert.equal(await page.locator('[data-test="task"]').count(), before - 1, 'a task is deleted at once');
+  await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
+  assert.equal(await page.locator('[data-test="task"]').count(), before, 'Undo brings it back');
+  if (process.env.SHOTS) { const b = await page.locator('.pln-main').boundingBox(); await page.locator('.pln-group[data-group="Tomorrow"] [data-test="task"] >> nth=0').hover(); await page.screenshot({ path: `${process.env.SHOTS}/rows.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } }); }
   await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
   assert.match(await page.textContent('.pln-main'), /Show 2 done/, 'a ticked task moves to the done list');
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });

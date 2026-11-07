@@ -6,6 +6,7 @@ import { toggleDone, isDone, dayLabel } from '../lib/tasks';
 import { labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
 import { toast, loading, finish } from '../lib/toast';
+import { deleteGoal, deleteTask } from '../lib/undo';
 import DateField from './DateField.vue';
 import MicButton from './MicButton.vue';
 import { useDictation, canDictate } from '../lib/dictation';
@@ -48,7 +49,7 @@ async function add() {
 }
 async function replan(g) { busy.value = g.id; const n = g.milestones.length; await planGoal(g); busy.value = ''; toast(`${g.milestones.length - n} more milestones added.`, { kind: 'success' }); }
 function addStep(g) { const v = step.value.trim(); if (!v) return; addMilestones(g, [v]); step.value = ''; }
-const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milestone tasks that are not done are removed too.`)) removeGoal(g); };
+const remove = g => deleteGoal(g);
 </script>
 
 <template>
@@ -68,13 +69,14 @@ const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milesto
           <span class="gl-name"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }} of {{ x.p.all }} steps{{ x.g.by ? ` · by ${dayLabel(x.g.by)}` : '' }}{{ x.p.daysLeft !== null && x.p.daysLeft >= 0 ? ` · ${x.p.daysLeft} days left` : '' }}</span></span>
           <span class="gl-pct">{{ x.p.pct }}%</span>
         </button>
+        <button type="button" class="ibtn ghost danger gl-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="remove(x.g)"><Icon name="trash" /></button>
         <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
         <div v-if="open === x.g.id" class="gl-body">
           <p v-if="x.g.why" class="muted small">{{ x.g.why }}</p>
           <ul class="gl-steps">
             <li v-for="t in x.tasks" :key="t.id" :class="{ done: isDone(t) }">
               <label><input type="checkbox" :checked="isDone(t)" @change="toggleDone(t)" /> {{ t.title }}</label>
-              <span class="muted small">{{ t.date ? dayLabel(t.date) : '' }}</span>
+              <span class="gl-step-end"><span class="muted small">{{ t.date ? dayLabel(t.date) : '' }}</span><button type="button" class="ibtn ghost danger" title="Delete milestone" :aria-label="`Delete ${t.title}`" @click="deleteTask(t)"><Icon name="x" /></button></span>
             </li>
           </ul>
           <form class="gl-step" @submit.prevent="addStep(x.g)"><input v-model="step" placeholder="Add a milestone, then press Enter" aria-label="Add a milestone" maxlength="120" /></form>

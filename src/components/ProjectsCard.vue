@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { GOAL_COLORS } from '../lib/goals';
 import Icon from './Icon.vue';
+import { deleteProject } from '../lib/undo';
 
 // Projects and categories: the #tags on your tasks. Rename one and every task
 // follows; give each a colour.
@@ -34,7 +35,7 @@ function rename(from) {
         </span>
         <form v-if="editing === p.name" class="pj-rename" @submit.prevent="rename(p.name)"><input v-model="draft" :aria-label="`New name for ${p.name}`" maxlength="40" @blur="rename(p.name)" /></form>
         <button v-else type="button" class="pj-name" title="Rename" @click="editing = p.name; draft = p.name"><i :style="{ background: colorOf(p.name) }" />#{{ p.name }}<Icon name="edit" :size="12" /></button>
-        <span class="muted small">{{ p.open }} open</span>
+        <span class="pj-end"><span class="muted small">{{ p.open }} open</span><button type="button" class="ibtn ghost danger" title="Remove this project from its tasks" :aria-label="`Remove #${p.name}`" data-test="project-delete" @click="deleteProject(p.name)"><Icon name="trash" /></button></span>
       </li>
     </ul>
     <p v-else class="empty-note">Add #project to any task, like “essay due Fri #English”, and it shows up here.</p>

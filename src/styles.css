@@ -2464,3 +2464,26 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .dict-wrap > textarea + .mic-btn { top: auto; bottom: 6px; transform: none; }
 .dict-wrap.live > input, .dict-wrap.live > textarea { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px #ede9fe; }
 .lede-note { font-weight: 400; color: #71717a; font-size: .8em; }
+
+/* Task rows: title and details on the left; when, priority and actions on the right */
+.tk-side { justify-content: flex-end; gap: 10px; }
+.tk-due { display: grid; justify-items: end; text-align: right; line-height: 1.25; white-space: nowrap; }
+.tk-due b { font-size: 12px; font-weight: 600; color: #3f3f46; }
+.tk-due span { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; color: #71717a; }
+.tk-due.late b { color: #be123c; }
+.tk-tools .ibtn.danger:hover { color: #be123c; background: #fff1f2; }
+.gl-goal { grid-template-columns: minmax(0, 1fr) auto; }
+.gl-goal > .gl-top { grid-column: 1; }
+.gl-goal > .gl-del { grid-column: 2; grid-row: 1; align-self: center; }
+.gl-goal > .td-bar, .gl-goal > .gl-body { grid-column: 1 / -1; }
+.gl-step-end { display: inline-flex; align-items: center; gap: 4px; }
+.gl-step-end .ibtn { width: 24px !important; height: 24px !important; min-width: 24px; opacity: 0; }
+.gl-steps li:hover .gl-step-end .ibtn, .gl-step-end .ibtn:focus-visible { opacity: 1; }
+.pj-end { display: inline-flex; align-items: center; gap: 4px; }
+@media (hover: none) { .gl-step-end .ibtn { opacity: 1; } }
+@media (max-width: 640px) { .tk-due b { font-size: 11px; } .tk-due span { font-size: 10.5px; } .tk-side { gap: 6px; } }
+/* On computers the row's actions float over its right end on hover, so dates sit flush right. */
+@media (hover: hover) {
+  .tk { position: relative; }
+  .tk-tools { position: absolute; right: 6px; top: 9px; padding-left: 16px; background: linear-gradient(90deg, rgba(250, 250, 250, 0), #fafafa 16px); }
+}

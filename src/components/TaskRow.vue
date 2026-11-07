@@ -6,6 +6,7 @@ import { KINDS, DAY_SHORT, isDone, toggleDone, streak, timeLabel, dayLabel, toda
 import { breakDown } from '../lib/breakdown';
 import { startFocus } from '../lib/focus';
 import TaskEditor from './TaskEditor.vue';
+import { deleteTask } from '../lib/undo';
 import Icon from './Icon.vue';
 
 // One Planner item: tick it, read its details at a glance, open it to edit.
@@ -38,6 +39,8 @@ const repeatText = computed(() => {
 const goal = computed(() => (t.goalId ? store.goals.find(g => g.id === t.goalId) : null));
 const subDone = computed(() => (t.subtasks || []).filter(s => s.done).length);
 const tick = () => toggleDone(t, day.value);
+// The Delete key on a focused row (not while typing in the editor) deletes it, with Undo.
+const onDeleteKey = e => { if (!e.target.closest('input, textarea, select, .tk-edit')) deleteTask(t); };
 // Opened from search: expand and bring into view.
 const el = ref(null);
 onMounted(async () => { if (nav.task === t.id) { open.value = true; nav.task = ''; await nextTick(); el.value?.scrollIntoView({ block: 'center' }); } });
@@ -46,15 +49,13 @@ async function split() { splitting.value = true; await breakDown(t); splitting.v
 </script>
 
 <template>
-  <li ref="el" class="tk" :class="{ done, open, urgent, overdue }" :style="{ '--k': kind.color }" data-test="task">
+  <li ref="el" class="tk" :class="{ done, open, urgent, overdue }" :style="{ '--k': kind.color }" data-test="task" @keydown.delete="onDeleteKey">
     <button class="tk-check" type="button" role="checkbox" :aria-checked="done" :aria-label="`${done ? 'Undo' : 'Done'}: ${t.title}`" data-test="task-check" @click="tick">
       <Icon name="check" :size="14" />
     </button>
     <button class="tk-main" type="button" :aria-expanded="open" @click="open = !open">
       <span class="tk-title">{{ t.title }}</span>
       <span class="tk-meta">
-        <span v-if="when" class="tk-when" :class="{ late: overdue }">{{ overdue ? `Overdue · ${when}` : when }}</span>
-        <span v-if="t.time" class="tk-i"><Icon name="clock" :size="12" />{{ timeLabel(t.time) }}<template v-if="t.mins"> · {{ t.mins >= 60 ? `${+(t.mins / 60).toFixed(1)} h` : `${t.mins} min` }}</template></span>
         <span class="tk-kind">{{ kind.label }}</span>
         <span v-if="t.project" class="tk-proj">#{{ t.project }}</span>
         <span v-if="repeatText" class="tk-i tk-rep"><Icon name="repeat" :size="12" />{{ repeatText }}</span>
@@ -65,11 +66,16 @@ async function split() { splitting.value = true; await breakDown(t); splitting.v
       </span>
     </button>
     <span class="tk-side">
+      <span v-if="when || t.time" class="tk-due" :class="{ late: overdue }">
+        <b v-if="when">{{ overdue ? `Overdue · ${when}` : when }}</b>
+        <span v-if="t.time"><Icon name="clock" :size="11" />{{ timeLabel(t.time) }}<template v-if="t.mins"> · {{ t.mins >= 60 ? `${+(t.mins / 60).toFixed(1)} h` : `${t.mins} min` }}</template></span>
+      </span>
       <span v-if="t.priority === 'high' || urgent" class="tk-flag" :title="urgent && t.priority !== 'high' ? 'Budgie thinks this is urgent' : 'High priority'">{{ t.priority === 'high' ? 'High' : 'Urgent' }}</span>
       <span class="tk-tools">
         <button v-if="!t.subtasks?.length && !done" type="button" class="ibtn ghost ai" :disabled="splitting" title="Break into steps with AI" :aria-label="`Break ${t.title} into steps`" data-test="row-breakdown" @click="split"><Icon :name="splitting ? 'refresh' : 'sparkle'" /></button>
         <button v-if="!done" type="button" class="ibtn ghost" title="Focus for 25 minutes" :aria-label="`Focus on ${t.title}`" @click="startFocus(t)"><Icon name="play" /></button>
         <button type="button" class="ibtn ghost" title="Edit" :aria-label="`Edit ${t.title}`" @click="open = !open"><Icon name="edit" /></button>
+        <button type="button" class="ibtn ghost danger" title="Delete (Delete key)" :aria-label="`Delete ${t.title}`" data-test="task-delete" @click="deleteTask(t)"><Icon name="trash" /></button>
       </span>
     </span>
     <TaskEditor v-if="open" :task="t" @close="open = false" />

@@ -34,7 +34,13 @@ async function refresh(f) {
   if (r) finish(id, `${f.name} is up to date${r.added ? `: ${r.added} new` : ''}.`);
   else fail(id, f.error, { title: `${f.name} did not update` });
 }
-const remove = f => { if (confirm(`Stop importing ${f.name}? Items from it that are not done are removed.`)) removeFeed(f); };
+// Remove at once; Undo brings the calendar and its items back.
+function remove(f) {
+  const feeds = JSON.parse(JSON.stringify(store.feeds));
+  const tasks = JSON.parse(JSON.stringify(store.tasks));
+  removeFeed(f);
+  toast(`${f.name} removed, with its open items.`, { kind: 'info', action: { label: 'Undo', run: () => { store.feeds = feeds; store.tasks = tasks; } } });
+}
 </script>
 
 <template>

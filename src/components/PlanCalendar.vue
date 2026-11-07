@@ -10,6 +10,7 @@ import { startFocus } from '../lib/focus';
 import { ai, aiSuggestTasks } from '../lib/ai';
 import { plannerFacts } from '../lib/suggest';
 import TaskEditor from './TaskEditor.vue';
+import { deleteTask } from '../lib/undo';
 import Icon from './Icon.vue';
 
 // A calendar like the ones you know: day, week and month, with a time grid.
@@ -154,7 +155,7 @@ const act = {
   skip: () => { skipDay(cur.value.task, cur.value.date); pop.value = null; },
   copy: () => { duplicateTask(cur.value.task); pop.value = null; },
   focus: () => { startFocus(cur.value.task); emit('focus'); pop.value = null; },
-  remove: () => { if (confirm(`Delete "${cur.value.task.title}"${cur.value.task.repeat ? ' and every repeat' : ''}?`)) { removeTask(cur.value.task); pop.value = null; } },
+  remove: () => { const t = cur.value.task; pop.value = null; deleteTask(t); },
 };
 
 // ---------- drag to move ----------
