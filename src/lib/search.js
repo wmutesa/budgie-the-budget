@@ -7,7 +7,7 @@ import { parseGoal, makeGoal, planGoal, progress, GOAL_WORDS } from './goals';
 import { go } from './nav';
 
 const PLACES = [
-  ['Today', 'Today', 'Your day and goals', /today|home|overview|dashboard|brief/],
+  ['Overview', 'Overview', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Planner', 'Planner', 'Tasks, deadlines, classes and routines', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule/],
   ['Planner', 'Schedule', 'Your day by category, plus week and month', /calendar|week|month|day view|schedule|timeline/, 'Schedule'],
   ['Planner', 'Focus', 'Top three and a focus timer', /focus|timer|pomodoro|top three/, 'Focus'],
@@ -24,7 +24,7 @@ export function actionsFor(text) {
   const bits = [task.date && dayLabel(task.date), task.time && timeLabel(task.time), task.repeat && 'repeats', task.project && `#${task.project}`].filter(Boolean).join(' · ');
   const addTask = { id: 'act-task', icon: 'plus', title: `Add “${task.title}” to Planner`, sub: [task.repeat ? 'Routine' : KINDS[task.kind].label, bits].filter(Boolean).join(' · '), run: () => { const [t] = addFromText(q); go('Planner', { task: t.id }); } };
   const g = parseGoal(q);
-  const addGoal = { id: 'act-goal', icon: 'target', title: `Set a goal: “${g.title}”`, sub: `${g.by ? `By ${dayLabel(g.by)} · ` : ''}milestones added for you`, run: async () => { const goal = makeGoal(g); await planGoal(goal); go('Today'); } };
+  const addGoal = { id: 'act-goal', icon: 'target', title: `Set a goal: “${g.title}”`, sub: `${g.by ? `By ${dayLabel(g.by)} · ` : ''}milestones added for you`, run: async () => { const goal = makeGoal(g); await planGoal(goal); go('Overview'); } };
   return GOAL_WORDS.test(q) && !task.time ? [addGoal, addTask] : [addTask, addGoal];
 }
 
@@ -41,8 +41,8 @@ export function search(text, page) {
     });
   if (tasks.length) groups.push({ name: 'Planner', page: 'Planner', items: tasks });
   const goals = store.goals.filter(g => has(g.title, q) || has(g.why, q)).slice(0, 4)
-    .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Today') }; });
-  if (goals.length) groups.push({ name: 'Goals', page: 'Today', items: goals });
+    .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Overview') }; });
+  if (goals.length) groups.push({ name: 'Goals', page: 'Overview', items: goals });
   const feeds = store.feeds.filter(f => has(f.name, q)).map(f => ({ id: `f-${f.id}`, icon: 'calendar', title: f.name, sub: `Calendar · ${f.count} events`, run: () => go('Planner', { anchor: '#calendars' }) }));
   if (feeds.length) groups.push({ name: 'Calendars', page: 'Planner', items: feeds });
   const places = PLACES.filter(([, title, , re]) => has(title, q) || re.test(q)).slice(0, 4)
@@ -53,6 +53,6 @@ export function search(text, page) {
 
 // The search box's hint for each page.
 export const HINTS = {
-  Today: 'Search or add anything: tasks and goals',
+  Overview: 'Search or add anything: tasks and goals',
   Planner: 'Search tasks, or type one to add it',
 };

@@ -128,7 +128,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Today', 'Planner'], 'the two pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner'], 'the two pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -154,7 +154,7 @@ async function run(url) {
   assert.equal(await page.locator('[data-task-id].pending').count() > 0, true, 'new items are dashed until kept');
   await page.click('[data-test="review-keep"]');
   await page.click('[data-test="review-keep"]');
-  assert.match(await page.textContent('.cr-where'), /Today · Goals/, 'a goal is shown on Today');
+  assert.match(await page.textContent('.cr-where'), /Overview · Goals/, 'a goal is shown on Today');
   await page.click('[data-test="review-keep"]');
   // Switch the last one to a routine and back, then keep it.
   await page.click('[data-test="review-routine"]');
@@ -185,7 +185,9 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
   // Deleting is one click, with Undo in a notification.
   const before = await page.locator('[data-test="task"]').count();
-  await page.locator('.pln-group[data-group="Today"] [data-test="task"]', { hasText: 'Haircut' }).locator('[data-test="task-delete"]').click();
+  const haircutRow = page.locator('.pln-group[data-group="Today"] [data-test="task"]', { hasText: 'Haircut' });
+  await haircutRow.hover();
+  await haircutRow.locator('[data-test="task-delete"]').click();
   assert.equal(await page.locator('[data-test="task"]').count(), before - 1, 'a task is deleted at once');
   await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
   assert.equal(await page.locator('[data-test="task"]').count(), before, 'Undo brings it back');
@@ -215,6 +217,7 @@ async function run(url) {
   await page.click('[data-test="view-tasks"]');
   assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
   // AI breakdown (rules here, since no model runs in the test).
+  await page.locator('.pln-group[data-group="Tomorrow"] [data-test="task"]').first().hover();
   await page.click('.pln-group[data-group="Tomorrow"] [data-test="row-breakdown"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /0\/6/, 'the assignment is broken into six steps');
   // Editing a task: link it to a goal.
@@ -289,7 +292,7 @@ async function run(url) {
 
 
   // Today: the day, goals and the latest digest together.
-  await page.click(tab('Today'));
+  await page.click(tab('Overview'));
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
@@ -352,7 +355,7 @@ async function run(url) {
   assert.match(seen, /Two pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
-  await guide.click(tab('Today'));
+  await guide.click(tab('Overview'));
   assert.ok((await guide.locator('.empty-note').count()) >= 1, 'empty cards explain what to add');
   await guide.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await guide.waitForTimeout(1500);
@@ -385,7 +388,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Today', 'Planner']) {
+  for (const p of ['Overview', 'Planner']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -407,12 +410,25 @@ async function run(url) {
   await full.click('[data-test="account-close"], .acct-sheet [aria-label="Close"]').catch(() => {});
   const timings = { fill: Number(filled.match(/in (\d+) ms/)[1]) };
   const time = async (name, act, ready) => { const t0 = Date.now(); await act(); await full.waitForSelector(ready); timings[name] = Date.now() - t0; if (process.env.SHOTS) await full.screenshot({ path: `${process.env.SHOTS}/full-${name}.png` }); };
-  await time('today', () => full.click(tab('Today')), '[data-test="today-goals"]');
+  await time('today', () => full.click(tab('Overview')), '[data-test="today-goals"]');
   await time('schedule', async () => { await full.click(tab('Planner')); await full.click('[data-test="view-schedule"]'); await full.click('[data-test="cal-day"]'); }, '[data-test="sch-box"]');
   await time('week', () => full.click('[data-test="cal-week"]'), '.cal-dh');
   await time('month', () => full.click('[data-test="cal-month"]'), '.cal-mcell');
   await time('tasks', () => full.click('[data-test="view-tasks"]'), '.pln-group');
-  await time('search', () => full.fill('[data-test="search"]', 'lab'), '[data-test="search-pop"]');
+  // Long lists stay short: columns show a few, then "Show N more"; group by category too.
+  assert.ok(await full.locator('.pln-col').count() >= 4, 'tasks sit in side-by-side columns');
+  assert.ok(await full.locator('.pln-col[data-group="Later"] [data-test="task"]').count() <= 7, 'a long column shows only the first few');
+  await full.click('.pln-col[data-group="Later"] .pln-more');
+  assert.ok(await full.locator('.pln-col[data-group="Later"] [data-test="task"]').count() > 7, 'Show more opens the rest');
+  await full.click('[data-test="group-category"]');
+  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"]').count(), 'grouping by category gives a column per project');
+  await full.click('[data-test="group-when"]');
+  await full.click('[data-test="view-agenda"]');
+  assert.equal(await full.locator('[data-test="agenda-day"]').count(), 14, 'the agenda is a column per day');
+  await full.click(tab('Overview'));
+  assert.ok(await full.locator('[data-test="today-list"] [data-test="task"]').count() <= 5, 'Overview shows only what is next');
+  assert.match(await full.textContent('[data-test="today-more"]'), /\d+ more today/, 'the rest is one tap away');
+  await time('search', () => (async () => { await full.click(tab('Planner')); await full.fill('[data-test="search"]', 'lab'); })(), '[data-test="search-pop"]');
   const n = await full.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('budgie.v3'))) || '{}').tasks?.length || 0);
   console.log('with sample data:', n, 'tasks;', Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', '));
   for (const [k, v] of Object.entries(timings)) assert.ok(v < 2500, `${k} stays quick with sample data (${v} ms)`);

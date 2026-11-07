@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
 import { progress } from '../lib/goals';
@@ -17,6 +17,16 @@ const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
 const d = today();
 const items = computed(() => occurrences(d, d));
 const left = computed(() => items.value.filter(x => !x.done));
+// The list stays short: what is next first, the rest behind one tap.
+const SHOW = 5;
+const allOpen = ref(false);
+const showDone = ref(false);
+const upNext = computed(() => {
+  const m = new Date().getHours() * 60 + new Date().getMinutes();
+  const rank = x => (x.task.time ? (toMins(x.task.time) + (x.task.mins || 30) < m ? 2000 + toMins(x.task.time) : toMins(x.task.time)) : 1500);
+  return [...left.value].sort((a, b) => rank(a) - rank(b));
+});
+const shown = computed(() => (allOpen.value ? upNext.value : upNext.value.slice(0, SHOW)));
 const next = computed(() => { const m = new Date().getHours() * 60 + new Date().getMinutes(); return left.value.find(x => x.task.time && toMins(x.task.time) >= m) || null; });
 const deadlines = computed(() => store.tasks.filter(t => !t.repeat && !t.done && ['assignment', 'exam'].includes(t.kind) && t.date >= d && t.date <= addDays(d, 7)).sort((a, b) => a.date.localeCompare(b.date)));
 const overdue = computed(() => store.tasks.filter(t => !t.repeat && !t.done && t.date && t.date < d).length);
@@ -59,9 +69,16 @@ const nextStep = computed(() => {
     </p>
   </section>
   <section class="card cell" data-test="today-list">
-    <div class="cell-head"><p class="label">On today</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="store.planner.view = 'Schedule'; go('Planner')"><Icon name="calendar" /></button></div>
-    <ul v-if="items.length" class="tk-list"><TaskRow v-for="x in items" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-    <p v-else class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
+    <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="store.planner.view = 'Schedule'; go('Planner')"><Icon name="calendar" /></button></div>
+    <ul v-if="left.length" class="tk-list"><TaskRow v-for="x in shown" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
+    <p v-else-if="items.length" class="empty-note">All done for today.</p>
+    <p v-if="items.length" class="td-more">
+      <button v-if="upNext.length > SHOW" type="button" class="pln-more" data-test="today-more" @click="allOpen = !allOpen">{{ allOpen ? 'Show fewer' : `${upNext.length - SHOW} more today` }}</button>
+      <button v-if="items.length - left.length" type="button" class="pln-more" :aria-expanded="showDone" @click="showDone = !showDone">{{ showDone ? 'Hide done' : `${items.length - left.length} done` }}</button>
+      <button type="button" class="pln-more" @click="store.planner.view = 'Schedule'; go('Planner')">See the day</button>
+    </p>
+    <ul v-if="showDone" class="tk-list"><TaskRow v-for="x in items.filter(y => y.done)" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
+    <p v-if="!items.length" class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
   </section>
   </div>
   <div class="td-col td-side span-4">

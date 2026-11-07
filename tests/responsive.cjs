@@ -51,7 +51,7 @@ const spill = () => {
 };
 
 const SCREENS = [
-  ['today', async p => { await p.click(tab('Today')); }],
+  ['today', async p => { await p.click(tab('Overview')); }],
   ['schedule', async p => { await p.click(tab('Planner')); await p.click('[data-test="view-schedule"]'); await p.click('[data-test="cal-day"]'); }],
   ['week', async p => { await p.click('[data-test="cal-week"]'); }],
   ['month', async p => { await p.click('[data-test="cal-month"]'); }],

@@ -23,7 +23,7 @@ export const cards = computed(() => {
   if (left.length) out.push({ id: `plan-today-${d}`, tone: 'info', title: `${left.length} thing${left.length === 1 ? '' : 's'} on today`, body: left.slice(0, 4).map(x => x.task.title).join(', ') + (left.length > 4 ? ` and ${left.length - 4} more.` : '.'), action: open('Planner') });
   for (const g of store.goals) {
     const p = progress(g);
-    if (p.daysLeft !== null && p.daysLeft >= 0 && p.daysLeft <= 14 && p.pct < 100) out.push({ id: `goal-soon-${g.id}-${g.by}`, tone: 'warn', title: `${g.title}: ${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left`, body: `${p.done} of ${p.all} steps done.${p.next ? ` Next: ${p.next.title}.` : ''}`, action: { label: 'Open Today', run: () => go('Today') } });
+    if (p.daysLeft !== null && p.daysLeft >= 0 && p.daysLeft <= 14 && p.pct < 100) out.push({ id: `goal-soon-${g.id}-${g.by}`, tone: 'warn', title: `${g.title}: ${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left`, body: `${p.done} of ${p.all} steps done.${p.next ? ` Next: ${p.next.title}.` : ''}`, action: { label: 'Open Overview', run: () => go('Overview') } });
   }
   return out.filter(c => !store.dismissed.includes(c.id));
 });

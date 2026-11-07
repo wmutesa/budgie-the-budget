@@ -7,6 +7,7 @@ import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
 import { nav, go } from '../lib/nav';
 let showDoneFirst = false;
@@ -34,7 +35,7 @@ onMounted(() => {
 });
 onUnmounted(() => clearInterval(tick));
 
-// Adding happens in the Playground's inbox; flash shows notes here.
+// Notes from reminders and such.
 const flash = ref('');
 
 // ---------- filters ----------
@@ -57,8 +58,25 @@ const groups = computed(() => {
     ['Any time', one.filter(t => !t.date)],
   ].map(([name, list]) => ({ name, list: sorted(list) }));
   rows.push({ name: 'Routines and classes', list: store.tasks.filter(t => t.repeat && inFilter(t)).sort((a, b) => (a.time || '99').localeCompare(b.time || '99')), repeating: true });
+  if (groupBy.value === 'category') {
+    // One column per #project, or per kind when there is no project.
+    const all = [...one.filter(t => !t.date || t.date >= addDays(d, -60)), ...store.tasks.filter(t => t.repeat && inFilter(t))];
+    const m = new Map();
+    for (const t of all) { const k = t.project ? `#${t.project}` : (KINDS[t.kind]?.label || 'Task'); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+    return [...m.entries()].map(([name, list]) => ({ name, list: sorted(list), color: list[0].project ? store.projects[list[0].project]?.color : KINDS[list[0].kind]?.color })).sort((a, b) => b.list.length - a.list.length);
+  }
   return rows.filter(g => g.list.length);
 });
+// Columns stay short: the first few, then "Show more".
+const LIMIT = 6;
+const expanded = ref(new Set());
+const more = name => { const s = new Set(expanded.value); s.has(name) ? s.delete(name) : s.add(name); expanded.value = s; };
+const visible = g => (expanded.value.has(g.name) || g.list.length <= LIMIT + 1 ? g.list : g.list.slice(0, LIMIT));
+// Opened from search: make sure that item's column shows it.
+if (nav.task) { const t = store.tasks.find(x => x.id === nav.task); if (t) expanded.value = new Set(['Overdue', 'Today', 'Tomorrow', 'This week', 'Later', 'Any time', 'Routines and classes']); }
+const groupBy = computed({ get: () => (store.planner.groupBy === 'category' ? 'category' : 'when'), set: v => { store.planner.groupBy = v; } });
+// Overdue: bring everything to today in one go.
+function allToToday(g) { const d = now.value; const was = g.list.map(t => [t, t.date]); g.list.forEach(t => { t.date = d; }); toast(`${was.length} moved to today.`, { kind: 'success', action: { label: 'Undo', run: () => was.forEach(([t, x]) => { t.date = x; }) } }); }
 const doneList = computed(() => store.tasks.filter(t => !t.repeat && t.done && inFilter(t)).sort((a, b) => String(b.doneAt).localeCompare(String(a.doneAt))).slice(0, 30));
 
 // ---------- Agenda ----------
@@ -67,8 +85,7 @@ const agenda = computed(() => {
   const days = [];
   for (let i = 0; i < 14; i++) {
     const d = addDays(now.value, i);
-    const list = items.filter(x => x.date === d);
-    if (list.length || i === 0) days.push({ date: d, list });
+    days.push({ name: d, date: d, list: items.filter(x => x.date === d) });
   }
   return days;
 });
@@ -130,17 +147,29 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     <template v-if="view === 'Schedule'">
       <PlanSchedule @view="v => view = v" />
     </template>
-    <div v-else class="pln-body">
+    <div v-else class="pln-body" :class="{ cols: view === 'Tasks' || view === 'Agenda' }">
       <div class="pln-main">
-        <!-- Tasks: grouped by when -->
+        <!-- Tasks: columns, by when or by category; each column stays short -->
         <template v-if="view === 'Tasks'">
-          <div v-for="g in groups" :key="g.name" class="pln-group" :data-group="g.name">
-            <h2 class="pln-gh">{{ g.name }} <span class="muted">{{ g.list.length }}</span></h2>
-            <ul class="tk-list"><TaskRow v-for="t in g.list" :key="t.id" :task="t" :show-date="!['Today', 'Tomorrow'].includes(g.name)" /></ul>
+          <div class="pln-cols-bar">
+            <span class="muted small">Group by</span>
+            <div class="seg" role="group" aria-label="Group by">
+              <button type="button" :class="{ on: groupBy === 'when' }" :aria-pressed="groupBy === 'when'" data-test="group-when" @click="groupBy = 'when'">When</button>
+              <button type="button" :class="{ on: groupBy === 'category' }" :aria-pressed="groupBy === 'category'" data-test="group-category" @click="groupBy = 'category'">Category</button>
+            </div>
+          </div>
+          <div v-if="groups.length" class="pln-cols">
+            <section v-for="g in groups" :key="g.name" class="pln-group pln-col" :class="{ late: g.name === 'Overdue' }" :style="g.color ? { '--c': g.color } : {}" :data-group="g.name">
+              <h2 class="pln-gh"><i v-if="g.color" class="pln-col-dot" />{{ g.name }} <span class="muted">{{ g.list.length }}</span>
+                <button v-if="g.name === 'Overdue'" type="button" class="pln-col-act" data-test="overdue-today" @click="allToToday(g)">Move all to today</button>
+              </h2>
+              <ul class="tk-list"><TaskRow v-for="t in visible(g)" :key="t.id" :task="t" :show-date="!['Today', 'Tomorrow'].includes(g.name)" /></ul>
+              <button v-if="g.list.length > LIMIT + 1" type="button" class="pln-more" :aria-expanded="expanded.has(g.name)" @click="more(g.name)">{{ expanded.has(g.name) ? 'Show fewer' : `Show ${g.list.length - LIMIT} more` }}</button>
+            </section>
           </div>
           <div v-if="!groups.length" class="pln-empty">
             <h2>Your planner is clear</h2>
-            <p>Add a deadline, a class or a habit above, import your school calendar, or let Budgie build a daily routine for you.</p>
+            <p>Tap Add and say what is coming up, or bring in your school calendar from the Schedule.</p>
           </div>
           <div v-if="doneList.length" class="pln-group">
             <button type="button" class="notice-link" :aria-expanded="showDone" @click="showDone = !showDone">{{ showDone ? 'Hide' : 'Show' }} {{ doneList.length }} done</button>
@@ -148,12 +177,15 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
           </div>
         </template>
 
-        <!-- Agenda: the next two weeks, day by day -->
+        <!-- Agenda: the next two weeks, one column per day -->
         <template v-else-if="view === 'Agenda'">
-          <div v-for="d in agenda" :key="d.date" class="pln-group" data-test="agenda-day">
-            <h2 class="pln-gh">{{ dayLabel(d.date, now) }} <span class="muted">{{ fromIso(d.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}</span></h2>
-            <ul v-if="d.list.length" class="tk-list"><TaskRow v-for="x in d.list" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-            <p v-else class="muted small">Nothing planned.</p>
+          <div class="pln-cols">
+            <section v-for="d in agenda" :key="d.date" class="pln-group pln-col" :class="{ today: d.date === now }" data-test="agenda-day">
+              <h2 class="pln-gh">{{ dayLabel(d.date, now) }} <span class="muted">{{ fromIso(d.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}</span></h2>
+              <ul v-if="d.list.length" class="tk-list"><TaskRow v-for="x in visible(d)" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
+              <p v-else class="muted small pln-free">Free</p>
+              <button v-if="d.list.length > LIMIT + 1" type="button" class="pln-more" @click="more(d.name)">{{ expanded.has(d.name) ? 'Show fewer' : `Show ${d.list.length - LIMIT} more` }}</button>
+            </section>
           </div>
         </template>
 

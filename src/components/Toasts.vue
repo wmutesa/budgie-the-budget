@@ -9,7 +9,7 @@ const run = t => { t.action?.run(); dismiss(t.id); };
 
 <template>
   <div class="toasts" aria-live="polite" aria-relevant="additions text" data-test="toasts">
-    <div v-for="t in toasts" :key="t.id" class="toast" :class="t.kind" :role="t.kind === 'error' ? 'alert' : 'status'" data-test="toast">
+    <div v-for="t in toasts.slice(-3)" :key="t.id" class="toast" :class="t.kind" :role="t.kind === 'error' ? 'alert' : 'status'" data-test="toast">
       <span class="toast-ico"><Icon :name="icon[t.kind]" :size="14" /></span>
       <div class="toast-text">
         <b v-if="t.title">{{ t.title }}</b>

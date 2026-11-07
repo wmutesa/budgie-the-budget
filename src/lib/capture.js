@@ -72,7 +72,7 @@ export const itemOf = x => (x.to === 'goal' ? store.goals.find(g => g.id === x.i
 export function placeOf(x) {
   const it = itemOf(x);
   if (!it) return { where: '', target: '' };
-  if (x.to === 'goal') return { page: 'Today', where: `Today · Goals${it.by ? ` · by ${dayLabel(it.by)}` : ''} · ${store.tasks.filter(t => t.goalId === it.id).length} milestones in your Planner`, target: `[data-goal-id="${it.id}"]` };
+  if (x.to === 'goal') return { page: 'Overview', where: `Overview · Goals${it.by ? ` · by ${dayLabel(it.by)}` : ''} · ${store.tasks.filter(t => t.goalId === it.id).length} milestones in your Planner`, target: `[data-goal-id="${it.id}"]` };
   const when = it.repeat
     ? (it.repeat.every === 'day' ? 'every day' : it.repeat.every === 'weekdays' ? 'weekdays' : it.repeat.every === 'month' ? 'every month' : `every ${(it.repeat.days || []).map(d => DAY_SHORT[d]).join(', ')}`)
     : it.date ? dayLabel(it.date) : 'any day';
