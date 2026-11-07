@@ -174,6 +174,7 @@ export function loadModel(key) {
       });
       engines[key] = await Promise.race([engine, watchdog]);
       Object.assign(ai[key], { state: 'ready', progress: 100, text: '' });
+      if (['error', 'idle', 'waiting'].includes(ai.cpu.state)) cpuNotNeeded();
       write(FAIL_KEY, null);
       return true;
     } catch (e) {
@@ -207,24 +208,37 @@ if (typeof window !== 'undefined') {
 }
 
 // ---------- Processor engine (wllama: llama.cpp in WebAssembly) ----------
+// The processor engine is only a fallback: with a graphics-chip model ready, it is not needed.
+const gpuReady = () => isReady('small') || isReady('medium');
+function cpuNotNeeded() {
+  if (engines.cpu || ai.cpu.state === 'loading') return;
+  Object.assign(ai.cpu, { state: 'notneeded', progress: 0, text: '', error: '', detail: '' });
+}
+
 export function loadCpuModel() {
   if (engines.cpu) return Promise.resolve(true);
   if (loading.cpu) return loading.cpu;
+  if (gpuReady()) { cpuNotNeeded(); return Promise.resolve(false); }
   Object.assign(ai.cpu, { state: 'loading', progress: 0, text: 'Starting…', error: '', detail: '' });
   loading.cpu = (async () => {
     try {
       if (typeof WebAssembly !== 'object') throw Object.assign(new Error('This browser cannot run WebAssembly.'), { plain: true });
       const { Wllama } = await import(/* @vite-ignore */ WLLAMA_JS);
-      const w = new Wllama({ default: wllamaWasm }, { suppressNativeLog: true });
+      let w = null;
       let last = Date.now();
       const stall = new Promise((_, reject) => {
         const t = setInterval(() => { if (Date.now() - last > STALL_MS) { clearInterval(t); reject(new Error('stalled')); } }, 5000);
         loading.cpuTimer = t;
       });
-      const download = url => w.loadModelFromUrl(url, {
-        n_ctx: 2048,
-        progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
-      });
+      // A new engine for each attempt: an engine that failed once cannot start again.
+      const download = async url => {
+        try { await w?.exit?.(); } catch { /* already stopped */ }
+        w = new Wllama({ default: wllamaWasm }, { suppressNativeLog: true });
+        return w.loadModelFromUrl(url, {
+          n_ctx: 2048,
+          progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
+        });
+      };
       // Through Budgie first; if that fails on the network, wait and try once more.
       const attempt = async () => {
         try { return await download(`${location.origin}${MODELS.cpu.path}`); } catch (e) {
@@ -240,7 +254,9 @@ export function loadCpuModel() {
       return true;
     } catch (e) {
       engines.cpu = null;
-      Object.assign(ai.cpu, { state: 'error', error: e?.plain ? e.message : explain(e), detail: String(e?.message || e || '').slice(0, 300) });
+      // A graphics-chip model came up meanwhile: the fallback was not needed.
+      if (gpuReady()) cpuNotNeeded();
+      else Object.assign(ai.cpu, { state: 'error', error: e?.plain ? e.message : explain(e), detail: String(e?.message || e || '').slice(0, 300) });
       return false;
     } finally {
       clearInterval(loading.cpuTimer);

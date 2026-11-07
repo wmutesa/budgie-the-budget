@@ -4,7 +4,7 @@ import { ai, MODELS, browserAISupported, startBrowserModels, setAIEnabled } from
 // AI on this device: on by default, models picked per task automatically.
 const supported = browserAISupported();
 const stateText = s => ({
-  idle: 'Not started', loading: `Downloading · ${s.progress}%`, ready: 'Ready', error: 'Not available', skipped: 'Skipped on this device', waiting: 'Waiting for a faster connection',
+  idle: 'Not started', loading: `Downloading · ${s.progress}%`, ready: 'Ready', error: 'Not available', skipped: 'Skipped on this device', notneeded: 'Not needed: the graphics chip models are ready', waiting: 'Waiting for a faster connection',
 }[s.state] || s.state);
 const toggle = () => {
   if (ai.enabled && !confirm('Turn off AI on this device? The downloaded models are deleted, and Budgie uses its built-in rules.')) return;
