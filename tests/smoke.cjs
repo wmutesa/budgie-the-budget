@@ -128,7 +128,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner', 'Focus'], 'the three pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner', 'Focus', 'Reports'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -176,27 +176,37 @@ async function run(url) {
   await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-day"]');
   await page.waitForSelector('[data-test="schedule"]');
-  { const r = await page.locator('[data-test="remind"]').boundingBox(); if (r) assert.ok(Math.abs(r.width - r.height) < 0.5, `the reminders button is a perfect circle (${r.width}x${r.height})`); }
+  assert.equal(await page.$('[data-test="planner"] [data-test="remind"]'), null, 'task reminders live on the Profile page, not in the Planner');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/planner-head.png`, clip: { x: 0, y: 60, width: 1440, height: 200 } });
   assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Planner opens on the Schedule, with today\'s activity by category');
   await page.click('[data-test="view-tasks"]');
-  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority, with its time on the right');
-  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits repeat on their days');
+  // Tasks sit in one column per category; find a row by what it says.
+  const row = text => page.locator('.pln-col [data-test="task"]', { hasText: text }).first();
+  assert.equal(await page.$('[data-test="group-when"]'), null, 'tasks are always grouped by category, with no Group by switch');
+  assert.match(await row('Essay 2').textContent(), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow shows its kind, #project, time and high priority');
+  assert.match(await row('Gym').textContent(), /Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits repeat on their days');
   assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
   // Deleting is one click, with Undo in a notification.
   const before = await page.locator('[data-test="task"]').count();
-  const haircutRow = page.locator('.pln-group[data-group="Today"] [data-test="task"]', { hasText: 'Haircut' });
+  const haircutRow = row('Haircut');
+  // Hovering shows the actions over the card without making it taller.
+  const h0 = (await haircutRow.boundingBox()).height;
   await haircutRow.hover();
+  assert.ok(Math.abs((await haircutRow.boundingBox()).height - h0) < 1, 'hovering a card does not change its height');
   await haircutRow.locator('[data-test="task-delete"]').click();
   assert.equal(await page.locator('[data-test="task"]').count(), before - 1, 'a task is deleted at once');
   await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
   assert.equal(await page.locator('[data-test="task"]').count(), before, 'Undo brings it back');
-  if (process.env.SHOTS) { const b = await page.locator('.pln-main').boundingBox(); await page.locator('.pln-group[data-group="Tomorrow"] [data-test="task"] >> nth=0').hover(); await page.screenshot({ path: `${process.env.SHOTS}/rows.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } }); }
-  await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
+  if (process.env.SHOTS) { const b = await page.locator('.pln-main').boundingBox(); await row('Essay 2').hover(); await page.screenshot({ path: `${process.env.SHOTS}/rows.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } }); }
+  await row('List 15 places').locator('[data-test="task-check"]').click();
   assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
+  // Suggestions live on the Overview.
+  assert.equal(await page.$('[data-test="planner"] [data-test="suggestions"]'), null, 'the Planner has no suggestions bar');
+  await page.click(tab('Overview'));
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
   await idea.locator('[data-test="suggestion-add"]').click();
-  assert.match(await page.textContent('.pln-group[data-group="Today"]'), /Work on Essay 2/, 'an accepted suggestion becomes a task for today');
+  await page.click(tab('Planner'));
+  assert.ok(await row('Work on Essay 2').count(), 'an accepted suggestion becomes a task for today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.
   await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-day"]');
@@ -215,15 +225,15 @@ async function run(url) {
   await page.waitForSelector('[data-test="sch-box"]:has-text("Office hours")');
   await page.click('[data-test="calendars-open"]');
   await page.click('[data-test="view-tasks"]');
-  assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
+  assert.match(await row('Lab report').textContent(), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
   // AI breakdown (rules here, since no model runs in the test).
-  await page.locator('.pln-group[data-group="Tomorrow"] [data-test="task"]').first().hover();
-  await page.click('.pln-group[data-group="Tomorrow"] [data-test="row-breakdown"]');
-  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /0\/6/, 'the assignment is broken into six steps');
+  await row('Essay 2').hover();
+  await row('Essay 2').locator('[data-test="row-breakdown"]').click();
+  assert.match(await row('Essay 2').textContent(), /0\/6/, 'the assignment is broken into six steps');
   // Editing a task: link it to a goal.
-  await page.selectOption('.pln-group[data-group="Tomorrow"] [data-test="task-goal"]', { label: 'Run a 10K' });
+  await row('Essay 2').locator('[data-test="task-goal"]').selectOption({ label: 'Run a 10K' });
   // The date and time pickers: one design everywhere.
-  const editor = page.locator('.pln-group[data-group="Tomorrow"] [data-test="task-edit"]');
+  const editor = row('Essay 2').locator('[data-test="task-edit"]');
   await editor.locator('[data-test="time-field"]').click();
   await page.waitForSelector('[data-test="time-pop"]');
   if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
@@ -236,7 +246,7 @@ async function run(url) {
   if (process.env.SHOTS) { const b = await page.locator('[data-test="date-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/datepicker.png`, clip: { x: b.x - 120, y: b.y - 60, width: b.width + 240, height: b.height + 80 } }); }
   await page.keyboard.press('Escape');
   assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
-  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Run a 10K/, 'a task shows the goal it moves forward');
+  assert.match(await row('Essay 2').textContent(), /Run a 10K/, 'a task shows the goal it moves forward');
   // Week and month live in the Schedule.
   await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-week"]');
@@ -262,7 +272,7 @@ async function run(url) {
   await page.click('[data-test="plan-day"]');
   await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n, boxes);
   assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
-  await page.locator('[data-test="sch-box"]').first().click();
+  await page.locator('[data-test="sch-box"]').first().click({ position: { x: 12, y: 10 } });
   await page.waitForSelector('.sch-sheet [data-test="task-edit"]');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
   await page.click('.sch-sheet [aria-label="Close"]');
@@ -286,6 +296,7 @@ async function run(url) {
   }
   await page.fill('[data-test="you-name"]', 'Sam');
   await page.fill('[data-test="you-study"]', 'Electrical Engineering');
+  assert.match(await page.textContent('[data-test="profile-remind"]'), /Task reminders[\s\S]*10 minutes before/, 'task reminders are a switch on the Profile page');
   assert.equal(await page.textContent('[data-test="acct-tab-digests"]'), 'AI', 'the settings page is called AI for now');
   await page.click('[data-test="acct-tab-digests"]');
   assert.equal(await page.$('[data-test="you-key"]'), null, 'no Gemini key while digests are on hold');
@@ -299,7 +310,7 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
-  assert.ok(/Land a summer internship[\s\S]*0\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
+  assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress: the ticked milestone counts');
   assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
 
@@ -312,9 +323,16 @@ async function run(url) {
   await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
   assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to Planner[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-Planner action');
   await page.press('[data-test="search"]', 'Enter');
-  await page.waitForFunction(() => /Dentist/.test(document.querySelector('.pln-group[data-group="Tomorrow"]')?.textContent || ''), null, { timeout: 5000 });
+  await page.waitForFunction(() => [...document.querySelectorAll('.pln-col [data-test="task"]')].some(r => /Dentist[\s\S]*Tomorrow/.test(r.textContent)), null, { timeout: 5000 });
+  const unreadCount = async () => Number((await page.textContent('[data-test="bell-count"]').catch(() => '0')).replace('+', '')) || 0;
+  const unread0 = await unreadCount();
   await page.click('[data-test="bell"]');
   assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
+  assert.equal(await unreadCount(), unread0, 'opening the bell does not mark anything read');
+  if (unread0 && unread0 <= 9) {
+    await page.locator('[data-test="bell-item"].unread').first().focus();
+    assert.equal(await unreadCount(), unread0 - 1, 'reading one notification lowers the count by one');
+  }
   await page.click('[data-test="bell"]');
 
   // Voice: tap Add and it listens at once; tap again and it sorts, then the review starts.
@@ -328,7 +346,7 @@ async function run(url) {
   assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
   assert.match(await voice.textContent('[data-test="capture"]'), /Listening/, 'the Add button shows it is listening');
   if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
-  await voice.click('[data-test="capture"]');
+  await voice.click('[data-test="capture-sort"]');
   await voice.waitForSelector('[data-test="capture-review"]');
   assert.match(await voice.textContent('.cr-count'), /of 3/, 'three things are heard and sorted');
   await voice.click('[data-test="review-keep-all"]');
@@ -355,7 +373,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Three pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
+  assert.match(seen, /Four pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Overview'));
@@ -366,7 +384,7 @@ async function run(url) {
   await guide.click('[data-test="account"]');
   const sheet = await guide.locator('.acct-sheet').boundingBox();
   const vp = guide.viewportSize();
-  assert.ok(Math.abs(sheet.x - 75) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card leaves 75px on every side (${JSON.stringify(sheet)})`);
+  assert.ok(sheet.width <= 990 && Math.abs(sheet.x - (vp.width - sheet.width) / 2) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card fits its contents, centred, 75px from top and bottom (${JSON.stringify(sheet)})`);
   await guide.click('[data-test="acct-tab-data"]');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
   await guide.click('[data-test="acct-tab-profile"]');
@@ -391,7 +409,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Planner', 'Focus']) {
+  for (const p of ['Overview', 'Planner', 'Focus', 'Reports']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -418,14 +436,12 @@ async function run(url) {
   await time('week', () => full.click('[data-test="cal-week"]'), '.cal-dh');
   await time('month', () => full.click('[data-test="cal-month"]'), '.cal-mcell');
   await time('tasks', () => full.click('[data-test="view-tasks"]'), '.pln-group');
-  // Long lists stay short: columns show a few, then "Show N more"; group by category too.
+  // Long lists stay short: one column per category shows a few, then "Show N more".
   assert.ok(await full.locator('.pln-col').count() >= 4, 'tasks sit in side-by-side columns');
-  assert.ok(await full.locator('.pln-col[data-group="Later"] [data-test="task"]').count() <= 7, 'a long column shows only the first few');
-  await full.click('.pln-col[data-group="Later"] .pln-more');
-  assert.ok(await full.locator('.pln-col[data-group="Later"] [data-test="task"]').count() > 7, 'Show more opens the rest');
-  await full.click('[data-test="group-category"]');
-  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"]').count(), 'grouping by category gives a column per project');
-  await full.click('[data-test="group-when"]');
+  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"]').count(), 'tasks have a column per project');
+  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() <= 7, 'a long column shows only the first few');
+  await full.click('.pln-col[data-group="#Chemistry"] .pln-more');
+  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() > 7, 'Show more opens the rest');
   await full.click('[data-test="view-agenda"]');
   assert.equal(await full.locator('[data-test="agenda-day"]').count(), 14, 'the agenda is a column per day');
   await full.click(tab('Overview'));

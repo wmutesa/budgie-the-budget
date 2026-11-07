@@ -108,6 +108,16 @@ export function addSample(size = 420) {
     return g;
   });
 
+  // Focus sessions over the past four weeks, for Reports.
+  const log = [];
+  const focusable = out.filter(t => !t.repeat && ['assignment', 'exam', 'task'].includes(t.kind));
+  for (let i = 0; i < 70; i++) {
+    const t = focusable[(i * 17) % focusable.length];
+    const at = fromIso(addDays(d0, -((i * 5) % 28)));
+    at.setHours([8, 10, 14, 16, 19, 21][i % 6], (i * 13) % 60);
+    log.push({ id: newId(), taskId: t.id, title: t.title, project: t.project || '', kind: t.kind, mins: [25, 25, 50, 25, 15, 45][i % 6], at: at.toISOString(), sample: true });
+  }
+  store.focusLog = [...(store.focusLog || []).filter(x => !x.sample), ...log];
   store.tasks = [...out, ...store.tasks];
   store.goals = [...goals, ...store.goals];
   const colors = { ...store.projects };
@@ -122,6 +132,7 @@ export function removeSample() {
   const n = store.tasks.filter(t => t.sample).length + store.goals.filter(g => g.sample).length;
   store.tasks = store.tasks.filter(t => !t.sample);
   store.goals = store.goals.filter(g => !g.sample);
+  store.focusLog = (store.focusLog || []).filter(x => !x.sample);
   store.projects = Object.fromEntries(Object.entries(store.projects || {}).filter(([, v]) => !v?.sample));
   return n;
 }

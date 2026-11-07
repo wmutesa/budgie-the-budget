@@ -6,6 +6,7 @@ import { progress } from '../lib/goals';
 import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
+import PlanSuggest from './PlanSuggest.vue';
 import { deleteGoal } from '../lib/undo';
 import { capture } from '../lib/capture';
 
@@ -87,6 +88,7 @@ const nextStep = computed(() => {
     <div class="pln-ring td-ring" :style="{ '--p': pct }" role="img" :aria-label="`${pct}% of today done`"><b>{{ pct }}%</b><span>done</span></div>
     <p v-if="habits.length" class="muted small td-habits">{{ habits.filter(h => items.some(x => x.task === h.t && x.done)).length }} of {{ habits.filter(h => items.some(x => x.task === h.t)).length }} habits today</p>
   </section>
+  <div class="card cell td-sugg"><PlanSuggest /></div>
   <section class="card cell" data-test="today-goals">
     <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
     <ul v-if="goals.length" class="td-goals">

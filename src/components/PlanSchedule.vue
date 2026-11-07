@@ -63,6 +63,9 @@ const groupCats = list => {
     if (!m.has(k)) m.set(k, { key: k, label: catLabel(x.task), color: catColor(x.task), list: [] });
     m.get(k).list.push(x);
   }
+  // Done things sink to the bottom of their category.
+  const isDoneRow = x => (x.summary ? x.timesDone === x.times : x.done);
+  for (const c of m.values()) c.list.sort((a, b) => isDoneRow(a) - isDoneRow(b));
   return [...m.values()]
     .sort((a, b) => b.list.length - a.list.length || a.key.localeCompare(b.key))
     .map(c => ({ ...c, all: c.list.reduce((n, x) => n + (x.summary ? x.times : 1), 0), done: c.list.reduce((n, x) => n + (x.summary ? x.timesDone : x.done ? 1 : 0), 0) }));

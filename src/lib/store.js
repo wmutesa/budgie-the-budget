@@ -31,6 +31,8 @@ function fromSaved(saved = {}) {
     routine: saved.routine && typeof saved.routine === 'object' ? saved.routine : { wake: '07:00', sleep: '23:00', text: '' },
     // Planner settings: { view, cal, remind }.
     planner: saved.planner && typeof saved.planner === 'object' ? saved.planner : { view: 'Tasks', remind: false },
+    // Focus sessions for Reports: { id, taskId, title, project, kind, mins, at }.
+    focusLog: Array.isArray(saved.focusLog) ? saved.focusLog.slice(-2000) : [],
     // Life goals: { id, title, why, by, color, milestones: [{ id, title, date, taskId }] } (see goals.js).
     // Savings goals from older versions (no milestones) are dropped.
     goals: Array.isArray(saved.goals) ? saved.goals.filter(g => g && g.id && g.title && Array.isArray(g.milestones)) : [],

@@ -2899,3 +2899,145 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .brief-acts .btn { height: 42px !important; padding: 0 18px !important; font-size: 14px !important; gap: 8px; }
 .fcs .pln-idea-acts .ibtn.primary { background: #3f3f46 !important; border-color: #3f3f46 !important; }
 .fcs .pln-idea-acts .ibtn.primary:hover, .fcs .pln-idea-acts .ibtn.primary:active, .fcs .pln-idea-acts .ibtn.primary:focus-visible { background: #000 !important; border-color: #000 !important; }
+/* Task columns: the actions float in the card's bottom-right corner on hover,
+   so a card never grows and the sections never move */
+.pln-col .tk { position: relative; }
+.pln-col .tk-tools { display: flex !important; position: absolute !important; right: 6px; bottom: 6px; padding: 0 0 0 18px !important; opacity: 0 !important; pointer-events: none; background: linear-gradient(90deg, rgba(250, 250, 250, 0), #fafafa 18px) !important; }
+.pln-col .tk:hover .tk-tools, .pln-col .tk:focus-within .tk-tools { opacity: 1 !important; pointer-events: auto; }
+.pln-col .tk.open .tk-tools { opacity: 0 !important; pointer-events: none; }
+@media (hover: none) { .pln-col .tk-tools { position: static !important; opacity: 1 !important; pointer-events: auto; background: none !important; padding: 0 !important; } }
+/* Notifications: only unread ones keep their dot */
+.bell-head-acts { display: inline-flex; gap: 12px; align-items: center; }
+.bell-dot.off { background: transparent !important; box-shadow: inset 0 0 0 1px #e4e4e7; }
+.bell-item.unread .bell-text b { font-weight: 700; }
+/* Account dialog: only as wide as its contents (side menu plus the settings column) */
+.overlay:has(.acct-sheet) { grid-template-columns: minmax(0, 990px) !important; justify-content: center; }
+/* Overview actions: a touch smaller than before */
+.brief-acts .btn { height: 38px !important; padding: 0 15px !important; font-size: 13.5px !important; }
+/* Only the action buttons take clicks; the faded strip behind them lets clicks through to the card */
+.pln-col .tk:hover .tk-tools, .pln-col .tk:focus-within .tk-tools { pointer-events: none !important; }
+.pln-col .tk:hover .tk-tools .ibtn, .pln-col .tk:focus-within .tk-tools .ibtn { pointer-events: auto; }
+/* Tick buttons everywhere: a softer black, full black on hover or press */
+.ibtn.primary[aria-label], .pln-idea-acts .ibtn.primary { background: #3f3f46 !important; border-color: #3f3f46 !important; color: #fff !important; transition: background .15s, border-color .15s; }
+.ibtn.primary[aria-label]:hover:not(:disabled), .ibtn.primary[aria-label]:active, .ibtn.primary[aria-label]:focus-visible,
+.pln-idea-acts .ibtn.primary:hover, .pln-idea-acts .ibtn.primary:active { background: #000 !important; border-color: #000 !important; }
+/* Profile: task reminders switch */
+.you-remind { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.you-remind p { margin: 2px 0 0; }
+.you-switch { flex: none; width: 42px; height: 24px; padding: 2px; border: 0; border-radius: 999px; background: #d4d4d8; cursor: pointer; display: flex; transition: background .15s; }
+.you-switch i { width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .15s; }
+.you-switch[aria-checked="true"] { background: var(--violet); }
+.you-switch[aria-checked="true"] i { transform: translateX(18px); }
+.you-switch:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+/* Planner (Schedule, Tasks, Agenda): soft lavender glows and a faint dot grid behind the cards */
+.pln[data-test="planner"] {
+  background:
+    radial-gradient(520px 320px at 92% 4%, rgba(167, 139, 250, .16), transparent 70%),
+    radial-gradient(640px 420px at 4% 96%, rgba(196, 181, 253, .18), transparent 70%),
+    radial-gradient(circle at 1px 1px, rgba(124, 58, 237, .09) 1px, transparent 1.5px) 0 0 / 18px 18px,
+    linear-gradient(180deg, #fbfaff, #f7f5ff);
+}
+.pln[data-test="planner"] .sch, .pln[data-test="planner"] .pln-cols, .pln[data-test="planner"] .pln-col { background: #fff; }
+.pln[data-test="planner"] .pln-body { border-top-color: #ede9fe; }
+
+/* ---------- Reports ---------- */
+.rep { background: radial-gradient(560px 340px at 96% 0%, rgba(167, 139, 250, .14), transparent 70%), linear-gradient(180deg, #fbfaff, #fff 320px); border: 1px solid var(--line); padding: 24px 28px 28px; display: grid; gap: 20px; align-content: start; min-width: 0; }
+.rep-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.rep-head h1 { margin: 2px 0 4px; font-size: 26px; }
+.rep-head .seg button { padding: 6px 14px; font-size: 12px; font-weight: 600; }
+.rep-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.rep-stat { position: relative; display: grid; gap: 2px; padding: 16px; background: #fff; border: 1px solid #ede9fe; }
+.rep-stat .label { margin: 0; }
+.rep-stat b { font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 1.15; }
+.rep-stat-ic { position: absolute; right: 12px; top: 12px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #f5f3ff; color: var(--violet); }
+.rep-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rep-card { background: #fff; border: 1px solid var(--line); padding: 16px 18px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+.rep-card h2 { margin: 0; font-family: var(--display); font-size: 15px; font-weight: 600; }
+.rep-wide { grid-column: 1 / -1; }
+.rep-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rep-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #52525b; }
+.rep-key i { width: 10px; height: 10px; display: inline-block; margin-left: 6px; }
+.k-done, .b-done { background: var(--violet); }
+.k-focus, .b-focus { background: #c4b5fd; }
+.rep-says { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px; }
+.rep-says li { padding: 10px 12px; font-size: 13.5px; line-height: 1.45; border-left: 3px solid #a78bfa; background: #faf8ff; }
+.rep-says li.good { border-left-color: #16a34a; background: #f0fdf4; }
+.rep-says li.warn { border-left-color: #f59e0b; background: #fffbeb; }
+.rep-days { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); gap: 3px; height: 150px; align-items: end; }
+.rep-day { display: grid; grid-template-rows: 1fr 16px; height: 100%; min-width: 0; }
+.rep-bars { display: flex; align-items: flex-end; justify-content: center; gap: 1px; height: 100%; border-bottom: 1px solid var(--line); }
+.rep-bars i { flex: 1; max-width: 14px; min-height: 0; }
+.rep-day.today .rep-bars { background: #faf8ff; }
+.rep-dl { font-size: 10.5px; color: #71717a; text-align: center; white-space: nowrap; overflow: visible; }
+.rep-cats { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rep-cats li { display: grid; grid-template-columns: minmax(110px, 200px) minmax(0, 1fr) 70px 44px 60px; align-items: center; gap: 10px; font-size: 13px; }
+.rep-cat-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rep-cat-name i { width: 8px; height: 8px; background: var(--c); flex: none; }
+.rep-cat-bar { height: 8px; background: #f4f4f5; }
+.rep-cat-bar b { display: block; height: 100%; background: var(--c); }
+.rep-cat-n { text-align: right; font-size: 12px; }
+.rep-parts, .rep-kinds { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rep-parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.rep-parts li > span:first-child { display: grid; }
+.rep-pill { font-size: 12px; font-weight: 600; padding: 2px 8px; background: #f5f3ff; color: #5b21b6; white-space: nowrap; }
+.rep-pill.f { background: #ede9fe; }
+.rep-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; height: 150px; }
+.rep-wk { display: grid; grid-template-rows: 1fr auto auto; justify-items: center; gap: 2px; }
+.rep-wk-bar { width: 100%; max-width: 32px; display: flex; align-items: flex-end; background: #faf8ff; }
+.rep-wk-bar i { width: 100%; background: linear-gradient(180deg, #a78bfa, var(--violet)); }
+.rep-kinds li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.rep-kinds li i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.rep-kinds li b { margin-left: auto; }
+.rep-sub { margin: 6px 0 0; }
+@media (max-width: 900px) { .rep-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rep-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .rep { padding: 18px 16px; }
+  .rep-cats li { grid-template-columns: minmax(0, 1fr) 60px 40px; }
+  .rep-cat-bar { grid-column: 1 / -1; order: 5; }
+  .rep-cat-n:last-child { display: none; }
+  .rep-stat b { font-size: 22px; }
+}
+/* Overview: suggestions sit in the side column */
+.td-sugg { padding: 0 !important; }
+.td-sugg .pln-card { border-bottom: 0; padding: 16px 18px; }
+/* Planner: no suggestions bar below; a little breathing space instead */
+.pln[data-test="planner"] { padding-bottom: 15px; }
+.pln[data-test="planner"] .pln-body { border-top: 0; }
+/* Task columns: the actions always hold their place on the card's bottom line and
+   only fade in on hover, so cards never change height and never cover the title */
+.pln-col .tk-tools { position: static !important; display: flex !important; margin-left: auto; padding: 0 !important; background: none !important; visibility: hidden; opacity: 0 !important; pointer-events: none !important; }
+.pln-col .tk:hover .tk-tools, .pln-col .tk:focus-within .tk-tools { visibility: visible; opacity: 1 !important; }
+.pln-col .tk:hover .tk-tools .ibtn, .pln-col .tk:focus-within .tk-tools .ibtn { pointer-events: auto; }
+.pln-col .tk-side { display: flex !important; width: 100%; }
+@media (hover: none) { .pln-col .tk-tools { visibility: visible; opacity: 1 !important; } .pln-col .tk-tools .ibtn { pointer-events: auto; } }
+/* Add: a small pill in the top right, beside notifications and your profile */
+.nb-actions { display: flex; align-items: center; gap: 8px; }
+.cap-fab { position: relative !important; z-index: 150; height: 30px !important; padding: 0 12px 0 4px !important; gap: 6px !important; font: 600 13px var(--sans) !important; box-shadow: none !important; flex: none; }
+.cap-fab .cap-glyph { width: 22px !important; height: 22px !important; }
+.cap-fab:hover { transform: none; }
+.cap-fab.away, .cap-fab.open { display: inline-flex !important; }
+@media (max-width: 640px) { .cap-fab { padding: 0 4px !important; } .cap-fab .cap-word { display: none; } }
+
+/* Calendar cards: clean and minimal. A soft tint of the category colour, a thin
+   accent bar on the left, rounded corners and a quiet lift on hover. */
+.sch-box { border: 0 !important; border-left: 3px solid var(--c) !important; border-radius: 8px !important; background: color-mix(in srgb, var(--c) 8%, #fff) !important; box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 14%, transparent); padding: 8px 10px 8px 11px; transition: box-shadow .15s, transform .15s; }
+.sch-box:hover { box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--c) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent); transform: translateY(-1px); }
+.sch-box-top b { font-weight: 600; font-size: 12.5px; letter-spacing: -.005em; }
+.sch-box-top span { font-size: 11px; color: color-mix(in srgb, var(--c) 55%, #3f3f46); font-weight: 500; }
+.sch-box-note { color: #71717a; }
+.sch-box.pending { border-left-style: dashed !important; }
+.cal-item.box { border-radius: 7px; border-left-width: 3px; background: color-mix(in srgb, var(--k) 9%, #fff); box-shadow: 0 0 0 1px color-mix(in srgb, var(--k) 14%, transparent); padding: 4px 7px; transition: box-shadow .15s; }
+.cal-item.box:hover { box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--k) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--k) 26%, transparent); }
+.cal-item.box b { font-size: 11.5px; }
+.cal-item.box span { color: color-mix(in srgb, var(--k) 50%, #52525b); }
+.cal-item.chip { border-radius: 5px; }
+.cap-fab { top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; }
+/* A little more lavender behind the Planner, so it shows around the white cards */
+.pln[data-test="planner"] {
+  background:
+    radial-gradient(560px 340px at 94% 2%, rgba(167, 139, 250, .26), transparent 70%),
+    radial-gradient(700px 440px at 2% 98%, rgba(196, 181, 253, .30), transparent 70%),
+    radial-gradient(circle at 1px 1px, rgba(124, 58, 237, .16) 1px, transparent 1.6px) 0 0 / 18px 18px,
+    linear-gradient(180deg, #f8f6ff, #f3efff) !important;
+}
+.pln[data-test="planner"] .pln-filter .chip-btn:not(.on) { background: rgba(255, 255, 255, .85); }

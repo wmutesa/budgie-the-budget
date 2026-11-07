@@ -9,6 +9,7 @@ import SignInBackdrop from './components/SignInBackdrop.vue';
 import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
 import FocusView from './components/FocusView.vue';
+import ReportsView from './components/ReportsView.vue';
 import CaptureButton from './components/CaptureButton.vue';
 import CaptureReview from './components/CaptureReview.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
@@ -24,9 +25,9 @@ import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
 // Three pages: Overview (your day and goals), Planner (schedule, tasks,
-// agenda) and Focus (what matters now). The Add button adds anything from anywhere.
+// agenda), Focus (what matters now) and Reports (what got done). The Add button adds anything from anywhere.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Planner: 'planner', Focus: 'target' };
+const PAGE_ICONS = { Overview: 'home', Planner: 'planner', Focus: 'target', Reports: 'trend' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -95,6 +96,7 @@ onUnmounted(() => clearInterval(timer));
         </nav>
         <GlobalSearch />
         <div class="nb-actions">
+          <CaptureButton v-if="account.status === 'signed-in'" />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
         </div>
@@ -109,10 +111,13 @@ onUnmounted(() => clearInterval(timer));
       <template v-else-if="active === 'Focus'">
         <FocusView />
       </template>
+      <template v-else-if="active === 'Reports'">
+        <ReportsView />
+      </template>
     </main>
 
     <Toasts />
-    <template v-if="account.status === 'signed-in'"><CaptureButton /><CaptureReview /></template>
+    <CaptureReview v-if="account.status === 'signed-in'" />
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>
 </template>

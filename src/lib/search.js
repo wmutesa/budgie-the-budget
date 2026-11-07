@@ -10,6 +10,7 @@ const PLACES = [
   ['Overview', 'Overview', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Planner', 'Planner', 'Tasks, deadlines, classes and routines', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule/],
   ['Planner', 'Schedule', 'Your day by category, plus week and month', /calendar|week|month|day view|schedule|timeline/, 'Schedule'],
+  ['Reports', 'Reports', 'Focus hours, what got done, by category', /report|analytic|stats|insight|progress|hours/],
   ['Focus', 'Focus', 'Top three, a focus timer and suggestions', /focus|timer|pomodoro|top three|suggest/],
   ['Planner', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
 ];

@@ -4,13 +4,12 @@ import { store } from '../lib/store';
 import { parseTask, addFromText, occurrences, summary, today, addDays, dayLabel, fromIso, isoDay, timeLabel, isDone, KINDS } from '../lib/tasks';
 import { refreshFeeds } from '../lib/calendar';
 import TaskRow from './TaskRow.vue';
-import PlanSuggest from './PlanSuggest.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
 import { focus, finishFocus, mmss } from '../lib/focus';
 import { nav, go } from '../lib/nav';
-import { catColor } from '../lib/cats';
+import { catKey, catColor } from '../lib/cats';
 let showDoneFirst = false;
 
 // Planner: school, work, projects, routines and events in one place.
@@ -47,27 +46,17 @@ const inFilter = t => !project.value || t.project === project.value;
 
 // ---------- Tasks view ----------
 const showDone = ref(showDoneFirst);
+// One column per #project, or per kind when there is no project, most recent first.
 const groups = computed(() => {
   const d = now.value;
   const one = store.tasks.filter(t => !t.repeat && !t.done && inFilter(t));
   const sorted = list => [...list].sort((a, b) => (a.date || '9').localeCompare(b.date || '9') || (a.time || '99').localeCompare(b.time || '99') || ({ high: 0, medium: 1, low: 2 }[a.priority] - { high: 0, medium: 1, low: 2 }[b.priority]));
-  const rows = [
-    ['Overdue', one.filter(t => t.date && t.date < d)],
-    ['Today', one.filter(t => t.date === d)],
-    ['Tomorrow', one.filter(t => t.date === addDays(d, 1))],
-    ['This week', one.filter(t => t.date > addDays(d, 1) && t.date <= addDays(d, 7))],
-    ['Later', one.filter(t => t.date > addDays(d, 7))],
-    ['Any time', one.filter(t => !t.date)],
-  ].map(([name, list]) => ({ name, list: sorted(list) }));
-  rows.push({ name: 'Routines and classes', list: store.tasks.filter(t => t.repeat && inFilter(t)).sort((a, b) => (a.time || '99').localeCompare(b.time || '99')), repeating: true });
-  if (groupBy.value === 'category') {
-    // One column per #project, or per kind when there is no project.
-    const all = [...one.filter(t => !t.date || t.date >= addDays(d, -60)), ...store.tasks.filter(t => t.repeat && inFilter(t))];
-    const m = new Map();
-    for (const t of all) { const k = t.project ? `#${t.project}` : (KINDS[t.kind]?.label || 'Task'); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
-    return [...m.entries()].map(([name, list]) => ({ name, list: sorted(list), color: catColor(list[0]) })).sort((a, b) => b.list.length - a.list.length);
-  }
-  return rows.filter(g => g.list.length);
+  const all = [...one.filter(t => !t.date || t.date >= addDays(d, -60)), ...store.tasks.filter(t => t.repeat && inFilter(t))];
+  const m = new Map();
+  for (const t of all) { const k = catKey(t); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+  // Most recently added or ticked category first.
+  const recent = list => list.reduce((m, t) => [t.createdAt, t.doneAt, ...(t.doneDates || [])].reduce((x, v) => (v && v > x ? v : x), m), '');
+  return [...m.entries()].map(([name, list]) => ({ name, list: sorted(list), color: catColor(list[0]), recent: recent(list) })).sort((a, b) => b.recent.localeCompare(a.recent) || b.list.length - a.list.length);
 });
 // Columns stay short: the first few, then "Show more".
 const LIMIT = 6;
@@ -75,10 +64,7 @@ const expanded = ref(new Set());
 const more = name => { const s = new Set(expanded.value); s.has(name) ? s.delete(name) : s.add(name); expanded.value = s; };
 const visible = g => (expanded.value.has(g.name) || g.list.length <= LIMIT + 1 ? g.list : g.list.slice(0, LIMIT));
 // Opened from search: make sure that item's column shows it.
-if (nav.task) { const t = store.tasks.find(x => x.id === nav.task); if (t) expanded.value = new Set(['Overdue', 'Today', 'Tomorrow', 'This week', 'Later', 'Any time', 'Routines and classes']); }
-const groupBy = computed({ get: () => (store.planner.groupBy === 'category' ? 'category' : 'when'), set: v => { store.planner.groupBy = v; } });
-// Overdue: bring everything to today in one go.
-function allToToday(g) { const d = now.value; const was = g.list.map(t => [t, t.date]); g.list.forEach(t => { t.date = d; }); toast(`${was.length} moved to today.`, { kind: 'success', action: { label: 'Undo', run: () => was.forEach(([t, x]) => { t.date = x; }) } }); }
+if (nav.task) { const t = store.tasks.find(x => x.id === nav.task); if (t) expanded.value = new Set([catKey(t)]); }
 const doneList = computed(() => store.tasks.filter(t => !t.repeat && t.done && inFilter(t)).sort((a, b) => String(b.doneAt).localeCompare(String(a.doneAt))).slice(0, 30));
 
 // ---------- Agenda ----------
@@ -92,15 +78,6 @@ const agenda = computed(() => {
   return days;
 });
 
-// ---------- reminders on this device ----------
-const canNotify = typeof Notification !== 'undefined';
-async function toggleRemind() {
-  if (!store.planner.remind && canNotify && Notification.permission !== 'granted') {
-    const p = await Notification.requestPermission().catch(() => 'denied');
-    if (p !== 'granted') { flash.value = 'Notifications are blocked for this site in your browser settings.'; return; }
-  }
-  store.planner.remind = !store.planner.remind;
-}
 const greeting = computed(() => { const h = clock.value.getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; });
 </script>
 
@@ -117,7 +94,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         <div class="seg pln-views" role="tablist" aria-label="Planner views">
           <button v-for="[v, ic] in VIEWS" :key="v" type="button" role="tab" :aria-selected="view === v" :class="{ on: view === v }" :title="v" :data-test="`view-${v.toLowerCase()}`" @click="view = v"><Icon :name="ic" :size="15" /><span class="pln-vlabel">{{ v }}</span></button>
         </div>
-        <button v-if="canNotify" type="button" class="ibtn" :class="{ on: store.planner.remind }" :aria-pressed="store.planner.remind" :title="store.planner.remind ? 'Reminders on: tap to turn off' : 'Remind me 10 minutes before timed items'" :aria-label="store.planner.remind ? 'Turn reminders off' : 'Turn reminders on'" data-test="remind" @click="toggleRemind"><Icon :name="store.planner.remind ? 'bell' : 'bell-off'" /></button>
       </div>
     </section>
 
@@ -125,13 +101,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     <div v-if="(projects.length || view === 'Tasks') && view !== 'Schedule'" class="pln-filter" role="group" aria-label="Filter by project">
       <button type="button" class="chip-btn" :class="{ on: !project }" @click="project = ''">Everything</button>
       <button v-for="p in projects" :key="p" type="button" class="chip-btn" :class="{ on: project === p }" @click="project = project === p ? '' : p">#{{ p }}</button>
-      <div v-if="view === 'Tasks'" class="pln-cols-bar">
-        <span class="muted small">Group by</span>
-        <div class="seg" role="group" aria-label="Group by">
-          <button type="button" :class="{ on: groupBy === 'when' }" :aria-pressed="groupBy === 'when'" data-test="group-when" @click="groupBy = 'when'">When</button>
-          <button type="button" :class="{ on: groupBy === 'category' }" :aria-pressed="groupBy === 'category'" data-test="group-category" @click="groupBy = 'category'">Category</button>
-        </div>
-      </div>
       
     </div>
 
@@ -149,11 +118,10 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         <!-- Tasks: columns, by when or by category; each column stays short -->
         <template v-if="view === 'Tasks'">
           <div v-if="groups.length" class="pln-cols">
-            <section v-for="g in groups" :key="g.name" class="pln-group pln-col" :class="{ late: g.name === 'Overdue' }" :style="g.color ? { '--c': g.color } : {}" :data-group="g.name">
+            <section v-for="g in groups" :key="g.name" class="pln-group pln-col" :style="g.color ? { '--c': g.color } : {}" :data-group="g.name">
               <h2 class="pln-gh"><i v-if="g.color" class="pln-col-dot" />{{ g.name }} <span class="muted">{{ g.list.length }}</span>
-                <button v-if="g.name === 'Overdue'" type="button" class="pln-col-act" data-test="overdue-today" @click="allToToday(g)">Move all to today</button>
               </h2>
-              <ul class="tk-list"><TaskRow v-for="t in visible(g)" :key="t.id" :task="t" :show-date="!['Today', 'Tomorrow'].includes(g.name)" /></ul>
+              <ul class="tk-list"><TaskRow v-for="t in visible(g)" :key="t.id" :task="t" /></ul>
               <button v-if="g.list.length > LIMIT + 1" type="button" class="pln-more" :aria-expanded="expanded.has(g.name)" @click="more(g.name)">{{ expanded.has(g.name) ? 'Show fewer' : `Show ${g.list.length - LIMIT} more` }}</button>
             </section>
           </div>
@@ -180,10 +148,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         </template>
 
       </div>
-
-      <aside class="pln-side">
-        <PlanSuggest />
-      </aside>
     </div>
   </div>
 </template>

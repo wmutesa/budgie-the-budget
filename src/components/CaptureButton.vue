@@ -47,7 +47,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
 
 <template>
   <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: open' : 'Add anything (N)'" title="Add anything (N)" data-test="capture" @click="capture.open ? sortIt() : openSheet()">
-    <span class="cap-glyph"><Icon :name="listening ? 'pause' : 'capture'" :size="22" /></span>
+    <span class="cap-glyph"><Icon :name="listening ? 'pause' : 'capture'" :size="15" /></span>
     <span class="cap-word">{{ listening ? 'Listening' : 'Add' }}</span>
   </button>
 
