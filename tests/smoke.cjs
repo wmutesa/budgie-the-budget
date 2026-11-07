@@ -93,7 +93,7 @@ async function fakeApi(page, account = fakeAccount) {
     }
     if (p === '/api/markets') return route.fulfill({ json: {
       updatedAt: new Date().toISOString(), source: 'Yahoo Finance',
-      indexes: [{ symbol: '^GSPC', name: 'S&P 500', about: 'x', price: 6120.5, currency: 'USD', day: 0.8, month: 2.1, year: null, spark: [1, 2, 3, 2, 4] }, { symbol: '^TNX', name: '10-year Treasury yield', about: 'x', price: 4.12, currency: 'USD', day: -1.2, month: -0.5, year: null, spark: [3, 2, 1] }],
+      indexes: [{ symbol: '^GSPC', name: 'S&P 500', about: 'x', price: 6120.5, currency: 'USD', day: 0.8, month: 2.1, year: null, spark: [1, 2, 3, 2, 4] }, { symbol: '^IXIC', name: 'Nasdaq', about: 'x', price: 19850, currency: 'USD', day: 1.1, month: 3.4, year: null, spark: [1, 3, 2, 4] }, { symbol: '^DJI', name: 'Dow Jones', about: 'x', price: 43210, currency: 'USD', day: 0.3, month: 0.9, year: null, spark: [2, 2, 3, 3] }, { symbol: '^TNX', name: '10-year Treasury yield', about: 'x', price: 4.12, currency: 'USD', day: -1.2, month: -0.5, year: null, spark: [3, 2, 1] }],
       watch: [{ symbol: 'VTI', name: 'US stock market', about: 'x', price: 310, currency: 'USD', day: 0.5, month: 1.9, year: 14.2, spark: [1, 2] }, { symbol: 'BND', name: 'Bonds', about: 'x', price: 72, currency: 'USD', day: 0.1, month: 0.4, year: 3.1, spark: [1, 2] }],
       news: [{ title: 'Stocks rise as the Fed holds rates', link: 'https://finance.yahoo.com/news/a.html', source: 'Reuters', date: new Date().toUTCString() }],
     } });
@@ -253,12 +253,16 @@ async function run(url) {
   assert.equal(await page.$('.insight'), null, 'the old "What Budgie thinks" card is gone');
   await page.waitForSelector('#markets .mk-tile');
   const mk = await page.textContent('#markets');
-  assert.match(mk, /S&P 500[\s\S]*\+0\.8% today/, 'market indexes show today\'s change');
+  assert.match(await page.textContent('[data-test="markets-headline"]'), /^Stocks rise, led by tech as bond yields ease$/, 'the brief opens with a headline written from the numbers');
+  assert.match(await page.textContent('[data-test="market-status"]'), /^US markets (open|closed)/, 'it says whether US markets are open');
+  assert.match(await page.textContent('[data-test="money-today"]'), /Net worth[\s\S]*\$[\d,]+[\s\S]*Emergency cushion[\s\S]*months/, '"Your money today" uses your accounts and goals');
+  assert.match(mk, /S&P 500[\s\S]*\+0\.8%/, 'market indexes show today\'s change');
   assert.match(mk, /4\.12%/, 'the Treasury yield shows as a percentage');
   assert.match(mk, /US stock market[\s\S]*\+14\.2%[\s\S]*Bonds/, 'markets to watch are ranked by the past year');
   assert.match(mk, /not financial advice/i, 'markets are labelled as information, not advice');
-  assert.ok(await page.isVisible('#markets .mk-news a'), 'news shows beside markets to watch, without tabs');
-  assert.equal(await page.getAttribute('#markets .mk-news a', 'rel'), 'noopener noreferrer', 'news links open safely');
+  assert.equal(await page.getAttribute('#markets .mkt-lead', 'rel'), 'noopener noreferrer', 'the lead story opens safely');
+  assert.match(await page.textContent('#markets .mkt-lead'), /Stocks rise as the Fed holds rates[\s\S]*Reuters/, 'the first headline is the lead story');
+  assert.equal(await page.$('footer'), null, 'there is no footer');
   assert.equal(await page.textContent('[data-test="growth-total"]'), '$31,056', 'the growth calculator works out $200 a month for 10 years at 5%');
   await page.click('[data-test="growth"] .chip-btn:has-text("Bold")');
   assert.notEqual(await page.textContent('[data-test="growth-total"]'), '$31,056', 'a bolder return changes the estimate');

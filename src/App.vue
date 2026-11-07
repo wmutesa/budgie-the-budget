@@ -18,14 +18,13 @@ import CaptureCell from './components/CaptureCell.vue';
 import ReviewQueue from './components/ReviewQueue.vue';
 import SpendSummary from './components/SpendSummary.vue';
 import KpiStrip from './components/KpiStrip.vue';
-import OpportunitiesCell from './components/OpportunitiesCell.vue';
 import PlaygroundView from './components/PlaygroundView.vue';
 import SignIn from './components/SignIn.vue';
 import AccountMenu from './components/AccountMenu.vue';
 import NoticeBell from './components/NoticeBell.vue';
 import UpcomingCell from './components/UpcomingCell.vue';
 import RecurringCell from './components/RecurringCell.vue';
-import MarketsCell from './components/MarketsCell.vue';
+import MarketsView from './components/MarketsView.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
@@ -77,7 +76,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
     </section>
   </main>
   <div v-else class="app">
-    <main class="grid hl canvas" :class="{ 'fit-page': active === 'Markets' }">
+    <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header class="cell nav-bar span-12">
         <div class="nb-brand">
@@ -128,8 +127,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <PlaygroundView />
       </template>
       <template v-else>
-        <MarketsCell class="span-8" id="markets" />
-        <OpportunitiesCell class="span-4" id="opportunities" />
+        <MarketsView class="span-12" id="markets" />
       </template>
     </main>
 
