@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { CATEGORIES } from '../lib/categorize';
@@ -36,8 +37,8 @@ const sourceLabel = { receipt: 'Receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'E
     <div class="cell-head">
       <div><p class="label">Review</p><p class="review-count">{{ store.drafts.length }} waiting · check, then accept</p></div>
       <div class="review-acts">
-        <button class="btn small" @click="store.drafts = []">Discard all</button>
-        <button class="btn primary small" data-test="accept-all" @click="acceptAll">Accept all</button>
+        <button class="btn small" @click="store.drafts = []"><Icon name="trash" :size="14" />Discard all</button>
+        <button class="btn primary small" data-test="accept-all" @click="acceptAll"><Icon name="check" :size="14" />Accept all</button>
       </div>
     </div>
 

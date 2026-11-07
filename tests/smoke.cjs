@@ -137,7 +137,12 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  assert.match(await page.textContent('.nav-bar .brand-word'), /BUDGIE/, 'navigation renders inside the grid');
+  assert.equal(await page.locator('.dock .dock-btn').count(), 5, 'the dock has the five pages');
+  assert.equal(await page.textContent('.nav-bar .nb-page'), 'Overview', 'the top bar names the page you are on');
+  await page.click('.dock-btn:has-text("Planner")');
+  assert.equal(await page.textContent('.nav-bar .nb-page'), 'Planner', 'the dock switches pages');
+  await page.click('.dock-btn:has-text("Overview")');
+  if (process.env.SHOTS) { await page.waitForTimeout(600); await page.screenshot({ path: `${process.env.SHOTS}/overview.png` }); }
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   assert.match(await page.textContent('.lede'), /You hold[\s\S]*spent/, 'the brief renders from your entries');
   for (const label of ['Savings goals', 'Net worth', 'Plan', 'Cash flow', 'Exchange rates', 'Subscriptions', 'Expense breakdown', 'Upcoming payments', 'Wallets']) {
@@ -298,15 +303,21 @@ async function run(url) {
   await page.click('.nb-pages button:has-text("Planner")');
   await page.waitForSelector('[data-test="planner"]');
   assert.match(await page.textContent('[data-test="planner-summary"]'), /Nothing planned for today yet/, 'an empty planner says so');
-  await page.fill('[data-test="plan-add"]', 'Essay 2 due tomorrow 5pm #English');
-  assert.match(await page.textContent('[data-test="plan-preview"]'), /Assignment[\s\S]*Tomorrow[\s\S]*5 PM[\s\S]*#English[\s\S]*Essay 2/, 'the preview shows what Budgie understood');
-  await page.press('[data-test="plan-add"]', 'Enter');
+  // Adding happens in the Playground inbox, which sends each line where it belongs.
+  await page.click('[data-test="planner-add"]');
+  await page.waitForSelector('[data-test="inbox"]');
+  await page.fill('[data-test="inbox-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nhaircut today $25\nspent 9 on coffee yesterday');
+  await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 4);
+  const dests = await page.$$eval('[data-test="inbox-rows"] li', rows => rows.map(r => [...r.querySelectorAll('.inbox-dest.on')].map(b => b.textContent.trim()).join('+')));
+  assert.deepEqual(dests, ['Planner', 'Planner', 'Planner', 'Transactions'], 'tasks go to the Planner and past spending to Transactions');
+  assert.match(await page.textContent('[data-test="inbox-rows"] li >> nth=2'), /\$25 when done/, 'a task with a price keeps it for when it is done');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/playground.png` });
+  await page.click('[data-test="inbox-send"]');
+  assert.match(await page.textContent('[data-test="inbox-done"]'), /3 to the Planner, 1 to Transactions/, 'the inbox says where things went');
+  await page.click('[data-test="inbox-done"] button:has-text("Open Planner")');
+  await page.click('[data-test="view-tasks"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*5 PM[\s\S]*Assignment[\s\S]*#English[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority');
-  await page.fill('[data-test="plan-add"]', 'Gym MWF 6pm');
-  await page.click('[data-test="plan-add-btn"]');
   assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*6 PM[\s\S]*Mon Wed Fri/, 'a habit repeats on its days');
-  await page.fill('[data-test="plan-add"]', 'haircut today $25');
-  await page.press('[data-test="plan-add"]', 'Enter');
   await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
   assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
   // Suggestions: a deadline tomorrow with no plan gets a work session.
@@ -391,6 +402,9 @@ async function run(url) {
   }
   // Search everything: tasks are found and opened; typed text becomes an action that fits the page.
   assert.equal((await page.textContent('[data-test="new"]')).trim(), '+ Task', 'the + button adds a task on the Planner');
+  await page.click('[data-test="new"]');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.test), 'inbox-text', '+ Task opens the inbox ready to type');
+  await page.click('.nb-pages button:has-text("Planner")');
   await page.click('.nb-pages button:has-text("Overview")');
   await page.fill('[data-test="search"]', 'essay');
   await page.waitForSelector('[data-test="search-pop"]');

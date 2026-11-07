@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { recurring, trackAsSubscription } from '../lib/recurring';
 import { newId } from '../lib/store';
 
@@ -14,7 +15,7 @@ const money = (n, c) => new Intl.NumberFormat('en-US', { style: 'currency', curr
       <li v-for="r in recurring.slice(0, 6)" :key="r.key">
         <span class="rec-name"><b>{{ r.name }}</b><span class="muted small">{{ r.count }} times over {{ r.months }} months · {{ r.category }}</span></span>
         <b>{{ money(r.amount, r.currency) }}<span class="muted small"> / month</span></b>
-        <button class="btn small" type="button" data-test="track-recurring" @click="trackAsSubscription(r, newId)">Track as subscription</button>
+        <button class="btn small" type="button" data-test="track-recurring" @click="trackAsSubscription(r, newId)"><Icon name="plus" :size="14" />Track as subscription</button>
       </li>
     </ul>
   </section>

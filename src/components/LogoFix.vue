@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { ref } from 'vue';
 import BrandPicker from './BrandPicker.vue';
 import { logoUrl } from '../lib/brands';
@@ -40,7 +41,7 @@ function pick(b) {
         <BrandPicker :seed="name" :allow-manual="false" @pick="pick" />
         <form class="site-row" @submit.prevent="useSite">
           <input v-model="site" class="field" placeholder="Or type its website, for example netflix.com" aria-label="Company website" />
-          <button class="btn primary small" type="submit">Use this site</button>
+          <button class="btn primary small" type="submit"><Icon name="check" :size="14" />Use this site</button>
         </form>
       </div>
     </div>

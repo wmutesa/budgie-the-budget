@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { newId } from '../lib/store';
 import { colorFor } from '../lib/budgets';
 import { ref, computed, watch, onMounted } from 'vue';
@@ -169,8 +170,8 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
       <div><p class="label">Playground</p><p class="lede-sm">Write it messy. Budgie sorts it.</p></div>
       <div class="chips">
         <button class="chip-btn" :class="{ on: plan.auto }" @click="plan.auto = !plan.auto">Auto-sort {{ plan.auto ? 'on' : 'off' }}</button>
-        <button class="btn small" @click="useExample">Try an example</button>
-        <button class="btn primary small" data-test="organize" @click="runOrganize">Organize</button>
+        <button class="btn small" @click="useExample"><Icon name="sparkle" :size="14" />Try an example</button>
+        <button class="btn primary small" data-test="organize" @click="runOrganize"><Icon name="sparkle" :size="14" />Organize</button>
       </div>
     </div>
     <div class="scratch-wrap" :class="{ live: dict.listening.value }">
@@ -219,7 +220,7 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
     </div>
     <form class="note" @submit.prevent="quickAdd">
       <input v-model="addLine" class="field note-field" placeholder="Add one more: gym 40 a month" />
-      <button class="btn" type="submit">Add</button>
+      <button class="btn" type="submit"><Icon name="plus" :size="14" />Add</button>
     </form>
 
     <div v-if="aiNote || tips.length" class="pg-notes" data-test="pg-notes">
@@ -256,31 +257,31 @@ onMounted(() => { if (plan.text && !plan.items.length) runOrganize(); });
 
     <p class="kicker">What if I trim wants?</p>
     <input v-model.number="trim" type="range" min="0" max="50" step="5" class="slider" aria-label="Trim wants by percent" />
-    <div class="row-line"><span class="small">Trim {{ trim }}% → frees {{ usd(freed) }} a month</span><button class="btn small" :disabled="!trim" @click="applyTrim">Apply</button></div>
+    <div class="row-line"><span class="small">Trim {{ trim }}% → frees {{ usd(freed) }} a month</span><button class="btn small" :disabled="!trim" @click="applyTrim"><Icon name="check" :size="14" />Apply</button></div>
 
     <p class="kicker">Goal calculator</p>
     <div class="goal-calc">
       <input v-model="goalName" class="field" placeholder="Goal, e.g. New laptop" />
       <input v-model="goalTarget" class="field" type="number" min="0" placeholder="Target $" />
       <div class="chips"><button v-for="m in [3, 6, 12, 24]" :key="m" class="chip-btn" :class="{ on: goalMonths === m }" @click="goalMonths = m">{{ m }} mo</button></div>
-      <div class="row-line"><span class="small">{{ goalTarget ? `${usd(goalTarget / goalMonths)} a month` : 'Pick a target' }}</span><button class="btn small" @click="addGoal">Add goal</button></div>
+      <div class="row-line"><span class="small">{{ goalTarget ? `${usd(goalTarget / goalMonths)} a month` : 'Pick a target' }}</span><button class="btn small" @click="addGoal"><Icon name="plus" :size="14" />Add goal</button></div>
     </div>
 
     <p class="kicker">Scenarios</p>
     <form class="pg-scen-form" @submit.prevent="saveScenario">
       <input v-model="scenarioName" class="field" placeholder="Name this plan, e.g. New job" aria-label="Scenario name" maxlength="40" data-test="scenario-name" />
-      <button class="btn small" type="submit" :disabled="!plan.items.length" data-test="save-scenario">Save</button>
+      <button class="btn small" type="submit" :disabled="!plan.items.length" data-test="save-scenario"><Icon name="check" :size="14" />Save</button>
     </form>
     <ul v-if="store.planScenarios.length" class="pg-scen">
       <li v-for="s in store.planScenarios" :key="s.id">
         <span><b>{{ s.name }}</b><span class="muted small">{{ usd(scenarioTotals(s).planned) }} planned · {{ scenarioTotals(s).left >= 0 ? `${usd(scenarioTotals(s).left)} left` : `${usd(-scenarioTotals(s).left)} over` }}</span></span>
-        <button class="btn small" type="button" data-test="load-scenario" @click="loadScenario(s)">Open</button>
+        <button class="btn small" type="button" data-test="load-scenario" @click="loadScenario(s)"><Icon name="right" :size="14" />Open</button>
         <button class="icon-x" type="button" :aria-label="`Delete ${s.name}`" @click="dropScenario(s)">×</button>
       </li>
     </ul>
     <p v-else class="muted small">Save different versions of your plan and switch between them to compare.</p>
 
-    <button class="btn primary apply-btn" data-test="apply-plan" :disabled="!plan.items.length" @click="applyPlan">Use this plan for my budgets</button>
+    <button class="btn primary apply-btn" data-test="apply-plan" :disabled="!plan.items.length" @click="applyPlan"><Icon name="check" :size="14" />Use this plan for my budgets</button>
     <p v-if="applied" class="status-line done">{{ applied }}</p>
   </section>
 

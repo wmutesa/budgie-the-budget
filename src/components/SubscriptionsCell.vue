@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import AiHint from './AiHint.vue';
 import { computed, ref } from 'vue';
 import { store, monthly, daysUntil, fixLogo } from '../lib/store';
@@ -24,7 +25,7 @@ const hiddenTotal = computed(() => items.value.slice(LIMIT).reduce((s, x) => s +
   <section class="card cell">
     <div class="cell-head">
       <div><p class="label">Subscriptions</p><p class="big sm">{{ fmt(total, store.base) }} <span class="muted small">a month</span></p></div>
-      <button class="btn primary small" data-test="add-sub" @click="emit('add', '')">+ Add from the web</button>
+      <button class="btn primary small" data-test="add-sub" @click="emit('add', '')"><Icon name="plus" :size="14" />Add from the web</button>
     </div>
     <AiHint for="subscriptions" />
     <div v-if="!items.length" class="empty">

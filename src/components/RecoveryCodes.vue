@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { ref } from 'vue';
 
 // Shows new recovery codes once, with ways to keep them, and asks the person
@@ -37,12 +38,12 @@ function download() {
       <li v-for="c in codes" :key="c"><code>{{ c }}</code></li>
     </ol>
     <div class="rc-acts">
-      <button class="btn small" type="button" @click="copy">{{ copied ? 'Copied' : 'Copy all' }}</button>
-      <button class="btn small" type="button" @click="download">Download .txt</button>
+      <button class="btn small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy all' }}</button>
+      <button class="btn small" type="button" @click="download"><Icon name="download" :size="14" />Download .txt</button>
     </div>
     <template v-if="confirm">
       <label class="rc-check"><input v-model="saved" type="checkbox" data-test="codes-saved" /> I have saved these codes somewhere safe</label>
-      <button class="btn primary si-btn" type="button" data-test="codes-done" :disabled="!saved" @click="emit('done')">Continue to Budgie</button>
+      <button class="btn primary si-btn" type="button" data-test="codes-done" :disabled="!saved" @click="emit('done')"><Icon name="check" :size="14" />Continue to Budgie</button>
       <div class="rc-skip">
         <button class="si-link" type="button" data-test="codes-skip" @click="emit('skip')">Skip, my passkey syncs (iCloud or Google)</button>
         <p>Choose this if your passkey is saved to iCloud Keychain or Google Password Manager, or you will add a second device. These codes are then cancelled, and you can make new ones any time from the account menu.</p>

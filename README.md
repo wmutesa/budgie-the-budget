@@ -37,9 +37,9 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Week, Focus). Type or say anything and Budgie reads the date, time, repeat, project, priority and cost. Imports Canvas, Google, Apple and Outlook calendars, builds a daily routine, suggests what to prepare for, keeps streaks, and sends ticked costs to Transactions |
 | **Transactions** | Add spending by typing, speaking, scanning a receipt, or importing a PDF, CSV or Excel statement; review it; AI-drafted budgets; recent activity; your accounts |
 | **Markets** | A daily brief: the day's headline, what it means for you, indexes, top stories, markets to watch, a growth calculator and savings ideas for your banks |
-| **Playground** | Write or say messy notes and Budgie turns them into a plan, with scenarios to compare |
+| **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sends each line to the Planner, Transactions, your money plan or more than one. Below it, messy money notes become a plan with scenarios to compare |
 
-Budgie starts empty: every number comes from what you add.
+Budgie starts empty: every number comes from what you add. Pages sit in a rail on the left (a bar at the bottom on phones), and one search in the top bar finds anything (tasks, spending, subscriptions, goals, pages) and turns what you type into an action. Press `/` to jump to it.
 
 ## Run it locally
 

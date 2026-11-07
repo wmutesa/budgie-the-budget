@@ -3,16 +3,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { parseTask, addFromText, occurrences, openTasks, summary, today, addDays, dayLabel, fromIso, isoDay, timeLabel, toMins, isDone, toggleDone, KINDS, streak } from '../lib/tasks';
 import { refreshFeeds } from '../lib/calendar';
-import { useDictation, canDictate } from '../lib/dictation';
 import TaskRow from './TaskRow.vue';
-import MicButton from './MicButton.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import PlanRoutine from './PlanRoutine.vue';
 import PlanCalendars from './PlanCalendars.vue';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
 import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
-import { nav } from '../lib/nav';
+import { nav, go } from '../lib/nav';
 let showDoneFirst = false;
 
 // Planner: school, work, projects, routines and events in one place.
@@ -33,27 +31,9 @@ onMounted(() => {
 });
 onUnmounted(() => clearInterval(tick));
 
-// ---------- quick add ----------
-const entry = ref('');
+// Adding happens in the Playground's inbox; flash shows notes here.
 const flash = ref('');
-const preview = computed(() => (entry.value.trim() ? parseTask(entry.value.split('\n')[0]) : null));
-function add() {
-  const text = entry.value.trim();
-  if (!text) return;
-  const made = addFromText(text);
-  const first = made[0];
-  flash.value = made.length > 1 ? `Added ${made.length} items.` : `Added “${first.title}”${first.date ? ` for ${dayLabel(first.date).toLowerCase()}` : ''}${first.time ? ` at ${timeLabel(first.time)}` : ''}.`;
-  setTimeout(() => { flash.value = ''; }, 2500);
-  entry.value = '';
-}
-let baseText = '';
-const dict = useDictation({
-  continuous: false,
-  onCancel: () => { entry.value = baseText; },
-  onText: t => { entry.value = `${baseText}${t}`; },
-  onFinal: () => {},
-});
-const toggleDictate = () => { if (!dict.listening.value) baseText = entry.value ? `${entry.value.trim()} ` : ''; dict.toggle(); };
+const addElsewhere = () => go('Playground', { anchor: '#inbox' });
 
 // ---------- filters ----------
 const project = ref('');
@@ -123,30 +103,17 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         <p class="label">{{ greeting }}</p>
         <h1>Planner</h1>
         <p class="pln-sum" data-test="planner-summary">{{ summary(now) }}</p>
+        <p v-if="flash" class="pln-err small" role="alert">{{ flash }}</p>
       </div>
       <div class="pln-head-right">
         <div class="seg pln-views" role="tablist" aria-label="Planner views">
           <button v-for="[v, ic] in VIEWS" :key="v" type="button" role="tab" :aria-selected="view === v" :class="{ on: view === v }" :title="v" :data-test="`view-${v.toLowerCase()}`" @click="view = v"><Icon :name="ic" :size="15" /><span class="pln-vlabel">{{ v }}</span></button>
         </div>
+        <button type="button" class="ibtn primary" title="Add in the Playground inbox" aria-label="Add" data-test="planner-add" @click="addElsewhere"><Icon name="plus" /></button>
         <button v-if="canNotify" type="button" class="ibtn" :class="{ on: store.planner.remind }" :aria-pressed="store.planner.remind" :title="store.planner.remind ? 'Reminders on: tap to turn off' : 'Remind me 10 minutes before timed items'" :aria-label="store.planner.remind ? 'Turn reminders off' : 'Turn reminders on'" data-test="remind" @click="toggleRemind"><Icon :name="store.planner.remind ? 'bell' : 'bell-off'" /></button>
       </div>
     </section>
 
-    <section class="pln-add" :class="{ live: dict.listening.value }">
-      <div class="pln-add-row">
-        <span class="pln-plus" aria-hidden="true">+</span>
-        <textarea v-model="entry" rows="1" class="pln-input" placeholder="Add anything, like “Essay due Fri 5pm” or “Gym MWF 6pm”" aria-label="Add to planner" data-test="plan-add" @keydown.enter.exact.prevent="add" />
-        <MicButton v-if="canDictate" :listening="dict.listening.value" label="Say it" @toggle="toggleDictate" />
-        <button type="button" class="ibtn primary" :disabled="!entry.trim()" title="Add (Enter)" aria-label="Add" data-test="plan-add-btn" @click="add"><Icon name="plus" /></button>
-      </div>
-      <p v-if="preview" class="pln-chips" aria-live="polite" data-test="plan-preview">
-        <span class="pln-chip k" :style="{ '--k': KINDS[preview.kind].color }">{{ KINDS[preview.kind].label }}</span>
-        <span v-for="c in preview.found" :key="c" class="pln-chip">{{ c }}</span>
-        <span class="muted small">“{{ preview.title }}”</span>
-      </p>
-      <p v-else-if="flash" class="pln-chips pln-ok" role="status">{{ flash }}</p>
-      <p v-else class="pln-chips muted small">Dates, times, repeats (“every Mon”, “3x a week”), #projects, ! for priority and $ for costs are picked up for you.</p>
-    </section>
 
     <div v-if="projects.length" class="pln-filter" role="group" aria-label="Filter by project">
       <button type="button" class="chip-btn" :class="{ on: !project }" @click="project = ''">Everything</button>

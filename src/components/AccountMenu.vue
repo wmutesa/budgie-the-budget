@@ -1,4 +1,7 @@
 <script setup>
+import AvatarPicker from './AvatarPicker.vue';
+import { avatar } from '../lib/profile';
+import Icon from './Icon.vue';
 import { ref, computed } from 'vue';
 import PasskeyNote from './PasskeyNote.vue';
 import { snapshot } from '../lib/store';
@@ -110,7 +113,7 @@ const tour = () => { open.value = false; emit('tour'); };
 <template>
   <span class="acct">
     <button class="acct-btn" type="button" :aria-label="`Account: ${account.user?.name}`" data-test="account" @click="show">
-      <span class="acct-initial">{{ initial }}</span>
+      <span class="acct-initial" :style="{ background: avatar.bg, color: avatar.ink }">{{ initial }}</span>
       <i class="acct-dot" :class="account.sync" aria-hidden="true" />
     </button>
 
@@ -119,7 +122,7 @@ const tour = () => { open.value = false; emit('tour'); };
     <div v-if="open" class="overlay" @click.self="open = false">
       <div class="sheet acct-sheet" role="dialog" aria-label="Account">
         <div class="acct-top">
-          <span class="acct-avatar" aria-hidden="true">{{ initial }}</span>
+          <AvatarPicker :initial="initial" :name="account.user?.name" />
           <div class="acct-who">
             <p class="label">{{ account.user?.name }} <span class="acct-role">{{ isOwner ? 'Owner' : 'Member' }}</span></p>
             <p class="acct-sync" :class="account.sync">{{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
@@ -131,8 +134,8 @@ const tour = () => { open.value = false; emit('tour'); };
         <div class="acct-grid">
         <div class="acct-col">
 
-        <section class="acct-sec t-blue">
-          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink">Add a device</button></div>
+        <section class="acct-sec t-a">
+          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink"><Icon name="plus" :size="14" />Add a device</button></div>
           <ul class="acct-list">
             <li v-for="p in passkeys" :key="p.id">
               <span>{{ p.label || 'Passkey' }}</span>
@@ -142,10 +145,10 @@ const tour = () => { open.value = false; emit('tour'); };
           </ul>
         </section>
 
-        <section class="acct-sec t-amber">
+        <section class="acct-sec t-b">
           <div class="acct-sec-head">
             <p class="kicker"><span class="acct-ico" aria-hidden="true">✳</span>Recovery codes</p>
-            <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes">{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
+            <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes"><Icon name="sparkle" :size="14" />{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
           </div>
           <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
             {{ codesLeft === null ? '' : codesLeft === 0 ? 'No recovery codes. That is fine if your passkey syncs with iCloud or Google, or you have added a second device. Otherwise, make some.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
@@ -153,8 +156,8 @@ const tour = () => { open.value = false; emit('tour'); };
           <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
         </section>
 
-        <section class="acct-sec t-slate">
-          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData">Download a copy</button></div>
+        <section class="acct-sec t-a">
+          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData"><Icon name="download" :size="14" />Download a copy</button></div>
           <p class="small muted">Everything you have added, as one file: entries, budgets, accounts, goals, subscriptions and plans.</p>
         </section>
         </div>
@@ -164,7 +167,7 @@ const tour = () => { open.value = false; emit('tour'); };
           <p class="small">{{ link.label }}</p>
           <div class="acct-link-row">
             <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
-            <button class="btn primary small" type="button" @click="copy">{{ copied ? 'Copied' : 'Copy' }}</button>
+            <button class="btn primary small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button>
           </div>
           <div class="acct-qr">
             <QrCode :text="link.url" :size="110" />
@@ -172,23 +175,23 @@ const tour = () => { open.value = false; emit('tour'); };
           </div>
         </div>
 
-        <section v-if="isOwner" class="acct-sec t-green">
+        <section v-if="isOwner" class="acct-sec t-b">
           <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">☺</span>People</p><span class="muted small">{{ people.length }} with access</span></div>
           <ul class="acct-list">
             <li v-for="p in people" :key="p.id">
               <span>{{ p.name }}<span v-if="p.id === account.user.id" class="muted small"> · you</span></span>
               <span class="muted small">{{ p.role === 'owner' ? 'Owner' : 'Member' }} · last seen {{ date(p.last_seen) }}</span>
-              <button v-if="p.role !== 'owner'" class="btn small" :disabled="busy" @click="dropPerson(p)">Remove</button>
+              <button v-if="p.role !== 'owner'" class="btn small" :disabled="busy" @click="dropPerson(p)"><Icon name="trash" :size="14" />Remove</button>
             </li>
             <li v-for="i in invites" :key="i.id" class="pending">
               <span>{{ i.name }}</span>
               <span class="muted small">Invited · expires {{ date(i.expires_at) }}</span>
-              <button class="btn small" :disabled="busy" @click="dropInvite(i.id)">Cancel</button>
+              <button class="btn small btn-icon" :disabled="busy" @click="dropInvite(i.id)" title="Cancel" aria-label="Cancel"><Icon name="x" :size="14" /></button>
             </li>
           </ul>
           <form class="acct-invite" @submit.prevent="sendInvite">
             <input v-model="inviteName" class="field" placeholder="Name of the person to invite" aria-label="Name of the person to invite" maxlength="60" />
-            <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()">Create invite link</button>
+            <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()"><Icon name="plus" :size="14" />Create invite link</button>
           </form>
         </section>
 
@@ -204,11 +207,11 @@ const tour = () => { open.value = false; emit('tour'); };
         </div>
 
         <div class="acct-foot">
-          <button class="btn small" type="button" data-test="replay-guide" @click="tour">Take the tour again</button>
+          <button class="btn small" type="button" data-test="replay-guide" @click="tour"><Icon name="play" :size="14" />Take the tour again</button>
           <span class="acct-foot-right">
-            <button v-if="!isOwner" class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe">Delete my account</button>
-            <button class="btn small" type="button" data-test="sign-out-everywhere" :disabled="busy" @click="leaveEverywhere">Sign out everywhere</button>
-            <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave">Sign out</button>
+            <button v-if="!isOwner" class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe"><Icon name="trash" :size="14" />Delete my account</button>
+            <button class="btn small" type="button" data-test="sign-out-everywhere" :disabled="busy" @click="leaveEverywhere"><Icon name="logout" :size="14" />Sign out everywhere</button>
+            <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="14" />Sign out</button>
           </span>
         </div>
       </div>

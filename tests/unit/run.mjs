@@ -123,4 +123,15 @@ check('calendar links: only public https addresses', () => {
   assert.equal(feedKind('https://calendar.google.com/calendar/ical/x/private-y/basic.ics'), 'google');
   assert.equal(feedKind('https://outlook.office365.com/owa/calendar/x/reachcalendar.ics'), 'outlook');
 });
+const { route } = await import('../../src/lib/router.js');
+check('the Playground inbox sends each line where it belongs', () => {
+  const to = t => route(t).dest.sort().join('+');
+  assert.equal(to('Essay due Fri 5pm #English'), 'planner');
+  assert.equal(to('spent 12.50 on lunch at Chipotle yesterday'), 'money');
+  assert.equal(to('salary 4000 a month'), 'plan');
+  assert.equal(to('gym MWF 6pm'), 'planner');
+  const bill = route('pay phone bill $45 on the 15th');
+  assert.equal(bill.dest.join(), 'planner'); assert.equal(bill.task.cost, 45, 'a bill to pay keeps its cost');
+  assert.equal(to('call mom'), 'planner');
+});
 console.log(`\n${n} checks passed`);

@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { store, newId } from '../lib/store';
@@ -59,10 +60,10 @@ function remove(g) { if (confirm(`Remove the goal "${g.name}"?`)) store.goals = 
       <input v-model="draft.target" class="field" type="number" min="1" step="1" placeholder="Target in USD" aria-label="Target" required />
       <input v-model="draft.saved" class="field" type="number" min="0" step="1" placeholder="Saved so far" aria-label="Saved so far" />
       <div class="acc-form-acts">
-        <button class="btn primary small" type="submit">Add goal</button>
-        <button class="btn small" type="button" @click="adding = false">Cancel</button>
+        <button class="btn primary small" type="submit"><Icon name="plus" :size="14" />Add goal</button>
+        <button class="btn small btn-icon" type="button" @click="adding = false" title="Cancel" aria-label="Cancel"><Icon name="x" :size="14" /></button>
       </div>
     </form>
-    <button v-else class="btn small acc-add" type="button" data-test="add-goal" @click="adding = true">+ Add goal</button>
+    <button v-else class="btn small acc-add" type="button" data-test="add-goal" @click="adding = true"><Icon name="plus" :size="14" />Add goal</button>
   </section>
 </template>

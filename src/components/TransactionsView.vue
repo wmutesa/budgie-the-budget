@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import AiHint from './AiHint.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
@@ -86,7 +87,7 @@ const sourceLabel = { sample: 'sample', receipt: 'receipt scan', pdf: 'PDF', csv
       <p class="label">{{ title }}</p>
       <span class="tx-head-right">
         <span class="muted small">{{ full ? `${rows.length} shown` : `Latest ${rows.length} of ${store.transactions.length}` }}</span>
-        <button v-if="store.transactions.length" class="btn small" type="button" data-test="export-csv" title="Download all entries as a CSV file" @click="exportCSV">Export CSV</button>
+        <button v-if="store.transactions.length" class="btn small" type="button" data-test="export-csv" title="Download all entries as a CSV file" @click="exportCSV"><Icon name="download" :size="14" />Export CSV</button>
       </span>
     </div>
     <AiHint for="ledger" />

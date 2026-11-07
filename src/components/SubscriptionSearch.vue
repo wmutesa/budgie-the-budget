@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import BrandPicker from './BrandPicker.vue';
 import { store, newId } from '../lib/store';
@@ -51,7 +52,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKey));
         <div class="form-row"><span>Billing</span><div class="chips"><button v-for="[v, l] in cycles" :key="v" class="chip-btn" :class="{ on: form.cycle === v }" @click="form.cycle = v">{{ l }}</button></div></div>
         <label class="form-row"><span>Next payment</span><input v-model="form.next" class="field" type="date" /></label>
         <div class="sheet-foot">
-          <button class="btn" @click="picked = null">Back</button>
+          <button class="btn btn-icon" @click="picked = null" title="Back" aria-label="Back"><Icon name="left" :size="14" /></button>
           <button class="btn primary" data-test="save-sub" :disabled="!(Number(form.amount) > 0)" @click="save">Track {{ picked.name }}</button>
         </div>
       </template>

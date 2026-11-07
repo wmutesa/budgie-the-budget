@@ -47,6 +47,8 @@ function fromSaved(saved = {}) {
     feeds: Array.isArray(saved.feeds) ? saved.feeds.slice(0, 12) : [],
     // What the routine was built from: { wake, sleep, text, builtAt }.
     routine: saved.routine && typeof saved.routine === 'object' ? saved.routine : { wake: '07:00', sleep: '23:00', text: '' },
+    // How you look in Budgie: { color } for your avatar, picked at random at first and editable.
+    profile: saved.profile && typeof saved.profile === 'object' ? saved.profile : {},
     // Planner settings: { view, remind }.
     planner: saved.planner && typeof saved.planner === 'object' ? saved.planner : { view: 'Tasks', remind: false },
   };

@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import AiHint from './AiHint.vue';
 import { ref } from 'vue';
 import { store, newId } from '../lib/store';
@@ -108,10 +109,10 @@ function remove(a) {
       <input v-model="draft.balance" class="field" type="number" step="0.01" placeholder="Balance today" aria-label="Balance today" required />
       <PickMenu v-model="draft.currency" :options="currencies" label="Currency" searchable />
       <div class="acc-form-acts">
-        <button class="btn primary small" type="submit">Add account</button>
-        <button class="btn small" type="button" @click="adding = false">Cancel</button>
+        <button class="btn primary small" type="submit"><Icon name="plus" :size="14" />Add account</button>
+        <button class="btn small btn-icon" type="button" @click="adding = false" title="Cancel" aria-label="Cancel"><Icon name="x" :size="14" /></button>
       </div>
     </form>
-    <button v-else class="btn small acc-add" type="button" data-test="add-account" @click="adding = true">+ Add account</button>
+    <button v-else class="btn small acc-add" type="button" data-test="add-account" @click="adding = true"><Icon name="plus" :size="14" />Add account</button>
   </section>
 </template>

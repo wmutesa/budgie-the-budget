@@ -3,9 +3,12 @@
 ## Overview
 A written brief of your month, net worth with 1M, 3M and 1Y ranges, a monthly plan, cash flow, savings goals, live exchange rates, subscriptions, expense breakdown, accounts and wallets converted to your base currency.
 
+## Search and navigation
+Pages sit in a rail on the left with live signs: today's Planner progress, entries waiting in Transactions, and whether markets are open. The search in the top bar finds tasks, spending, subscriptions, goals, accounts, calendars and pages, and turns typed text into "add to Planner" or "add spending". Press `/` to jump to it.
+
 ## Planner
 One place for school, work, projects, events and daily life.
-- **Type or say anything.** "Essay due Fri 5pm #English !", "Chem lecture MWF 10-12", "Gym 3x a week at 6pm", "Pay rent on the 1st $1450". Budgie reads the date, time, length, repeat, project (`#name`), priority (`!`) and cost (`$`), and shows what it understood before you add it.
+- **Add from the Playground inbox, the search bar or a calendar slot.** "Essay due Fri 5pm #English !", "Chem lecture MWF 10-12", "Gym 3x a week at 6pm", "Pay rent on the 1st $1450". Budgie reads the date, time, length, repeat, project (`#name`), priority (`!`) and cost (`$`), and shows what it understood before you add it.
 - **Four views.** Tasks (grouped by when), Agenda (the next two weeks), Week (seven columns) and Focus (progress today, what is on now, your top three and a 25-minute focus timer).
 - **Calendars.** Paste the iCal link from Canvas, Google Calendar, Apple iCloud or Outlook. Canvas items become assignments under their course; repeating classes stay repeating. Calendars refresh every few hours, and your ticks and notes are kept.
 - **Routine.** Give your wake and sleep times and a few words about your week; Budgie drafts a daily routine (the on-device AI refines it when ready) and you choose what to keep. Repeating items keep a streak.
@@ -22,6 +25,8 @@ Four summary tiles, the Add spending panel, a review queue, monthly budgets and 
 - **Year in numbers** and **All activity** side by side.
 
 ## Playground
+**Inbox:** write or say anything, one thing per line. Budgie sends things to do to the Planner, money already spent to Transactions, and amounts that repeat to your money plan, and you can change each line's destinations before sending.
+
 Write or say messy notes. Budgie sorts them into needs, wants and savings, converts yearly, weekly and daily costs to monthly, compares the plan with common splits, and can turn the plan into your monthly budgets.
 
 ## Subscriptions

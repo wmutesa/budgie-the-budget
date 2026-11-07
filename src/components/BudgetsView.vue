@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import AiHint from './AiHint.vue';
 import { ref, computed, watch } from 'vue';
 import { budgetRows } from '../lib/ledger';
@@ -75,7 +76,7 @@ function setIncome() {
         </li>
       </ul>
       <div class="bf-foot">
-        <button class="btn small" type="button" data-test="redo-budgets" :disabled="busy || !ready" @click="redo">{{ busy ? 'Drafting…' : `Redo with ${ai.ready ? 'AI' : 'your spending'}` }}</button>
+        <button class="btn small" type="button" data-test="redo-budgets" :disabled="busy || !ready" @click="redo"><Icon name="sparkle" :size="14" />{{ busy ? 'Drafting…' : `Redo with ${ai.ready ? 'AI' : 'your spending'}` }}</button>
         <span class="muted small">Click an amount to change it. {{ labelFor('budget') }}</span>
       </div>
     </template>
@@ -84,13 +85,13 @@ function setIncome() {
       <p v-if="busy" class="empty-note">Budgie is drafting your budgets…</p>
       <template v-else-if="ready">
         <p class="empty-note">Budgie can draft budgets from your income and spending.</p>
-        <button class="btn primary small" type="button" data-test="draft-budgets" @click="draftBudgets({ force: true })">Draft my budgets</button>
+        <button class="btn primary small" type="button" data-test="draft-budgets" @click="draftBudgets({ force: true })"><Icon name="sparkle" :size="14" />Draft my budgets</button>
       </template>
       <template v-else>
         <p class="empty-note">Budgie drafts your monthly budgets with AI from your income and spending. Add some spending, or enter your monthly income to start.</p>
         <form class="bf-income" @submit.prevent="setIncome">
           <input v-model="income" class="field" type="number" min="1" step="50" placeholder="Monthly income in USD" aria-label="Monthly income" data-test="budget-income" />
-          <button class="btn primary small" type="submit">Draft budgets</button>
+          <button class="btn primary small" type="submit"><Icon name="sparkle" :size="14" />Draft budgets</button>
         </form>
       </template>
     </div>

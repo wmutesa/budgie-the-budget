@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { computed } from 'vue';
 import { rates, loadRates, ratesLabel } from '../lib/rates';
 import { store } from '../lib/store';
@@ -14,7 +15,7 @@ const fmt = n => (n >= 100 ? n.toFixed(1) : n.toFixed(4));
   <section class="card cell">
     <div class="cell-head">
       <p class="label">Exchange rates</p>
-      <button class="btn small" @click="loadRates(store.base, { force: true })">Refresh</button>
+      <button class="btn small btn-icon" @click="loadRates(store.base, { force: true })" title="Refresh" aria-label="Refresh"><Icon name="refresh" :size="14" /></button>
     </div>
     <div class="chips">
       <button v-for="b in bases" :key="b" class="chip-btn" :class="{ on: store.base === b }" @click="setBase(b)">{{ b }}</button>

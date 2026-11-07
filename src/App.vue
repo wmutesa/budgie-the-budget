@@ -30,9 +30,12 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import PlannerView from './components/PlannerView.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
+import SideDock from './components/SideDock.vue';
+import PlayInbox from './components/PlayInbox.vue';
 import { nextTick } from 'vue';
-import { nav, PAGES } from './lib/nav';
+import { nav, PAGES, go } from './lib/nav';
 import { refreshFeeds } from './lib/calendar';
+import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
@@ -41,7 +44,6 @@ import { store } from './lib/store';
 
 // Five pages: Overview (dashboard), Planner (tasks, routines, calendars), Transactions (capture, review, budgets, accounts),
 // Markets (news and savings ideas), Playground (build a plan).
-const tabs = PAGES;
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
 const searching = ref(false);
 const seed = ref('');
@@ -51,7 +53,7 @@ const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
 watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immediate: true });
 // Calendars refresh and reminders run once your data has loaded.
-watch(() => account.sync, s => { if (account.status === 'signed-in' && s === 'saved') { refreshFeeds(); startReminders(); } });
+watch(() => account.sync, s => { if (account.status === 'signed-in' && s === 'saved') { refreshFeeds(); startReminders(); ensureColor(); } });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
 }, { immediate: true });
@@ -60,9 +62,10 @@ const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* st
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
 // The + button adds what fits the page you are on.
-const newLabel = computed(() => ({ Planner: '+ Task', Transactions: '+ Spending' }[active.value] || '+ Subscription'));
-function newThing() {
-  if (active.value === 'Planner') return document.querySelector('[data-test="plan-add"]')?.focus();
+const newLabel = computed(() => ({ Planner: '+ Task', Transactions: '+ Spending', Playground: '+ Anything' }[active.value] || '+ Subscription'));
+async function newThing() {
+  // Tasks are added in the Playground's inbox, which sends them to the Planner.
+  if (active.value === 'Planner' || active.value === 'Playground') { go('Playground', { anchor: '#inbox' }); await nextTick(); return document.querySelector('[data-test="inbox-text"]')?.focus(); }
   if (active.value === 'Transactions') { const el = document.querySelector('[data-test="quick-note"]'); el?.scrollIntoView({ block: 'center' }); return el?.focus(); }
   openSearch('');
 }
@@ -98,19 +101,15 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" @skip="skipCodes" />
     </section>
   </main>
-  <div v-else class="app">
+  <div v-else class="app docked">
+    <SideDock />
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header class="cell nav-bar span-12">
         <div class="nb-brand">
-          <span class="brand-word">BUDGIE</span>
+          <span class="nb-page">{{ active }}</span>
           <span class="muted small nb-date">{{ today }}</span>
         </div>
-        <nav class="nb-pages" aria-label="Pages">
-          <button v-for="(t, i) in tabs" :key="t" :class="{ on: active === t }" :aria-current="active === t ? 'page' : undefined" @click="active = t">
-            <sup>0{{ i + 1 }}</sup>{{ t }}
-          </button>
-        </nav>
         <GlobalSearch />
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
@@ -147,6 +146,7 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <PlannerView />
       </template>
       <template v-else-if="active === 'Playground'">
+        <PlayInbox />
         <PlaygroundView />
       </template>
       <template v-else>

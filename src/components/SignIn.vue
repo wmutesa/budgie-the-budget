@@ -1,4 +1,5 @@
 <script setup>
+import Icon from './Icon.vue';
 import { ref } from 'vue';
 import { account, signIn, registerWithInvite, recoverWithCode, openInvite, inviteToken, passkeyError, canUsePasskeys } from '../lib/account';
 import SignInBackdrop from './SignInBackdrop.vue';
@@ -54,18 +55,14 @@ async function run(fn) {
             ? 'Create a passkey on this device so you can sign in here too.'
             : 'You have been invited to Budgie. Create a passkey to set up your account. It uses your fingerprint, face or device PIN, so there is no password to remember.' }}
         </p>
-        <button class="btn primary si-btn" data-test="create-passkey" :disabled="busy || !supported" @click="run(registerWithInvite)">
-          {{ busy ? 'Waiting for your passkey…' : 'Create a passkey' }}
-        </button>
+        <button class="btn primary si-btn" data-test="create-passkey" :disabled="busy || !supported" @click="run(registerWithInvite)"><Icon name="sparkle" :size="14" />{{ busy ? 'Waiting for your passkey…' : 'Create a passkey' }}</button>
       </template>
 
       <template v-else>
         <h1>Sign in</h1>
         <p class="si-lead">Use the passkey you created when you joined. Budgie is invite-only, so ask the owner for an invite link if you do not have one.</p>
         <p v-if="account.invite?.error" class="si-error" role="alert">{{ account.invite.error }}</p>
-        <button class="btn primary si-btn" data-test="sign-in" :disabled="busy || !supported" @click="run(signIn)">
-          {{ busy ? 'Waiting for your passkey…' : 'Sign in with a passkey' }}
-        </button>
+        <button class="btn primary si-btn" data-test="sign-in" :disabled="busy || !supported" @click="run(signIn)"><Icon name="sparkle" :size="14" />{{ busy ? 'Waiting for your passkey…' : 'Sign in with a passkey' }}</button>
         <p class="si-tip">On someone else's computer? In the passkey prompt, choose <b>Use a phone or tablet</b> and scan the code with your phone.</p>
 
         <button v-if="!pasting" class="si-link" type="button" data-test="have-invite" @click="pasting = true; recovering = false">Have an invite link? Paste it here</button>
@@ -73,7 +70,7 @@ async function run(fn) {
           <label class="si-k" for="inv-input">Invite link</label>
           <div class="acct-link-row">
             <input id="inv-input" v-model="pasted" class="field" placeholder="https://…/invite#…" autocomplete="off" spellcheck="false" data-test="invite-input" />
-            <button class="btn primary small" type="submit" data-test="invite-use" :disabled="busy || !pasted.trim()">Continue</button>
+            <button class="btn primary small" type="submit" data-test="invite-use" :disabled="busy || !pasted.trim()"><Icon name="check" :size="14" />Continue</button>
           </div>
           <button class="si-link" type="button" @click="pasting = false">Cancel</button>
         </form>
@@ -83,7 +80,7 @@ async function run(fn) {
           <label class="si-k" for="rc-input">Recovery code</label>
           <div class="acct-link-row">
             <input id="rc-input" v-model="code" class="field" placeholder="XXXXX-XXXXX" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" data-test="recovery-input" />
-            <button class="btn primary small" type="submit" data-test="recovery-use" :disabled="busy || code.replace(/[^a-z0-9]/gi, '').length < 10">Use code</button>
+            <button class="btn primary small" type="submit" data-test="recovery-use" :disabled="busy || code.replace(/[^a-z0-9]/gi, '').length < 10"><Icon name="check" :size="14" />Use code</button>
           </div>
           <button class="si-link" type="button" @click="recovering = false">Cancel</button>
         </form>
