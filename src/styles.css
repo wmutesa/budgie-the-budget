@@ -2438,3 +2438,29 @@ body:has(.overlay) .notice { display: none; }
 .acct-sheet .t-violet { background: #f5f3ff !important; border: 1px solid #e4dcff !important; }
 .acct-sheet .pk-note { background: #faf7ff; border-color: #ebe4ff; }
 .acct-sheet .acct-top { background: #f5f3ff; }
+
+/* Plus buttons are round: circles when icon-only, pills when they have words */
+button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
+.ibtn[aria-label]:has(> .ico-plus) { width: 32px; height: 32px; border-radius: 50% !important; }
+.tk-tools .ibtn[aria-label]:has(> .ico-plus) { width: 28px; height: 28px; }
+.dz-tab.dz-add { width: 32px; height: 32px; padding: 0; justify-content: center; border-radius: 50% !important; }
+.dz-tab.dz-add:hover { background: #f5f3ff; color: var(--violet); }
+
+/* Notifications are fully rounded */
+.toast { border-radius: 22px !important; border: 1px solid color-mix(in srgb, var(--tc) 28%, #fff) !important; background: #fff; padding: 12px 14px; }
+.toast-ico { border-radius: 50% !important; }
+.toast-x { border-radius: 50% !important; width: 24px; height: 24px; display: grid; place-items: center; }
+.toast-x:hover { background: #f4f4f5; }
+.bell-pop { border-radius: 22px !important; overflow: hidden; box-shadow: 0 20px 48px -18px rgba(20, 16, 40, .35) !important; border-color: #e4e4e7 !important; }
+.bell-item { border-radius: 16px !important; margin: 4px 6px; border-bottom: 0 !important; }
+.bell-item:hover, .bell-item:focus-visible { background: #faf7ff; }
+.bell-tip { border-radius: 14px !important; }
+.bell-acts .btn, .bell-acts .ibtn { border-radius: 999px !important; }
+
+/* Live dictation inside a field: the microphone sits at the right edge */
+.dict-wrap { position: relative; display: block; min-width: 0; }
+.dict-wrap > input, .dict-wrap > textarea { width: 100%; padding-right: 50px !important; }
+.dict-wrap > .mic-btn { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; margin: 0; }
+.dict-wrap > textarea + .mic-btn { top: auto; bottom: 6px; transform: none; }
+.dict-wrap.live > input, .dict-wrap.live > textarea { border-color: #8b5cf6 !important; box-shadow: 0 0 0 3px #ede9fe; }
+.lede-note { font-weight: 400; color: #71717a; font-size: .8em; }

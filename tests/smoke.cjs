@@ -265,6 +265,7 @@ async function run(url) {
   // Today: the day, goals and the latest digest together.
   await page.click(tab('Today'));
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
+  assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
   assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
   assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
@@ -302,6 +303,20 @@ async function run(url) {
   assert.deepEqual(await voice.$$eval('[data-test="inbox-made"]', li => li.map(x => x.className.match(/to-(\w+)/)[1])), ['task', 'routine', 'goal'], 'each is sorted');
   await voice.click('[data-test="inbox-undo"]');
   assert.doesNotMatch(await voice.textContent('[data-test="goals"]'), /Read 12 books/, 'Undo takes it all back');
+  // Say a goal: words appear live, and stopping plans it, with "because" as why.
+  await voice.evaluate(() => { window.__speechPhrase = 'I want to learn Spanish by June because I am moving to Madrid'; });
+  await voice.click('#goals .dict-wrap .mic-btn');
+  await voice.waitForFunction(() => /Spanish/.test(document.querySelector('[data-test="goal-title"]').value));
+  await voice.click('#goals .dict-wrap .mic-btn');
+  await voice.waitForFunction(() => /Learn Spanish/.test(document.querySelector('[data-test="goals"]').textContent));
+  assert.match(await voice.textContent('[data-test="goal"]:has-text("Learn Spanish")'), /by[\s\S]*I am moving to Madrid/, 'a spoken goal gets its date and why');
+  // Say your week: words appear live, and stopping drafts the routine.
+  await voice.evaluate(() => { window.__speechPhrase = 'gym every monday at 6pm'; });
+  await voice.click('#routine .dict-wrap .mic-btn');
+  await voice.waitForFunction(() => /gym/.test(document.querySelector('[data-test="routine-text"]').value));
+  await voice.click('#routine .dict-wrap .mic-btn');
+  await voice.waitForSelector('[data-test="routine-draft"]');
+  assert.match(await voice.textContent('[data-test="routine-draft"]'), /6 PM[\s\S]*Gym[\s\S]*Mon/, 'a spoken week becomes a routine draft');
   await voice.close();
 
   // First-time guide, once per person, on an empty account.

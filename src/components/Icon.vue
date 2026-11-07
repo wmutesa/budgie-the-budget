@@ -44,7 +44,7 @@ const P = {
 </script>
 
 <template>
-  <svg class="ico" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <svg :class="['ico', `ico-${name}`]" :width="size" :height="size" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
     <path :d="P[name] || P.plus" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
 </template>

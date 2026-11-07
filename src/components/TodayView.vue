@@ -1,10 +1,9 @@
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
 import { progress } from '../lib/goals';
 import { DIGESTS_LIVE, digests, loadDigests } from '../lib/digest';
-import { ai, aiAdvise } from '../lib/ai';
 import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
@@ -27,13 +26,17 @@ const goals = computed(() => store.goals.map(g => ({ g, p: progress(g) })));
 const ed = computed(() => digests.viewing.main || digests.current);
 const empty = computed(() => !store.tasks.length && !store.goals.length);
 const pct = computed(() => (items.value.length ? Math.round(((items.value.length - left.value.length) / items.value.length) * 100) : 0));
-// A one-line note from the on-device AI, when it is ready.
-const said = ref('');
-watch(() => ai.ready, async ready => {
-  if (!ready || !store.tasks.length) return;
-  const facts = [`Today: ${items.value.length} planned, ${items.value.length - left.value.length} done.`, next.value ? `Next: ${next.value.task.title} at ${timeLabel(next.value.task.time)}.` : 'Nothing else timed today.', `Deadlines this week: ${deadlines.value.map(t => `${t.title} ${t.date}`).join('; ') || 'none'}.`, `Overdue: ${overdue.value}.`, ...goals.value.map(x => `Goal ${x.g.title}: ${x.p.pct}% done.`)];
-  said.value = (await aiAdvise(facts)) || '';
-}, { immediate: true });
+// One next step, from your own data (no AI, so nothing is made up): what is
+// overdue first; otherwise, on a light day, the next milestone of the goal
+// furthest behind.
+const nextStep = computed(() => {
+  const late = store.tasks.filter(t => !t.repeat && !t.done && t.date && t.date < d).sort((a, b) => a.date.localeCompare(b.date))[0];
+  if (late) return { text: 'Start with', what: late.title, note: 'overdue' };
+  if (next.value || deadlines.value.some(t => t.date === d)) return null;
+  const behind = goals.value.filter(x => x.p.next).sort((a, b) => a.p.pct - b.p.pct)[0];
+  if (behind) return { text: left.value.length ? 'When you have a moment:' : 'A quiet day. Good time for', what: behind.p.next.title, note: behind.g.title };
+  return items.value.length ? null : { text: 'A quiet day. Set a goal in the Playground to give it direction.', what: '', note: '' };
+});
 </script>
 
 <template>
@@ -48,8 +51,8 @@ watch(() => ai.ready, async ready => {
       <template v-if="deadlines.length"><mark class="m-pink">{{ deadlines.length }} {{ deadlines.length === 1 ? 'deadline' : 'deadlines' }}</mark> this week, first <b>{{ deadlines[0].title }}</b> {{ dayLabel(deadlines[0].date).toLowerCase() }}. </template>
       <template v-if="overdue"><mark class="m-amber">{{ overdue }} overdue</mark>. </template>
       <template v-if="best">Your {{ best.t.title.toLowerCase() }} streak is <mark class="m-green">{{ best.n }} days</mark>. </template>
+      <template v-if="nextStep">{{ nextStep.text }}<template v-if="nextStep.what"> <b>{{ nextStep.what }}</b> <span class="lede-note">({{ nextStep.note }})</span></template>. </template>
     </p>
-    <p v-if="said" class="ai-hint ai-brief" data-test="ai-brief"><span class="ai-spark" aria-hidden="true">✦</span>{{ said }} <span class="muted small">· {{ ai.used.advice }}</span></p>
     <p class="brief-acts">
       <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="14" />Planner</button>
       <button type="button" class="btn small" @click="go('Playground', { anchor: '#inbox' })"><Icon name="plus" :size="14" />Add something</button>

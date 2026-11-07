@@ -5,6 +5,8 @@ import { buildRoutine, saveRoutine, timeLabel, DAY_SHORT } from '../lib/tasks';
 import { ai, aiRefineRoutine, labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
+import MicButton from './MicButton.vue';
+import { useDictation, canDictate } from '../lib/dictation';
 import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 
@@ -16,6 +18,17 @@ const busy = ref(false);
 const by = ref('');
 const has = computed(() => store.tasks.filter(t => t.source === 'routine').length);
 const days = rep => (!rep || rep.every === 'day' ? 'Daily' : rep.every === 'weekdays' ? 'Weekdays' : rep.every === 'month' ? 'Monthly' : rep.days.map(d => DAY_SHORT[d]).join(' '));
+
+// Talk about your week: words appear as you speak; stopping drafts the routine.
+let base = '';
+const dict = useDictation({
+  continuous: true,
+  onText: t => { r.text = `${base}${t}`; },
+  onCancel: () => { r.text = base; },
+  onFinal: () => { r.text = r.text.trim(); build(); },
+  onError: m => toast(m, { kind: 'error', title: 'Microphone' }),
+});
+const talk = () => { if (!dict.listening.value) base = r.text ? `${r.text.trim()}, ` : ''; dict.toggle(); };
 
 async function build() {
   busy.value = true;
@@ -43,7 +56,7 @@ function save() {
       <div class="tk-f"><span>Wake up</span><TimeField v-model="r.wake" label="Wake up" :clearable="false" /></div>
       <div class="tk-f"><span>Sleep</span><TimeField v-model="r.sleep" label="Sleep" :clearable="false" /></div>
       <label class="tk-f wide"><span>About your week</span>
-        <textarea v-model="r.text" rows="2" maxlength="600" placeholder="Classes MWF 10-12, gym 3x a week at 6pm, call friends Sundays, work Sat 9-5" data-test="routine-text" />
+        <span class="dict-wrap" :class="{ live: dict.listening.value }"><textarea v-model="r.text" rows="2" maxlength="600" placeholder="Classes MWF 10-12, gym 3x a week at 6pm, call friends Sundays, work Sat 9-5" data-test="routine-text" /><MicButton v-if="canDictate" :listening="dict.listening.value" label="Say it" @toggle="talk" /></span>
       </label>
     </div>
     <button type="button" class="ibtn ai wide-btn" :disabled="busy" data-test="routine-build" @click="build"><Icon name="sparkle" :size="14" />{{ busy ? 'Building…' : has ? 'Rebuild my routine' : 'Build my routine' }}</button>

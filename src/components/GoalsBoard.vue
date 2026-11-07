@@ -7,6 +7,8 @@ import { labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
 import { toast, loading, finish } from '../lib/toast';
 import DateField from './DateField.vue';
+import MicButton from './MicButton.vue';
+import { useDictation, canDictate } from '../lib/dictation';
 import TimeField from './TimeField.vue';
 
 // Life goals with milestones. Each milestone is a Planner task, so ticking it
@@ -19,6 +21,21 @@ const note = ref('');
 const open = ref(null);
 const step = ref('');
 const list = computed(() => store.goals.map(g => ({ g, p: progress(g), tasks: store.tasks.filter(t => t.goalId === g.id && !t.repeat).sort((a, b) => (a.date || '9').localeCompare(b.date || '9')) })));
+// Say a goal: words appear as you speak; stopping plans it. Anything after
+// "because" or "so that" becomes why it matters.
+const dict = useDictation({
+  continuous: true,
+  onText: t => { title.value = t; },
+  onCancel: () => { title.value = ''; },
+  onFinal: t => {
+    const m = t.match(/^(.*?)\s+(?:because|so that|since)\s+(.+)$/i);
+    title.value = (m ? m[1] : t).trim();
+    if (m) why.value = m[2].trim().replace(/^./, c => c.toUpperCase());
+    add();
+  },
+  onError: m => toast(m, { kind: 'error', title: 'Microphone' }),
+});
+
 async function add() {
   const parsed = parseGoal(title.value);
   if (!parsed.title || parsed.title === 'New goal') return;
@@ -38,7 +55,7 @@ const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milesto
   <section class="card cell span-8" id="goals" data-test="goals">
     <div class="cell-head"><div><p class="label">Goals</p><p class="lede-sm">What you are working towards</p></div><span class="muted small">{{ labelFor('plan') }}</span></div>
     <form class="gl-add" @submit.prevent="add">
-      <input v-model="title" placeholder="A goal, e.g. “Land a summer internship” or “Run a 10K by March”" aria-label="New goal" data-test="goal-title" maxlength="120" />
+      <span class="dict-wrap" :class="{ live: dict.listening.value }"><input v-model="title" placeholder="A goal, e.g. “Land a summer internship” or “Run a 10K by March”" aria-label="New goal" data-test="goal-title" maxlength="160" /><MicButton v-if="canDictate" :listening="dict.listening.value" label="Say a goal" @toggle="dict.toggle()" /></span>
       <DateField v-model="by" label="By when" placeholder="By when?" :min="new Date().toISOString().slice(0, 10)" />
       <button class="btn primary small" :disabled="!title.trim() || busy === 'new'" data-test="goal-add"><Icon :name="busy === 'new' ? 'refresh' : 'sparkle'" :size="14" />{{ busy === 'new' ? 'Planning…' : 'Plan it' }}</button>
     </form>
