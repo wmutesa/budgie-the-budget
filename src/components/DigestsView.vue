@@ -1,164 +1,260 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { store } from '../lib/store';
-import { digests, streams, loadDigests, openStream, openEdition, generate, addStream, removeStream, hasTopics, isRead, markRead } from '../lib/digest';
-import { occurrences, today, addDays, makeTask, KINDS } from '../lib/tasks';
+import {
+  digests, streams, loadDigests, openStream, openEdition, generate, addStream, removeStream, hasTopics, isRead, markRead,
+  isSaved, toggleSave, isHidden, toggleHide, isPlanned, planStory, actedOn, draftBody, editDraft, isSent, markSent, readingMinutes,
+} from '../lib/digest';
+import { occurrences, today, addDays, KINDS, dayDiff, fromIso } from '../lib/tasks';
 import Icon from './Icon.vue';
 
-// Read your digests: a short newspaper per digest, kept up to date on its own.
-// "My brief" follows your goals and projects; add others with a name and an
-// optional one-line focus. Your details and Gemini key live in your profile.
+// Your digests, to read and act on: a lead story, a 14-day deadline strip,
+// finds you can filter, sort, save, plan or hide, an outbox of drafts, and
+// what you saved. "My brief" follows your goals and projects; add others with a name.
 onMounted(() => { if (!digests.loaded) loadDigests(); else openStream(digests.active); });
 const st = computed(() => streams.value.find(x => x.id === digests.active) || streams.value[0]);
 const ed = computed(() => digests.viewing[digests.active] || null);
 const list = computed(() => digests.editions[digests.active] || []);
 const busy = computed(() => Boolean(digests.busy[digests.active]));
-watch(ed, e => markRead(e), { immediate: true });
-const lead = computed(() => (ed.value?.lead ? { ...ed.value.lead, ...(digests.polished[`${ed.value.stream}:${ed.value.id}`] || {}) } : null));
-const opened = ref(null);
+watch(ed, e => { markRead(e); day.value = ''; }, { immediate: true });
+const lead = computed(() => (ed.value?.lead ? { ...ed.value.lead, ...(digests.polished[`${ed.value.stream}:${ed.value.id}`] || {}), tag: ed.value.lead.kicker?.split(' ·')[0]?.toUpperCase() } : null));
+
+// ---------- helpers ----------
+const TAGS = { INTERNSHIP: '#7c3aed', PROGRAM: '#2563eb', EVENT: '#d97706', RESEARCH: '#0891b2', PERK: '#16a34a', AMBASSADOR: '#db2777' };
+const tagName = t => (t ? t.charAt(0) + t.slice(1).toLowerCase() : '');
+const left = iso => (iso ? dayDiff(today(), iso) : null);
+const countdown = iso => { const n = left(iso); return n === null ? '' : n < 0 ? 'Closed' : n === 0 ? 'Due today' : n === 1 ? '1 day left' : `${n} days left`; };
+const urgency = iso => { const n = left(iso); return n === null ? '' : n < 0 ? 'past' : n <= 3 ? 'hot' : n <= 7 ? 'warm' : 'calm'; };
+const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
 const copied = ref('');
+async function copy(text, key) { try { await navigator.clipboard.writeText(text); copied.value = key; setTimeout(() => { copied.value = ''; }, 1600); } catch { /* clipboard blocked */ } }
+
+// ---------- the 14-day strip ----------
+const day = ref('');
+const strip = computed(() => {
+  const mine = occurrences(today(), addDays(today(), 13)).filter(x => ['assignment', 'exam', 'event'].includes(x.task.kind) && !x.done && x.task.source !== 'digest')
+    .map(x => ({ date: x.date, name: x.task.title, desc: `${KINDS[x.task.kind].label}${x.task.project ? ` · ${x.task.project}` : ''}`, mine: true }));
+  const all = [...(ed.value?.deadlines || []).map(x => ({ ...x, mine: false })), ...mine];
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = addDays(today(), i);
+    const x = fromIso(d);
+    return { d, wd: x.toLocaleDateString('en-US', { weekday: 'narrow' }), n: x.getDate(), items: all.filter(a => a.date === d) };
+  });
+});
+const dayItems = computed(() => strip.value.find(x => x.d === day.value)?.items || []);
+
+// ---------- finds: filter, sort, search ----------
+const tag = ref('');
+const sort = ref('fit');
+const q = ref('');
+const showHidden = ref(false);
+const stories = computed(() => ed.value?.stories || []);
+const counts = computed(() => stories.value.reduce((m, s) => ({ ...m, [s.tag]: (m[s.tag] || 0) + 1 }), {}));
+const finds = computed(() => {
+  const term = q.value.trim().toLowerCase();
+  let out = stories.value.filter(s => (!tag.value || s.tag === tag.value) && (showHidden.value || !isHidden(s)) && (!term || `${s.headline} ${s.desc} ${s.fit}`.toLowerCase().includes(term)));
+  if (day.value) out = out.filter(s => s.dueIso === day.value);
+  const by = { fit: (a, b) => (b.score || 0) - (a.score || 0), deadline: (a, b) => dueKey(a).localeCompare(dueKey(b)), new: (a, b) => String(b.date || '').localeCompare(String(a.date || '')) }[sort.value];
+  return [...out].sort(by);
+});
+// Upcoming deadlines first, then rolling ones, then the ones that have closed.
+const dueKey = s => (!s.dueIso ? '2' : s.dueIso < today() ? `3${s.dueIso}` : `1${s.dueIso}`);
+const hiddenCount = computed(() => stories.value.filter(isHidden).length);
+
+// ---------- your briefing ----------
+const all = computed(() => [ed.value?.lead, ...stories.value].filter(Boolean));
+const acted = computed(() => all.value.filter(actedOn).length);
+const pct = computed(() => (all.value.length ? Math.round((acted.value / all.value.length) * 100) : 0));
+const soon = computed(() => strip.value.filter(x => x.items.length && x.d <= addDays(today(), 6)).reduce((n, x) => n + x.items.length, 0));
+
+// ---------- outbox ----------
+const opened = ref(null);
+const mailto = d => `mailto:?subject=${encodeURIComponent(d.subject || '')}&body=${encodeURIComponent(draftBody(ed.value, d))}`;
+
+// ---------- digests ----------
 const adding = ref(false);
 const name = ref('');
 const focus = ref('');
-const chip = iso => { const d = new Date(`${iso}T12:00:00`); return { mon: d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(), day: d.getDate(), wd: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() }; };
-// The calendar box: the digest's deadlines plus your own Planner deadlines.
-const calendar = computed(() => {
-  const mine = occurrences(today(), addDays(today(), 13)).filter(x => ['assignment', 'exam', 'event'].includes(x.task.kind) && !x.done && x.task.source !== 'digest')
-    .map(x => ({ date: x.date, name: x.task.title, desc: `${KINDS[x.task.kind].label}${x.task.project ? ` · ${x.task.project}` : ''} · in your Planner`, mine: true }));
-  return [...(ed.value?.deadlines || []), ...mine].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12);
-});
-async function copy(text, key) { try { await navigator.clipboard.writeText(text); copied.value = key; setTimeout(() => { copied.value = ''; }, 1600); } catch { /* clipboard blocked */ } }
-const toPlanner = s => { store.tasks.unshift(makeTask({ title: s.headline.slice(0, 120), notes: `${s.desc || s.dek || ''} ${s.fit || ''}`.trim().slice(0, 400), link: s.ctaLink, date: today(), kind: s.tag === 'EVENT' ? 'event' : 'task', project: 'Digest', source: 'digest' })); s.added = true; };
-const glance = computed(() => ({ deadlines: calendar.value.length, finds: (ed.value?.stories?.length || 0) + (ed.value?.lead ? 1 : 0), drafts: ed.value?.drafts?.length || 0 }));
-const tagName = t => t.charAt(0) + t.slice(1).toLowerCase();
 async function add() { if (!name.value.trim()) return; adding.value = false; await addStream(name.value, focus.value); name.value = ''; focus.value = ''; }
 const remove = () => { if (confirm(`Stop the “${st.value.name}” digest? Its past editions are removed.`)) removeStream(st.value.id); };
-const openProfile = () => document.querySelector('[data-test="account"]')?.click();
 const unread = id => { const l = digests.editions[id]; return Boolean(l?.length && !isRead({ stream: id, id: l[0].id })); };
+const shortDate = s => (s ? fromIso(s).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : '');
 </script>
 
 <template>
-  <div class="dg span-12" data-test="digests">
-    <div class="dg-bar">
-      <div class="dg-tabs" role="tablist" aria-label="Your digests">
-        <button v-for="s in streams" :key="s.id" type="button" role="tab" class="dg-tab" :class="{ on: s.id === digests.active }" :aria-selected="s.id === digests.active" :data-test="`digest-tab-${s.id}`" @click="openStream(s.id)">
-          {{ s.name }}<i v-if="unread(s.id) && s.id !== digests.active" class="dg-new" aria-label="new" />
+  <div class="dz span-12" data-test="digests">
+    <!-- Digests and editions -->
+    <header class="dz-top">
+      <div class="dz-tabs" role="tablist" aria-label="Your digests">
+        <button v-for="s in streams" :key="s.id" type="button" role="tab" class="dz-tab" :class="{ on: s.id === digests.active }" :aria-selected="s.id === digests.active" :data-test="`digest-tab-${s.id}`" @click="openStream(s.id)">
+          <Icon :name="s.id === 'main' ? 'home' : 'list'" :size="14" />{{ s.name }}<i v-if="unread(s.id) && s.id !== digests.active" class="dz-dot" aria-label="new" />
         </button>
-        <button type="button" class="ibtn ghost" title="Add a digest" aria-label="Add a digest" data-test="digest-add" @click="adding = !adding"><Icon name="plus" /></button>
+        <button type="button" class="dz-tab dz-add" title="Add a digest" aria-label="Add a digest" data-test="digest-add" @click="adding = !adding"><Icon name="plus" :size="14" /></button>
       </div>
-      <span class="dg-bar-acts">
-        <select v-if="list.length > 1" :value="ed?.id" class="dg-archive" aria-label="Past editions" data-test="digest-archive" @change="openEdition(digests.active, $event.target.value)">
-          <option v-for="x in list" :key="x.id" :value="x.id">{{ x.edition }} · {{ x.dateLong }}</option>
-        </select>
+      <div class="dz-tools">
         <button type="button" class="ibtn" :class="{ spin: busy }" :disabled="busy" title="Write a fresh edition now" aria-label="Write a fresh edition now" data-test="generate" @click="generate()"><Icon name="refresh" /></button>
         <button v-if="st.id !== 'main'" type="button" class="ibtn ghost danger" title="Stop this digest" aria-label="Stop this digest" @click="remove"><Icon name="trash" /></button>
-      </span>
-    </div>
-    <form v-if="adding" class="dg-addform" data-test="digest-new" @submit.prevent="add">
+      </div>
+    </header>
+    <form v-if="adding" class="dz-addform" data-test="digest-new" @submit.prevent="add">
       <input v-model="name" placeholder="Name, e.g. “Robotics internships” or “AI policy news”" aria-label="Digest name" maxlength="60" data-test="digest-name" />
-      <input v-model="focus" placeholder="What it should follow (optional, the name is used if empty)" aria-label="What it should follow" maxlength="120" />
+      <input v-model="focus" placeholder="What it should follow (optional)" aria-label="What it should follow" maxlength="120" />
       <button class="btn primary small" :disabled="!name.trim()" data-test="digest-create"><Icon name="check" :size="14" />Start</button>
     </form>
+    <nav v-if="list.length > 1" class="dz-editions" aria-label="Editions" data-test="digest-archive">
+      <button v-for="x in list" :key="x.id" type="button" :class="{ on: ed?.id === x.id }" :aria-current="ed?.id === x.id" @click="openEdition(digests.active, x.id)"><b>{{ x.edition.replace(' Edition', '') }}</b><span>{{ shortDate(x.id) }}</span></button>
+    </nav>
     <p v-if="busy" class="dg-status small" role="status" data-test="digest-busy"><Icon name="refresh" :size="13" />Writing a fresh edition{{ store.digest.geminiKey ? ' with Gemini and free sources' : ' from free sources' }}… this can take up to a minute.</p>
-    <p v-if="digests.error" class="pln-err small dg-pad" role="alert">{{ digests.error }}</p>
+    <p v-if="digests.error" class="pln-err small dz-pad" role="alert">{{ digests.error }}</p>
 
-    <div v-if="!ed && !busy" class="dg-empty">
-      <h2>No edition yet</h2>
-      <p>New editions arrive every Monday and Thursday.</p>
-      <button type="button" class="btn primary" data-test="generate-first" @click="generate()"><Icon name="refresh" :size="14" />Write it now</button>
+    <div v-if="!ed" class="dg-empty" :aria-busy="busy">
+      <template v-if="busy">
+        <h2>Writing {{ st.name }}…</h2>
+        <p>{{ st.id === 'main' && !hasTopics() ? 'Your first brief covers opportunities for students. Goals and projects in the Playground, and details in your profile, sharpen it.' : 'Gathering stories, deadlines and drafts for you.' }}</p>
+      </template>
+      <template v-else>
+        <h2>No edition yet</h2>
+        <p>New editions arrive every Monday and Thursday.</p>
+        <button type="button" class="btn primary" data-test="generate-first" @click="generate()"><Icon name="refresh" :size="14" />Write it now</button>
+      </template>
     </div>
-    <div v-if="!ed && busy" class="dg-empty" aria-busy="true">
-      <h2>Writing {{ st.name }}…</h2>
-      <p>{{ st.id === 'main' && !hasTopics() ? 'Your first brief covers opportunities for students. Add goals and projects in the Playground, and details about you in your profile, and it follows them.' : 'Gathering stories, deadlines and drafts for you.' }}</p>
-    </div>
 
-    <article v-if="ed" class="dg-paper" data-test="digest">
-      <header class="dg-mast">
-        <p class="dg-kick">{{ ed.edition }}</p>
-        <h1>{{ ed.name || st.name }}</h1>
-        <p class="dg-dateline"><span>{{ ed.dateLong }}</span><span>For {{ store.me?.name || 'you' }}<template v-if="store.me?.location"> · {{ store.me.location }}</template></span></p>
-      </header>
-
-      <div class="dg-glance">
-        <div><b>{{ glance.deadlines }}</b><span>Deadlines</span></div>
-        <div><b>{{ glance.finds }}</b><span>New finds</span></div>
-        <div><b>{{ glance.drafts }}</b><span>Drafts</span></div>
-      </div>
-
-      <section v-if="lead" class="dg-lead" data-test="digest-lead">
-        <p class="dg-red">{{ lead.kicker }}</p>
-        <h2>{{ lead.headline }}</h2>
-        <p class="dg-dek">{{ lead.dek }}</p>
-        <p class="dg-body">{{ lead.body }}</p>
-        <div class="dg-ctas">
-          <a class="btn primary" :href="lead.ctaLink" target="_blank" rel="noopener noreferrer">{{ lead.ctaLabel }}</a>
-          <a v-if="lead.link2" class="dg-link" :href="lead.link2" target="_blank" rel="noopener noreferrer">{{ lead.link2Label }}</a>
-          <button type="button" class="ibtn" :title="ed.lead.added ? 'Added to Planner' : 'Add to Planner'" aria-label="Add to Planner" @click="toPlanner(ed.lead)"><Icon :name="ed.lead.added ? 'check' : 'planner'" /></button>
+    <article v-else class="dz-paper" data-test="digest">
+      <!-- Hero: the lead story beside your briefing -->
+      <section class="dz-hero">
+        <div class="dz-lead" data-test="digest-lead">
+          <p class="dz-meta"><span class="dz-kicker">{{ ed.edition }} · {{ ed.dateLong }}</span><span>{{ readingMinutes(ed) }} min read</span></p>
+          <h1 class="dz-title">{{ ed.name || st.name }}</h1>
+          <template v-if="lead">
+            <p class="dz-red">{{ lead.kicker }}</p>
+            <h2>{{ lead.headline }}</h2>
+            <p class="dz-dek">{{ lead.dek }}</p>
+            <p class="dz-body">{{ lead.body }}</p>
+            <div class="dz-acts">
+              <a class="btn primary" :href="lead.ctaLink" target="_blank" rel="noopener noreferrer"><Icon name="external" :size="14" />{{ lead.ctaLabel }}</a>
+              <button type="button" class="btn" :class="{ on: isSaved(ed.lead) }" :aria-pressed="isSaved(ed.lead)" data-test="lead-save" @click="toggleSave(ed.lead, ed)"><Icon :name="isSaved(ed.lead) ? 'check' : 'plus'" :size="14" />{{ isSaved(ed.lead) ? 'Saved' : 'Save' }}</button>
+              <button type="button" class="btn" :disabled="isPlanned(ed.lead)" @click="planStory(ed.lead)"><Icon :name="isPlanned(ed.lead) ? 'check' : 'planner'" :size="14" />{{ isPlanned(ed.lead) ? 'In Planner' : 'Add to Planner' }}</button>
+              <a v-if="lead.link2" class="dg-link" :href="lead.link2" target="_blank" rel="noopener noreferrer">{{ lead.link2Label }}</a>
+            </div>
+          </template>
+          <p v-else class="dg-none">No new finds this time. Goals and projects in the Playground widen what your brief looks for.</p>
         </div>
-      </section>
-      <p v-else class="dg-none">No new finds this time. Goals and projects in the Playground widen what your brief looks for.</p>
 
-      <section class="dg-sec">
-        <h3 class="dg-h">On the calendar <span>Next 14 days</span></h3>
-        <ul v-if="calendar.length" class="dg-cal">
-          <li v-for="c in calendar" :key="c.date + c.name" :class="{ mine: c.mine }">
-            <span class="dg-chip"><small>{{ chip(c.date).mon }}</small><b>{{ chip(c.date).day }}</b><small>{{ chip(c.date).wd }}</small></span>
-            <span><b>{{ c.name }}</b><span class="muted small">{{ c.desc }}</span></span>
-            <a v-if="c.ctaLink" :href="c.ctaLink" target="_blank" rel="noopener noreferrer" class="dg-link">{{ c.ctaLabel }}</a>
-          </li>
+        <aside class="dz-brief" data-test="digest-briefing">
+          <p class="dz-label">Your briefing</p>
+          <div class="dz-stats">
+            <div><b>{{ all.length }}</b><span>finds</span></div>
+            <div><b>{{ soon }}</b><span>due this week</span></div>
+            <div><b>{{ ed.drafts.length }}</b><span>drafts</span></div>
+          </div>
+          <div class="dz-progress" :title="`${acted} of ${all.length} saved, planned or hidden`">
+            <span class="small"><b>{{ acted }} of {{ all.length }}</b> acted on</span>
+            <span class="dz-bar"><i :style="{ width: `${pct}%` }" /></span>
+          </div>
+          <div v-if="ed.action" class="dz-week">
+            <p class="dz-label">Do this week</p>
+            <p>{{ ed.action.text }}</p>
+            <a v-if="ed.action.link" class="btn small" :href="ed.action.link" target="_blank" rel="noopener noreferrer"><Icon name="external" :size="13" />{{ ed.action.label }}</a>
+          </div>
+          <div v-if="ed.watch" class="dz-watch">
+            <p class="dz-label">Watching: {{ ed.watch.topic }}</p>
+            <h4>{{ ed.watch.headline }}</h4>
+            <p class="small">{{ ed.watch.body }}</p>
+            <a class="dg-link small" :href="ed.watch.link" target="_blank" rel="noopener noreferrer">{{ ed.watch.linkLabel || 'Read it' }}</a>
+            <p v-if="ed.watch.note" class="muted small">{{ ed.watch.note }}</p>
+          </div>
+        </aside>
+      </section>
+
+      <!-- The next 14 days -->
+      <section class="dz-sec">
+        <div class="dz-sec-head"><h3>Next 14 days</h3><button v-if="day" type="button" class="link-btn small" @click="day = ''">Show all days</button></div>
+        <div class="dz-strip" role="group" aria-label="Deadlines by day" data-test="digest-strip">
+          <button v-for="x in strip" :key="x.d" type="button" class="dz-day" :class="{ on: day === x.d, today: x.d === today(), has: x.items.length }" :aria-pressed="day === x.d" :aria-label="`${shortDate(x.d)}: ${x.items.length} due`" @click="day = day === x.d ? '' : x.d">
+            <span>{{ x.wd }}</span><b>{{ x.n }}</b>
+            <i class="dz-dots"><em v-for="(it, k) in x.items.slice(0, 4)" :key="k" :class="{ mine: it.mine }" /></i>
+          </button>
+        </div>
+        <ul v-if="day" class="dz-dayitems">
+          <li v-for="(it, k) in dayItems" :key="k" :class="{ mine: it.mine }"><b>{{ it.name }}</b><span class="muted small">{{ it.desc }}{{ it.mine ? ' · in your Planner' : '' }}</span><a v-if="it.ctaLink" class="dg-link small" :href="it.ctaLink" target="_blank" rel="noopener noreferrer">{{ it.ctaLabel }}</a></li>
+          <li v-if="!dayItems.length" class="muted small">Nothing due {{ shortDate(day) }}.</li>
         </ul>
-        <p v-else class="dg-none">Nothing due in the next two weeks.</p>
+        <p class="dz-legend small"><i /> From this digest <i class="mine" /> From your Planner</p>
       </section>
 
-      <section class="dg-sec">
-        <h3 class="dg-h">New this scan <span>{{ ed.stories.length }}</span></h3>
-        <div v-if="ed.stories.length" class="dg-stories">
-          <article v-for="s in ed.stories" :key="s.ctaLink" class="dg-story" data-test="digest-story">
-            <p class="dg-tag" :data-tag="s.tag">{{ tagName(s.tag) }}<span v-if="s.fromAI" class="dg-ai" title="Found by Gemini with Google Search">Researched</span></p>
+      <!-- Finds -->
+      <section class="dz-sec">
+        <div class="dz-sec-head"><h3>New this scan <span class="muted">{{ stories.length }}</span></h3></div>
+        <div class="dz-filters">
+          <div class="dz-chips" role="group" aria-label="Filter by kind">
+            <button type="button" class="chip-btn" :class="{ on: !tag }" @click="tag = ''">All {{ stories.length }}</button>
+            <button v-for="(n, t) in counts" :key="t" type="button" class="chip-btn" :class="{ on: tag === t }" :style="{ '--t': TAGS[t] }" :data-test="`filter-${t.toLowerCase()}`" @click="tag = tag === t ? '' : t"><i class="dz-tagdot" />{{ tagName(t) }} {{ n }}</button>
+          </div>
+          <div class="dz-find">
+            <label class="dz-search"><Icon name="search" :size="14" /><input v-model="q" type="search" placeholder="Search this edition" aria-label="Search this edition" data-test="digest-search" /></label>
+            <select v-model="sort" aria-label="Sort" data-test="digest-sort"><option value="fit">Best fit</option><option value="deadline">Deadline soonest</option><option value="new">Newest</option></select>
+          </div>
+        </div>
+        <div v-if="finds.length" class="dz-cards">
+          <article v-for="s in finds" :key="s.ctaLink" class="dz-card" :class="{ hidden: isHidden(s) }" :style="{ '--t': TAGS[s.tag] || '#52525b' }" data-test="digest-story">
+            <p class="dz-card-top"><span class="dz-tag">{{ tagName(s.tag) }}</span><span v-if="s.fromAI" class="dg-ai" title="Found by Gemini with Google Search">Researched</span><span v-if="s.dueIso" class="dz-count" :class="urgency(s.dueIso)">{{ countdown(s.dueIso) }}</span></p>
             <h4>{{ s.headline }}</h4>
-            <p class="dg-desc">{{ s.desc }}</p>
-            <p class="small"><b>Fit:</b> {{ s.fit }} · <b>{{ s.deadline }}</b></p>
-            <div class="dg-ctas">
+            <p class="dz-desc">{{ s.desc }}</p>
+            <div class="dz-fit" :title="s.fit"><span class="dz-meter"><i :style="{ width: `${s.score || 50}%` }" /></span><span class="small"><b>{{ s.score || 50 }}% fit</b> · {{ s.fit }}</span></div>
+            <p class="dz-card-foot small"><span>{{ s.deadline }}</span><span class="muted">{{ s.source || host(s.ctaLink) }}</span></p>
+            <div class="dz-card-acts">
               <a class="btn small" :href="s.ctaLink" target="_blank" rel="noopener noreferrer"><Icon name="external" :size="13" />{{ s.ctaLabel }}</a>
-              <button type="button" class="ibtn ghost" :title="s.added ? 'Added to Planner' : 'Add to Planner'" :aria-label="`Add ${s.headline} to Planner`" data-test="story-plan" @click="toPlanner(s)"><Icon :name="s.added ? 'check' : 'planner'" /></button>
+              <span class="dz-icons">
+                <button type="button" class="ibtn ghost" :class="{ on: isSaved(s) }" :aria-pressed="isSaved(s)" :title="isSaved(s) ? 'Saved' : 'Save for later'" :aria-label="`Save ${s.headline}`" data-test="story-save" @click="toggleSave(s, ed)"><Icon :name="isSaved(s) ? 'check' : 'plus'" /></button>
+                <button type="button" class="ibtn ghost" :class="{ on: isPlanned(s) }" :disabled="isPlanned(s)" :title="isPlanned(s) ? 'In your Planner' : s.dueIso ? 'Add to Planner with its deadline' : 'Add to Planner'" :aria-label="`Add ${s.headline} to Planner`" data-test="story-plan" @click="planStory(s)"><Icon :name="isPlanned(s) ? 'check' : 'planner'" /></button>
+                <button type="button" class="ibtn ghost" :title="copied === s.ctaLink ? 'Copied' : 'Copy link'" :aria-label="`Copy link to ${s.headline}`" @click="copy(s.ctaLink, s.ctaLink)"><Icon :name="copied === s.ctaLink ? 'check' : 'copy'" /></button>
+                <button type="button" class="ibtn ghost" :title="isHidden(s) ? 'Show again' : 'Not for me'" :aria-label="isHidden(s) ? `Show ${s.headline}` : `Hide ${s.headline}`" data-test="story-hide" @click="toggleHide(s)"><Icon :name="isHidden(s) ? 'refresh' : 'x'" /></button>
+              </span>
             </div>
           </article>
         </div>
-        <p v-else class="dg-none">Nothing else new since the last edition.</p>
+        <p v-else class="dg-none">{{ stories.length ? 'Nothing matches. Clear the filter or search.' : 'Nothing else new since the last edition.' }}</p>
+        <button v-if="hiddenCount" type="button" class="link-btn small" data-test="show-hidden" @click="showHidden = !showHidden">{{ showHidden ? 'Hide' : 'Show' }} {{ hiddenCount }} you marked “not for me”</button>
       </section>
 
-      <section class="dg-sec">
-        <h3 class="dg-h">Your outbox <span>Drafts to send yourself</span></h3>
-        <ul v-if="ed.drafts.length" class="dg-out">
-          <li v-for="d in ed.drafts" :key="d.no" :class="{ open: opened === d.no }">
-            <button type="button" class="dg-out-row" :aria-expanded="opened === d.no" data-test="draft" @click="opened = opened === d.no ? null : d.no">
-              <b>#{{ d.no }}</b><span><b>{{ d.to }}</b><span class="muted small">{{ d.purpose }}</span></span><span class="dg-status">{{ d.status }}</span><span class="muted small">{{ d.sendBy }}</span>
+      <!-- Outbox -->
+      <section class="dz-sec">
+        <div class="dz-sec-head"><h3>Your outbox <span class="muted">{{ ed.drafts.length }}</span></h3><span class="muted small">Drafts to send yourself</span></div>
+        <ul v-if="ed.drafts.length" class="dz-out">
+          <li v-for="d in ed.drafts" :key="d.no" :class="{ open: opened === d.no, sent: isSent(ed, d) }">
+            <button type="button" class="dz-out-row" :aria-expanded="opened === d.no" data-test="draft" @click="opened = opened === d.no ? null : d.no">
+              <b class="dz-no">#{{ d.no }}</b>
+              <span><b>{{ d.to }}</b><span class="muted small">{{ d.purpose }}</span></span>
+              <span class="dz-status" :class="{ ok: isSent(ed, d) }">{{ isSent(ed, d) ? 'Sent' : d.status }}</span>
+              <span class="muted small">{{ d.sendBy }}</span>
             </button>
-            <div v-if="opened === d.no" class="dg-draft">
-              <p><b>Subject:</b> {{ d.subject }}</p>
-              <pre>{{ d.body }}</pre>
-              <div class="dg-ctas">
+            <div v-if="opened === d.no" class="dz-draft">
+              <p class="small"><b>Subject:</b> {{ d.subject }}</p>
+              <textarea :value="draftBody(ed, d)" rows="9" aria-label="Email text" data-test="draft-body" @input="editDraft(ed, d, $event.target.value)" />
+              <div class="dz-acts">
                 <button type="button" class="btn small" @click="copy(d.subject, `s${d.no}`)"><Icon :name="copied === `s${d.no}` ? 'check' : 'copy'" :size="14" />{{ copied === `s${d.no}` ? 'Copied' : 'Copy subject' }}</button>
-                <button type="button" class="btn small" data-test="copy-email" @click="copy(d.body, `b${d.no}`)"><Icon :name="copied === `b${d.no}` ? 'check' : 'copy'" :size="14" />{{ copied === `b${d.no}` ? 'Copied' : 'Copy email' }}</button>
+                <button type="button" class="btn small" data-test="copy-email" @click="copy(draftBody(ed, d), `b${d.no}`)"><Icon :name="copied === `b${d.no}` ? 'check' : 'copy'" :size="14" />{{ copied === `b${d.no}` ? 'Copied' : 'Copy email' }}</button>
+                <a class="btn small" :href="mailto(d)"><Icon name="external" :size="14" />Open in email app</a>
+                <button type="button" class="btn small" :class="{ primary: !isSent(ed, d) }" data-test="draft-sent" @click="markSent(ed, d)"><Icon :name="isSent(ed, d) ? 'refresh' : 'check'" :size="14" />{{ isSent(ed, d) ? 'Not sent yet' : 'Mark sent' }}</button>
               </div>
+              <p v-if="isSent(ed, d)" class="muted small">A follow-up is in your Planner for a week from now.</p>
             </div>
           </li>
         </ul>
         <p v-else class="dg-none">No new drafts this time.</p>
       </section>
 
-      <section v-if="ed.watch" class="dg-watch">
-        <p class="dg-kick">Watching: {{ ed.watch.topic }}</p>
-        <h4>{{ ed.watch.headline }}</h4>
-        <p>{{ ed.watch.body }}</p>
-        <a class="dg-link" :href="ed.watch.link" target="_blank" rel="noopener noreferrer">{{ ed.watch.linkLabel || 'Read it' }}</a>
-        <p v-if="ed.watch.note" class="muted small">{{ ed.watch.note }}</p>
-      </section>
-
-      <section v-if="ed.action" class="dg-week">
-        <p class="dg-kick">Do this week</p>
-        <p>{{ ed.action.text }}</p>
-        <a v-if="ed.action.link" class="btn small" :href="ed.action.link" target="_blank" rel="noopener noreferrer">{{ ed.action.label }}</a>
+      <!-- Saved across editions -->
+      <section v-if="store.digest.saved?.length" class="dz-sec" data-test="digest-saved">
+        <div class="dz-sec-head"><h3>Saved <span class="muted">{{ store.digest.saved.length }}</span></h3><span class="muted small">From every edition</span></div>
+        <ul class="dz-saved">
+          <li v-for="s in [...store.digest.saved].reverse()" :key="s.ctaLink" :style="{ '--t': TAGS[s.tag] || '#52525b' }">
+            <span class="dz-tag">{{ tagName(s.tag) || 'Lead' }}</span>
+            <a :href="s.ctaLink" target="_blank" rel="noopener noreferrer"><b>{{ s.headline }}</b></a>
+            <span v-if="s.dueIso" class="dz-count" :class="urgency(s.dueIso)">{{ countdown(s.dueIso) }}</span>
+            <button type="button" class="ibtn ghost" title="Remove from saved" :aria-label="`Remove ${s.headline} from saved`" @click="toggleSave(s)"><Icon name="x" /></button>
+          </li>
+        </ul>
       </section>
 
       <footer class="dg-foot">

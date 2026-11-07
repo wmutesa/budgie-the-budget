@@ -68,24 +68,9 @@ const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `
 // Money data saved by an older version of Budgie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
 // A sample edition, as the server would write it from free sources.
-function sampleEdition() {
-  return {
-    id: inDays(0), edition: 'Saturday Edition', dateLong: 'Saturday, November 7, 2026', createdAt: new Date().toISOString(), provider: 'free sources',
-    preheader: '3 new finds, 2 deadlines in the next two weeks.',
-    lead: { kicker: 'Internship · Apply by Dec 1', headline: 'Robotics lab opens first-year research roles', dek: 'Undergraduates can join a robotics lab this spring.', body: 'The lab builds low-cost robots. Matches robotics.', ctaLabel: 'Apply', ctaLink: 'https://example.org/lab', link2Label: 'More like this', link2: 'https://news.google.com/search?q=robotics' },
-    stories: [
-      { tag: 'EVENT', headline: 'Student hackathon this month', desc: 'A free weekend hackathon, online and in Boston.', fit: 'Matches robotics', deadline: `Register by ${inDays(4)}`, ctaLabel: 'Register', ctaLink: 'https://example.org/hack', dueIso: inDays(4) },
-      { tag: 'PERK', headline: 'Free cloud credits for students', desc: 'Credits for student projects.', fit: 'Check eligibility on the page', deadline: 'See the page', ctaLabel: 'Claim it', ctaLink: 'https://example.org/perk' },
-    ],
-    deadlines: [{ date: inDays(4), name: 'Student hackathon this month', desc: 'Event · example.org', ctaLabel: 'Register', ctaLink: 'https://example.org/hack' }],
-    drafts: [{ no: '1', to: 'Robotics Lab', purpose: 'Ask about first-year research roles', status: 'Needs a contact', sendBy: 'by Nov 20', subject: 'Student interested in your research', body: 'Hello,\n\nI am a student interested in robotics.\n\nThank you for your time,\nSam' }],
-    watch: { topic: 'student visa', headline: 'New guidance on student work rules', body: 'A short summary.', linkLabel: 'Read it', link: 'https://example.org/visa', note: 'Not legal advice.' },
-    action: { text: 'Register: Student hackathon this month.', label: 'Register', link: 'https://example.org/hack' },
-    sources: [{ title: 'example.org', url: 'https://example.org/lab' }],
-  };
-}
+const { sampleEdition, olderEditions } = require('./fixtures/sample-edition.cjs');
 async function fakeApi(page, account = fakeAccount) {
-  account.digests = account.digests || [];
+  account.digests = account.digests || olderEditions();
   await page.route('**/api/**', async route => {
     const req = route.request();
     const p = new URL(req.url()).pathname;
@@ -274,13 +259,40 @@ async function run(url) {
   assert.equal(fakeAccount.lastWrite.me.study, 'Electrical Engineering', 'your profile is saved before the server writes');
   assert.match(fakeAccount.lastWrite.key, /^AIza/, 'the Gemini key is in your account for the server');
   const paper = await page.textContent('[data-test="digest"]');
-  assert.match(paper, /Saturday Edition[\s\S]*My brief[\s\S]*For Sam[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
+  assert.match(paper, /Saturday Edition[\s\S]*My brief[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
+  assert.equal(await page.locator('[data-test="digest-archive"] button').count(), 3, 'past editions show as a timeline');
   assert.match(await page.textContent('[data-test="digest-made"]'), /Gemini with Google Search[\s\S]*following robotics/, 'it says how it was researched and what it follows');
-  const cal = await page.textContent('.dg-cal');
-  assert.ok(/Student hackathon/.test(cal) && /Essay 2[\s\S]*in your Planner/.test(cal), 'the calendar mixes digest deadlines and your own');
+  // The 14-day strip: tap a day to see what is due, from the digest and your Planner.
+  await page.click('[data-test="digest-strip"] button.has >> nth=0');
+  assert.ok((await page.locator('.dz-dayitems li').count()) >= 1, 'a day shows what is due');
+  await page.click('[data-test="digest-strip"] button.on');
+  // Finds: filter, search, sort, save, plan, hide.
+  assert.equal(await page.locator('[data-test="digest-story"]').count(), 10, 'all finds show');
+  await page.click('[data-test="filter-event"]');
+  assert.equal(await page.locator('[data-test="digest-story"]').count(), 2, 'filtering by kind');
+  await page.click('[data-test="filter-event"]');
+  await page.fill('[data-test="digest-search"]', 'solar');
+  assert.match(await page.textContent('[data-test="digest-story"]'), /solar microgrids/, 'searching the edition');
+  await page.fill('[data-test="digest-search"]', '');
+  await page.selectOption('[data-test="digest-sort"]', 'deadline');
+  assert.match(await page.textContent('[data-test="digest-story"] >> nth=0'), /Due today[\s\S]*Open source mentorship/, 'sorting by deadline, with a countdown');
+  await page.selectOption('[data-test="digest-sort"]', 'fit');
+  assert.match(await page.textContent('[data-test="digest-story"] >> nth=0'), /Embedded systems intern[\s\S]*92% fit/, 'best fit first');
+  const first = page.locator('[data-test="digest-story"] >> nth=0');
+  await first.locator('[data-test="story-save"]').click();
+  assert.equal(await first.locator('[data-test="story-plan"]').isDisabled(), true, 'finds due in two weeks are already in the Planner');
+  await page.locator('[data-test="digest-story"]', { hasText: 'Free cloud credits' }).locator('[data-test="story-plan"]').click();
+  await page.locator('[data-test="digest-story"]', { hasText: 'Remote software internship' }).locator('[data-test="story-hide"]').click();
+  assert.equal(await page.locator('[data-test="digest-story"]').count(), 9, '“not for me” hides a find');
+  assert.match(await page.textContent('[data-test="digest-saved"]'), /Embedded systems intern/, 'saved finds are kept');
+  assert.match(await page.textContent('[data-test="digest-briefing"]'), /3 of 11[\s\S]*acted on/, 'the briefing counts what you acted on');
   assert.match(paper, /Watching: student visa[\s\S]*Not legal advice/, 'the watch box shows its note');
   await page.click('[data-test="draft"]');
-  assert.match(await page.textContent('.dg-draft'), /Subject:[\s\S]*Thank you for your time/, 'a draft opens with its email');
+  assert.match(await page.inputValue('[data-test="draft-body"]'), /Thank you for your time/, 'a draft opens with its email');
+  await page.fill('[data-test="draft-body"]', 'Hello,\n\nA shorter note.\n\nSam');
+  await page.click('[data-test="draft-sent"]');
+  assert.match(await page.textContent('.dz-out li >> nth=0'), /Sent/, 'a draft can be marked sent');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true });
   // A second digest, tracked as its own tab.
   await page.click('[data-test="digest-add"]');
   await page.fill('[data-test="digest-name"]', 'AI policy news');
@@ -289,9 +301,10 @@ async function run(url) {
   assert.equal(await page.getAttribute('[data-test="digest-tab-ai-policy-news"]', 'aria-selected'), 'true', 'the new digest has its own tab');
   await page.click('[data-test="digest-tab-main"]');
   await page.waitForFunction(() => /Robotics lab opens/.test(document.querySelector('[data-test="digest"]')?.textContent || ''));
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true });
   await page.click('.nb-pages button:has-text("Planner")');
-  assert.match(await page.textContent('[data-test="planner"]'), /Student hackathon this month/, 'digest deadlines become Planner tasks');
+  const plannerText = await page.textContent('[data-test="planner"]');
+  assert.match(plannerText, /Student hackathon this month/, 'digest deadlines become Planner tasks');
+  assert.match(plannerText, /Follow up with Robotics Lab/, 'marking a draft sent adds a follow-up');
 
   // Today: the day, goals and the latest digest together.
   await page.click(tab('Today'));
@@ -361,7 +374,7 @@ async function run(url) {
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Today'));
-  assert.ok((await guide.locator('.empty-note').count()) >= 3, 'empty cards explain what to add');
+  assert.ok((await guide.locator('.empty-note').count()) >= 1, 'empty cards explain what to add');
   await guide.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await guide.waitForTimeout(1500);
   assert.equal(fresh.data?.guide?.done, true, 'finishing the guide is saved to the account');

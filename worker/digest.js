@@ -242,6 +242,8 @@ export function writeEdition({ items, watch, profile, research = null }, previou
       deadline: dueIso ? `${t === 'EVENT' ? 'On' : 'Apply by'} ${fmtDay(dueIso)}` : (it.kind === 'job' ? 'Open now' : 'See the page'),
       ctaLabel: CTA[t], ctaLink: it.link, link2Label: 'More like this', link2: `https://news.google.com/search?q=${encodeURIComponent(it.title.split(/[:|–-]/)[0].slice(0, 60))}`,
       dueIso, org: it.kind === 'job' ? it.source : '', source: it.source,
+      // How well it fits, 0-100, from interest matches, stage, deadline and freshness.
+      score: Math.max(20, Math.min(98, 35 + r.s * 6)), date: it.date || '',
     };
   });
   // Research (Gemini) goes first; free finds fill in after, without repeats.
@@ -269,7 +271,7 @@ export function writeEdition({ items, watch, profile, research = null }, previou
     : drafts[0] ? { text: `Send draft #${drafts[0].no} to ${drafts[0].to}.`, label: 'Open the outbox', link: '' }
       : lead ? { text: `Read the lead story and decide if it is for you.`, label: lead.ctaLabel, link: lead.ctaLink } : null;
   const sources = [...(research?.sources || []), ...[...new Map(stories.map(s => [s.source, s])).values()].filter(s => s.source).map(s => ({ title: s.source, url: s.ctaLink }))].slice(0, 12);
-  const clean = s => { const { dueIso, org, source, isLead, ...rest2 } = s; return { ...rest2, dueIso }; };
+  const clean = s => { const { org, isLead, ...rest2 } = s; return rest2; };
   return {
     preheader: `${stories.length} new find${stories.length === 1 ? '' : 's'}, ${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'} in the next two weeks.`,
     lead, stories: rest.map(clean), deadlines, drafts, watch: watchBox, action, sources,

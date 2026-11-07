@@ -63,7 +63,7 @@ Plain text in every field, no markdown.`;
     tag: TAGS.includes(String(s.tag).toUpperCase()) ? String(s.tag).toUpperCase() : 'PROGRAM',
     headline: text(s.headline, 160), desc: text(s.desc, 320), fit: text(s.fit, 200) || 'Check eligibility on the page',
     deadline: text(s.deadline, 60) || 'See the page', dueIso: isoDate(s.dueIso), ctaLabel: text(s.ctaLabel, 30) || 'Open', ctaLink: s.ctaLink,
-    source: (() => { try { return new URL(s.ctaLink).hostname.replace(/^www\./, ''); } catch { return ''; } })(), fromAI: true,
+    source: (() => { try { return new URL(s.ctaLink).hostname.replace(/^www\./, ''); } catch { return ''; } })(), fromAI: true, score: 85,
   } : null);
   const lead = out.lead && https(out.lead.ctaLink) && out.lead.headline ? {
     kicker: text(out.lead.kicker, 60), headline: text(out.lead.headline, 160), dek: text(out.lead.dek, 260), body: text(out.lead.body, 700),

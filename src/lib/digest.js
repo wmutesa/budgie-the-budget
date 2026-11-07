@@ -124,3 +124,40 @@ async function polish(ed) {
   const out = await aiPolishLead(ed.lead, line).catch(() => null);
   if (out) digests.polished[key] = { ...out, by: ai.used.digest };
 }
+
+// ---------- acting on stories and drafts (saved in your account) ----------
+const keep = (k, n) => { store.digest[k] = (store.digest[k] || []).slice(-n); };
+export const isSaved = s => Boolean(store.digest.saved?.some(x => x.ctaLink === s.ctaLink));
+export function toggleSave(s, ed) {
+  if (isSaved(s)) { store.digest.saved = store.digest.saved.filter(x => x.ctaLink !== s.ctaLink); return; }
+  store.digest.saved = [...(store.digest.saved || []), { tag: s.tag, headline: s.headline, desc: s.desc || s.dek || '', deadline: s.deadline || '', dueIso: s.dueIso || '', ctaLink: s.ctaLink, ctaLabel: s.ctaLabel || 'Open', from: ed?.name || 'Digest', savedAt: new Date().toISOString() }];
+  keep('saved', 100);
+}
+export const isHidden = s => Boolean(store.digest.hidden?.includes(s.ctaLink));
+export function toggleHide(s) {
+  store.digest.hidden = isHidden(s) ? store.digest.hidden.filter(x => x !== s.ctaLink) : [...(store.digest.hidden || []), s.ctaLink];
+  keep('hidden', 300);
+}
+export const isPlanned = s => store.tasks.some(t => t.link === s.ctaLink);
+// Add a story to the Planner with its real deadline when there is one.
+export function planStory(s) {
+  if (isPlanned(s)) return;
+  store.tasks.unshift(makeTask({ title: s.headline.slice(0, 120), notes: `${s.desc || s.dek || ''} ${s.fit || ''}`.trim().slice(0, 400), link: s.ctaLink, date: s.dueIso && s.dueIso >= today() ? s.dueIso : today(), kind: s.tag === 'EVENT' ? 'event' : s.dueIso ? 'assignment' : 'task', project: 'Digest', source: 'digest' }));
+}
+// Did you act on it? Saving, hiding or adding it to the Planner yourself counts
+// (deadlines Budgie added on its own do not).
+export const actedOn = s => isSaved(s) || isHidden(s) || store.tasks.some(t => t.link === s.ctaLink && !t.uid);
+const draftKey = (ed, d) => `${ed.stream || 'main'}:${ed.id}:${d.no}`;
+export const draftBody = (ed, d) => store.digest.drafts?.[draftKey(ed, d)] ?? d.body;
+export function editDraft(ed, d, body) { store.digest.drafts = { ...(store.digest.drafts || {}), [draftKey(ed, d)]: body.slice(0, 4000) }; }
+export const isSent = (ed, d) => Boolean(store.digest.sent?.includes(draftKey(ed, d)));
+// Marking a draft sent puts a follow-up in your Planner a week later.
+export function markSent(ed, d) {
+  const k = draftKey(ed, d);
+  if (isSent(ed, d)) { store.digest.sent = store.digest.sent.filter(x => x !== k); return; }
+  store.digest.sent = [...(store.digest.sent || []), k];
+  keep('sent', 300);
+  const d7 = new Date(); d7.setDate(d7.getDate() + 7);
+  store.tasks.unshift(makeTask({ title: `Follow up with ${d.to}`.slice(0, 120), date: `${d7.getFullYear()}-${String(d7.getMonth() + 1).padStart(2, '0')}-${String(d7.getDate()).padStart(2, '0')}`, kind: 'task', project: 'Digest', source: 'digest', notes: `Sent: ${d.subject || d.purpose}` }));
+}
+export const readingMinutes = ed => Math.max(1, Math.round(JSON.stringify([ed.lead, ed.stories, ed.drafts, ed.watch]).split(/\s+/).length / 220));
