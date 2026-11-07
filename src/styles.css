@@ -2422,3 +2422,19 @@ body:has(.overlay) .notice { display: none; }
 .dz-out-row { grid-template-columns: 44px minmax(0, 1fr) auto auto !important; }
 .dz-out-row .btn { white-space: nowrap; }
 @media (max-width: 640px) { .dz-out-row { grid-template-columns: 34px minmax(0, 1fr) !important; } .dz-out-row > *:nth-child(n+3) { grid-column: 2; justify-self: start; } }
+
+/* Profile page: lighter purple only, no green */
+.acct-sheet { --mint: #faf7ff; --mint-line: #ebe4ff; }
+.acct-sec.t-b { --tint: #faf7ff; --line-t: #ebe4ff; }
+.acct-sec.t-a { --tint: #f5f3ff; --line-t: #e4dcff; }
+.acct-sec .kicker .acct-ico { color: #7c3aed !important; }
+.acct-role { background: #ede9fe !important; color: #6d28d9 !important; }
+.avp-custom { background: #f5f3ff !important; }
+.avp-custom-dot { box-shadow: 0 0 0 1px #e4dcff !important; }
+.acct-dot.saved { background: #a78bfa; }
+.acct-sheet .ai-state.ready, .acct-sheet .pln-ok { color: #6d28d9; }
+.acct-sheet input[type="checkbox"] { accent-color: #7c3aed; }
+.acct-sheet .rc-ok, .acct-sheet .si-ok { color: #6d28d9; }
+.acct-sheet .t-violet { background: #f5f3ff !important; border: 1px solid #e4dcff !important; }
+.acct-sheet .pk-note { background: #faf7ff; border-color: #ebe4ff; }
+.acct-sheet .acct-top { background: #f5f3ff; }
