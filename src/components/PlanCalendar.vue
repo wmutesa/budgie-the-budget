@@ -24,7 +24,6 @@ const MODES = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
 const mode = computed({ get: () => (['day', 'week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'week'), set: v => { store.planner.cal = v; } });
 const anchor = ref(today());
 const HOUR = 48;                  // pixels per hour
-const START = 0;                  // the grid shows the whole day and scrolls
 const clock = ref(new Date());
 let tick = null;
 
@@ -70,12 +69,15 @@ function timed(d) {
   return list;
 }
 const boxStyle = x => ({
-  top: `${((x.s - START * 60) / 60) * HOUR}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR - 2)}px`,
+  top: `${((x.s - startH.value * 60) / 60) * HOUR}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR - 2)}px`,
   left: `calc(${(x.lane / x.lanes) * 100}% + 2px)`, width: `calc(${100 / x.lanes}% - 4px)`, '--k': KINDS[x.task.kind]?.color,
 });
-const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - START * 60) / 60) * HOUR);
-const hours = Array.from({ length: 24 - START }, (_, i) => START + i);
-const hourLabel = h => (h === 0 ? '' : timeLabel(fromMins(h * 60)).replace(':00', ''));
+const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR);
+// Full size, no inner scrolling: show 7 AM to 10 PM, widened to fit anything earlier or later.
+const startH = computed(() => Math.min(7, ...items.value.filter(x => x.task.time).map(x => Math.floor(toMins(x.task.time) / 60))));
+const endH = computed(() => Math.max(22, ...items.value.filter(x => x.task.time).map(x => Math.min(24, Math.ceil((toMins(x.task.time) + (x.task.mins || 45)) / 60)))));
+const hours = computed(() => Array.from({ length: endH.value - startH.value }, (_, i) => startH.value + i));
+const hourLabel = h => (h === startH.value ? '' : timeLabel(fromMins(h * 60)).replace(':00', ''));
 const grid = ref(null);
 function scrollToNow() { if (grid.value) grid.value.scrollTop = Math.max(0, nowTop.value - HOUR * 2.5); }
 
@@ -112,7 +114,7 @@ function newAt(e, date, timedClick) {
   let time = '';
   if (timedClick) {
     const r = e.currentTarget.getBoundingClientRect();
-    const mins = Math.floor((((e.clientY - r.top) / HOUR) * 60 + START * 60) / 30) * 30;
+    const mins = Math.floor((((e.clientY - r.top) / HOUR) * 60 + startH.value * 60) / 30) * 30;
     time = fromMins(Math.min(23 * 60 + 30, Math.max(0, mins)));
   }
   pop.value = { kind: 'new', date, time };
@@ -172,7 +174,7 @@ function dropOn(e, date, timedDrop) {
   if (timedDrop) {
     const r = e.currentTarget.getBoundingClientRect();
     const grab = Number(e.dataTransfer.getData('grab') || 0);
-    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR) * 60 + START * 60) / 15) * 15)));
+    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR) * 60 + startH.value * 60) / 15) * 15)));
   } else if (!timedDrop && mode.value !== 'month') t.time = '';
   if (!t.repeat) t.date = date;
   setTimeout(() => { dragging.value = null; }, 0);
@@ -247,7 +249,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           <span v-for="h in hours" :key="h" :style="{ height: `${HOUR}px` }">{{ hourLabel(h) }}</span>
         </div>
         <div v-for="d in days" :key="d" class="cal-col" :class="{ today: d === today() }" :style="{ height: `${hours.length * HOUR}px` }" :data-date="d" @click.self="newAt($event, d, true)" @dragover.prevent @drop="dropOn($event, d, true)">
-          <div v-if="d === today()" class="cal-now" :style="{ top: `${nowTop}px` }" aria-hidden="true" />
+          <div v-if="d === today() && nowTop >= 0 && nowTop <= hours.length * HOUR" class="cal-now" :style="{ top: `${nowTop}px` }" aria-hidden="true" />
           <button v-for="x in timed(d)" :key="x.key" type="button" class="cal-item box" :class="{ done: x.done, short: x.e - x.s < 40 }" :style="boxStyle(x)" draggable="true" data-test="cal-item" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
             <b>{{ x.task.title }}</b><span>{{ timeLabel(x.task.time) }}<template v-if="x.task.mins"> – {{ timeLabel(fromMins(x.s + x.task.mins)) }}</template></span>
           </button>

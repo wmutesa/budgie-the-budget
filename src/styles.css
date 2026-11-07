@@ -2843,3 +2843,15 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .pln-idea-acts .ibtn.primary { background: #18181b !important; border-color: #18181b !important; color: #fff !important; }
 .pln-cols { background: #fff !important; gap: 0 !important; border: 1px solid var(--line); border-width: 1px 0 0 1px !important; }
 .pln-col { box-shadow: inset -1px -1px 0 var(--line); }
+
+/* Calendars at full size: no scrolling inside, nothing pinned; the page scrolls. */
+.sch-body { height: auto !important; }
+.sch-list { max-height: none !important; overflow: visible !important; }
+.sch-time { overflow-y: visible !important; }
+.sch-grid { height: auto !important; max-height: none !important; overflow-y: visible !important; }
+.sch-cols-head { position: static !important; }
+.cal-grid { height: auto !important; max-height: none !important; overflow-y: visible !important; }
+@media (max-width: 900px) { .sch-list { max-height: none !important; } .sch-grid { height: auto !important; } }
+
+/* Focus: tick, stop and play are perfect circles */
+.pln-top .ibtn, .pln-timer .ibtn, .pln-now .ibtn, .pln-focusbar .ibtn { width: 36px !important; height: 36px !important; min-width: 36px; padding: 0 !important; border-radius: 50% !important; display: inline-grid !important; place-items: center; }

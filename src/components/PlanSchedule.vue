@@ -112,7 +112,8 @@ function planDay() {
 }
 
 // Jump the time line to now.
-function toNow() { if (!isToday.value) day.value = today(); nextTick(() => { if (grid.value) grid.value.scrollTo({ top: Math.max(0, nowTop.value - HOUR * 1.5), behavior: 'smooth' }); }); }
+// The calendar is full height, so Now scrolls the page to the red line.
+function toNow() { if (!isToday.value) day.value = today(); nextTick(() => grid.value?.querySelector('.sch-now')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })); }
 // ---------- editing ----------
 const editing = ref(null);
 const editRow = ref('');
