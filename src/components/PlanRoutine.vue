@@ -4,6 +4,8 @@ import { store } from '../lib/store';
 import { buildRoutine, saveRoutine, timeLabel, DAY_SHORT } from '../lib/tasks';
 import { ai, aiRefineRoutine, labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
+import DateField from './DateField.vue';
+import TimeField from './TimeField.vue';
 
 // A daily routine built for you: wake and sleep times plus a few words about
 // your week. Rules draft it instantly; the on-device AI then adjusts it.
@@ -36,8 +38,8 @@ function save() {
   <section class="pln-card card cell" id="routine" data-test="routine">
     <div class="pln-card-head"><h3>Routine</h3><span class="muted small">{{ has ? `${has} daily habits` : labelFor('plan') }}</span></div>
     <div class="pln-routine-in">
-      <label class="tk-f"><span>Wake up</span><input v-model="r.wake" type="time" /></label>
-      <label class="tk-f"><span>Sleep</span><input v-model="r.sleep" type="time" /></label>
+      <div class="tk-f"><span>Wake up</span><TimeField v-model="r.wake" label="Wake up" :clearable="false" /></div>
+      <div class="tk-f"><span>Sleep</span><TimeField v-model="r.sleep" label="Sleep" :clearable="false" /></div>
       <label class="tk-f wide"><span>About your week</span>
         <textarea v-model="r.text" rows="2" maxlength="600" placeholder="Classes MWF 10-12, gym 3x a week at 6pm, call friends Sundays, work Sat 9-5" data-test="routine-text" />
       </label>

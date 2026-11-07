@@ -210,6 +210,20 @@ async function run(url) {
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /0\/6/, 'the assignment is broken into six steps');
   // Editing a task: link it to a goal.
   await page.selectOption('.pln-group[data-group="Tomorrow"] [data-test="task-goal"]', { label: 'Run a 10K' });
+  // The date and time pickers: one design everywhere.
+  const editor = page.locator('.pln-group[data-group="Tomorrow"] [data-test="task-edit"]');
+  await editor.locator('[data-test="time-field"]').click();
+  await page.waitForSelector('[data-test="time-pop"]');
+  if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
+  await page.fill('[data-test="time-pop"] .tp-type', '4:30pm');
+  await page.press('[data-test="time-pop"] .tp-type', 'Enter');
+  assert.match(await editor.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
+  await editor.locator('[data-test="date-field"]').click();
+  await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
+  assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
+  if (process.env.SHOTS) { const b = await page.locator('[data-test="date-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/datepicker.png`, clip: { x: b.x - 120, y: b.y - 60, width: b.width + 240, height: b.height + 80 } }); }
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Run a 10K/, 'a task shows the goal it moves forward');
   // Calendar view: click a slot, add, and the card's actions work.
   await page.click('[data-test="view-calendar"]');

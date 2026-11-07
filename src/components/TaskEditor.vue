@@ -4,6 +4,8 @@ import { store, newId } from '../lib/store';
 import { KINDS, DAY_SHORT, removeTask, today } from '../lib/tasks';
 import { breakDown } from '../lib/breakdown';
 import Icon from './Icon.vue';
+import DateField from './DateField.vue';
+import TimeField from './TimeField.vue';
 
 // Every detail of one Planner item. Changes save as you type.
 const props = defineProps({ task: { type: Object, required: true } });
@@ -27,8 +29,8 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
 <template>
   <div class="tk-edit" data-test="task-edit">
     <label class="tk-f wide"><span>Title</span><input v-model="t.title" maxlength="160" /></label>
-    <label class="tk-f"><span>Date</span><input v-model="t.date" type="date" /></label>
-    <label class="tk-f"><span>Time</span><input v-model="t.time" type="time" /></label>
+    <div class="tk-f"><span>Date</span><DateField v-model="t.date" label="Date" placeholder="No date" /></div>
+    <div class="tk-f"><span>Time</span><TimeField v-model="t.time" label="Time" /></div>
     <label class="tk-f"><span>Minutes</span><input v-model.number="t.mins" type="number" min="0" step="5" /></label>
     <label class="tk-f"><span>Kind</span>
       <select :value="t.kind" @change="setKind($event.target.value)"><option v-for="(k, id) in KINDS" :key="id" :value="id">{{ k.label }}</option></select>

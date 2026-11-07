@@ -184,7 +184,7 @@ function onKey(e) {
   else if (e.key.toLowerCase() === 'w') mode.value = 'week';
   else if (e.key.toLowerCase() === 'm') mode.value = 'month';
 }
-const outside = e => { if (pop.value && popEl.value && !popEl.value.contains(e.target) && !e.target.closest('.cal-item, .cal-col, .cal-allday-cell, .cal-mcell')) pop.value = null; };
+const outside = e => { if (pop.value && popEl.value && !popEl.value.contains(e.target) && !e.target.closest('.cal-item, .cal-col, .cal-allday-cell, .cal-mcell, .pk-pop')) pop.value = null; };
 onMounted(() => {
   tick = setInterval(() => { clock.value = new Date(); }, 60000);
   document.addEventListener('keydown', onKey);

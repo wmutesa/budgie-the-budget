@@ -5,6 +5,8 @@ import { makeGoal, planGoal, progress, removeGoal, addMilestones, parseGoal } fr
 import { toggleDone, isDone, dayLabel } from '../lib/tasks';
 import { labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
+import DateField from './DateField.vue';
+import TimeField from './TimeField.vue';
 
 // Life goals with milestones. Each milestone is a Planner task, so ticking it
 // there (or here) moves the goal forward.
@@ -35,7 +37,7 @@ const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milesto
     <div class="cell-head"><div><p class="label">Goals</p><p class="lede-sm">What you are working towards</p></div><span class="muted small">{{ labelFor('plan') }}</span></div>
     <form class="gl-add" @submit.prevent="add">
       <input v-model="title" placeholder="A goal, e.g. “Land a summer internship” or “Run a 10K by March”" aria-label="New goal" data-test="goal-title" maxlength="120" />
-      <input v-model="by" type="date" aria-label="By when (optional)" title="By when (optional)" />
+      <DateField v-model="by" label="By when" placeholder="By when?" :min="new Date().toISOString().slice(0, 10)" />
       <button class="btn primary small" :disabled="!title.trim() || busy === 'new'" data-test="goal-add"><Icon :name="busy === 'new' ? 'refresh' : 'sparkle'" :size="14" />{{ busy === 'new' ? 'Planning…' : 'Plan it' }}</button>
     </form>
     <input v-if="title" v-model="why" class="gl-why" placeholder="Why it matters to you (optional, helps the AI)" aria-label="Why it matters" maxlength="200" />
