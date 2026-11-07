@@ -3041,3 +3041,10 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
     linear-gradient(180deg, #f8f6ff, #f3efff) !important;
 }
 .pln[data-test="planner"] .pln-filter .chip-btn:not(.on) { background: rgba(255, 255, 255, .85); }
+/* Add sheet: accent picker and Tidy up */
+.cap-foot { flex-wrap: wrap; }
+.cap-accent select { height: 38px; max-width: 180px; padding: 0 28px 0 12px; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; font: 500 13px var(--sans); color: #18181b; cursor: pointer; }
+.cap-tidy { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 1px solid #ddd6fe; border-radius: 999px; background: #f5f3ff; color: #5b21b6; font: 600 13px var(--sans); cursor: pointer; }
+.cap-tidy:hover:not(:disabled) { background: #ede9fe; }
+.cap-tidy:disabled { opacity: .5; cursor: default; }
+@media (max-width: 640px) { .cap-keys { display: none; } .cap-accent select { max-width: 130px; } }

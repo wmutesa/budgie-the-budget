@@ -435,3 +435,16 @@ export async function aiPolishLead(lead, profileLine) {
   const out = firstJSON(reply);
   return out && typeof out.dek === 'string' && typeof out.body === 'string' ? { dek: out.dek.replace(/[<>]/g, '').slice(0, 300), body: out.body.replace(/[<>]/g, '').slice(0, 900) } : null;
 }
+
+// Rewrite dictated notes as clear planner lines: fix misheard words, drop filler,
+// one thing per line, keeping every date, time, name and #project. Returns a string or null.
+export async function aiRewriteDictation(text) {
+  const reply = await route('plan', [
+    { role: 'system', content: 'You tidy up text someone dictated into a planner, in any accent. Fix words the speech recognition clearly misheard, remove filler (um, uh, like, you know, so yeah), and write each separate thing on its own short line: a task, an event, a routine or a goal. Keep every date, day, time, duration, person, place and #tag exactly. Do not add anything that was not said. Reply with JSON only: {"lines": [string]}' },
+    { role: 'user', content: String(text).slice(0, 2000) },
+  ], { json: true, temperature: 0.1, max_tokens: 400 });
+  const lines = firstJSON(reply)?.lines;
+  if (!Array.isArray(lines)) return null;
+  const out = lines.map(x => String(x || '').replace(/[<>]/g, '').trim()).filter(Boolean).slice(0, 20);
+  return out.length ? out.join('\n') : null;
+}

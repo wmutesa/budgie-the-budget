@@ -219,4 +219,17 @@ await check('model downloads: only the exact files Budgie uses', () => {
     assert.equal(modelSource(bad), null, bad);
   }
 });
+const { tidyDictation } = await import('../../src/lib/tidy.js');
+await check('tidying dictation: no filler, one thing per line, planner times', () => {
+  const out = tidyDictation('um so essay due friday at 5 p.m. hashtag english and then uh gym monday at 6 pm. also you know call mom sunday');
+  assert.deepEqual(out.split('\n'), ['Essay due friday at 5pm #english', 'Gym monday at 6pm', 'Call mom sunday']);
+});
+await check('tidying keeps lines that are already clean', () => {
+  assert.equal(tidyDictation('Essay due Fri 5pm #English\nGym MWF 6pm'), 'Essay due Fri 5pm #English\nGym MWF 6pm');
+});
+const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
+await check('accents cover many kinds of English', () => {
+  for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);
+  assert.ok(ACCENTS.some(([x]) => x === defaultAccent()));
+});
 console.log(`\n${n} checks passed`);

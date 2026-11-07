@@ -345,6 +345,14 @@ async function run(url) {
   await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="capture-text"]').value));
   assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
   assert.match(await voice.textContent('[data-test="capture"]'), /Listening/, 'the Add button shows it is listening');
+  // Edit while listening: the typed words stay; speech no longer writes over them.
+  await voice.focus('[data-test="capture-text"]');
+  await voice.keyboard.press('End');
+  await voice.keyboard.type(' soon');
+  await voice.waitForTimeout(500);
+  { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /books soon this year$|books this year soon$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
+  assert.ok(await voice.locator('[data-test="capture-accent"] option').count() >= 15, 'you can pick your accent');
+  assert.ok(await voice.$('[data-test="capture-tidy"]'), 'dictation can be tidied up or rewritten');
   if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
   await voice.click('[data-test="capture-sort"]');
   await voice.waitForSelector('[data-test="capture-review"]');
