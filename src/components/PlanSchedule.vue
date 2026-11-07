@@ -233,8 +233,9 @@ const tickX = x => toggleDone(x.task, x.date);
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, narrow: x.lanes > 1, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" @click="editing = x">
-              <span class="sch-box-top"><b>{{ x.task.title }}</b><span>{{ hhmm(x.s) }} - {{ hhmm(x.e) }}</span></span>
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, narrow: x.lanes > 1, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" @click="editing = x">
+              <span class="sch-box-time">{{ hhmm(x.s) }} – {{ hhmm(x.e) }}<Icon name="more" :size="14" class="sch-box-more" /></span>
+              <b class="sch-box-title">{{ x.task.title }}</b>
               <span v-if="x.task.notes && x.e - x.s >= 60" class="sch-box-note">{{ x.task.notes }}</span>
               <span v-if="x.task.subtasks?.length && x.e - x.s >= 60" class="sch-box-subs">
                 <label v-for="s in x.task.subtasks" :key="s.id" :class="{ done: s.done }" @click.stop><input v-model="s.done" type="checkbox" />{{ s.title }}</label>
