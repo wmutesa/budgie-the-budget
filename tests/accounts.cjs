@@ -137,16 +137,21 @@ async function main() {
     const alexData = await getJSON(alex.page, '/api/data');
     assert.ok(!JSON.stringify(alexData.body).includes('Blue Bottle'), 'people do not see each other\'s data');
     assert.equal((await getJSON(alex.page, '/api/people')).status, 403, 'members cannot manage people');
-    // Digests: each person has their own; a profile is needed to write one.
+    // Digests: each person has their own, in one or more digests; written from their account data.
     const none = await getJSON(alex.page, '/api/digests');
     assert.equal(none.status, 200, 'signed-in people can list their digests');
-    assert.deepEqual(none.body, { list: [], latest: null }, 'a new person has no digests');
+    assert.deepEqual(none.body, { editions: {} }, 'a new person has no digests');
     const send = body => alex.page.evaluate(async b => { const r = await fetch('/api/digests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return { status: r.status, body: await r.json() }; }, body);
-    assert.equal((await send({ profile: {} })).status, 400, 'an empty profile is refused');
-    const wrote = await send({ profile: { name: 'Alex', interests: ['robotics'], lookingFor: ['events'], feeds: ['https://localhost/feed'] }, timeZone: 'America/New_York' });
+    assert.equal((await send({ stream: { id: '../x' } })).status, 400, 'odd digest names are refused');
+    const wrote = await send({ stream: { id: 'robotics', name: 'Robotics', focus: 'robotics internships' }, timeZone: 'America/New_York' });
     assert.equal(wrote.status, 200, 'a digest is written even when sources cannot be reached');
     assert.match(wrote.body.edition, /Edition$/, 'the edition is named after the day');
-    assert.equal((await getJSON(alex.page, '/api/digests')).body.list.length, 1, 'the edition is stored');
+    assert.equal(wrote.body.stream, 'robotics');
+    const listed = (await getJSON(alex.page, '/api/digests')).body.editions;
+    assert.equal(listed.robotics.length, 1, 'the edition is stored under its digest');
+    assert.equal((await getJSON(alex.page, `/api/digests/robotics/${wrote.body.id}`)).body.name, 'Robotics', 'one edition can be read back');
+    assert.equal(await alex.page.evaluate(async () => (await fetch('/api/digests/robotics', { method: 'DELETE' })).status), 200);
+    assert.deepEqual((await getJSON(alex.page, '/api/digests')).body.editions, {}, 'stopping a digest removes its editions');
     assert.equal((await fetch(`${base}/api/digests`)).status, 401, 'digests are only for signed-in people');
 
     // An invite works only once.

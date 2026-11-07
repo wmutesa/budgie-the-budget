@@ -8,6 +8,7 @@ import { snapshot } from '../lib/store';
 import QrCode from './QrCode.vue';
 import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
+import ProfileYou from './ProfileYou.vue';
 import {
   account, signOut, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
@@ -133,6 +134,7 @@ const tour = () => { open.value = false; emit('tour'); };
 
         <div class="acct-grid">
         <div class="acct-col">
+        <ProfileYou />
 
         <section class="acct-sec t-a">
           <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink"><Icon name="plus" :size="14" />Add a device</button></div>

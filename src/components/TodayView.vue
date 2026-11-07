@@ -11,7 +11,7 @@ import Icon from './Icon.vue';
 
 // Today: your day first (what is on, what is next, deadlines, streaks), then
 // your goals and the latest digest. Everything comes from your own planner.
-onMounted(() => { if (!digests.list.length) loadDigests(); });
+onMounted(() => { if (!digests.loaded) loadDigests(); });
 const now = new Date();
 const part = now.getHours() < 12 ? 'morning' : now.getHours() < 18 ? 'afternoon' : 'evening';
 const weekday = now.toLocaleDateString('en-US', { weekday: 'long' });
@@ -24,7 +24,7 @@ const overdue = computed(() => store.tasks.filter(t => !t.repeat && !t.done && t
 const habits = computed(() => store.tasks.filter(t => t.repeat && t.kind === 'routine').map(t => ({ t, n: streak(t) })).sort((a, b) => b.n - a.n));
 const best = computed(() => habits.value.find(h => h.n >= 3) || null);
 const goals = computed(() => store.goals.map(g => ({ g, p: progress(g) })));
-const ed = computed(() => digests.current);
+const ed = computed(() => digests.viewing.main || digests.current);
 const empty = computed(() => !store.tasks.length && !store.goals.length);
 const pct = computed(() => (items.value.length ? Math.round(((items.value.length - left.value.length) / items.value.length) * 100) : 0));
 // A one-line note from the on-device AI, when it is ready.

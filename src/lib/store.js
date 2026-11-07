@@ -13,6 +13,7 @@ function readKey(key) {
   try { return JSON.parse(localStorage.getItem(key)) || null; } catch { return null; }
 }
 
+const pickMe = p => (p && typeof p === 'object' ? Object.fromEntries(['name', 'school', 'study', 'year', 'location', 'about'].map(k => [k, String(p[k] || '')])) : {});
 // Build the saved part of the state from a stored object, filling gaps with defaults.
 // Anything else in the stored object (such as money data from older versions
 // of Budgie) is left out, so it is removed from the account on the next save.
@@ -35,8 +36,11 @@ function fromSaved(saved = {}) {
     goals: Array.isArray(saved.goals) ? saved.goals.filter(g => g && g.id && g.title && Array.isArray(g.milestones)) : [],
     // Projects and categories for the planner: { name: { color } }.
     projects: saved.projects && typeof saved.projects === 'object' ? saved.projects : {},
-    // Digests: the profile they are written for, settings and what was already used (see digest.js).
-    digest: saved.digest && typeof saved.digest === 'object' ? saved.digest : { profile: null, autoTasks: true, used: [] },
+    // Digests: the digests you follow ({ id, name, focus, auto }), your own Gemini key (optional),
+    // settings and what was already used (see digest.js).
+    digest: saved.digest && typeof saved.digest === 'object' ? saved.digest : { autoTasks: true, used: [], streams: [{ id: 'main', name: 'My brief', auto: true }] },
+    // About you, for digests and drafts: { name, school, study, year, location, about }.
+    me: saved.me && typeof saved.me === 'object' ? saved.me : pickMe(saved.digest?.profile),
     // How you look in Budgie: { color } for your avatar, picked at random at first and editable.
     profile: saved.profile && typeof saved.profile === 'object' ? saved.profile : {},
   };

@@ -4,7 +4,7 @@ import { computed } from 'vue';
 import { store } from './store';
 import { today, addDays, occurrences, dayLabel } from './tasks';
 import { progress } from './goals';
-import { digests } from './digest';
+import { digests, isRead } from './digest';
 import { go } from './nav';
 
 const open = page => ({ label: `Open ${page}`, run: () => go(page) });
@@ -23,6 +23,6 @@ export const cards = computed(() => {
     if (p.daysLeft !== null && p.daysLeft >= 0 && p.daysLeft <= 14 && p.pct < 100) out.push({ id: `goal-soon-${g.id}-${g.by}`, tone: 'warn', title: `${g.title}: ${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left`, body: `${p.done} of ${p.all} steps done.${p.next ? ` Next: ${p.next.title}.` : ''}`, action: { label: 'Open goals', run: () => go('Playground', { anchor: '#goals' }) } });
   }
   const ed = digests.current;
-  if (ed && !store.digest?.read?.includes(ed.id)) out.push({ id: `digest-${ed.id}`, tone: 'good', title: `New digest: ${ed.edition}`, body: ed.preheader || ed.lead?.headline || '', action: open('Digests') });
+  if (ed && !isRead(ed)) out.push({ id: `digest-${ed.stream}-${ed.id}`, tone: 'good', title: `New digest: ${ed.name || 'My brief'}, ${ed.edition}`, body: ed.preheader || ed.lead?.headline || '', action: open('Digests') });
   return out.filter(c => !store.dismissed.includes(c.id));
 });

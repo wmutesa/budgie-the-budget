@@ -281,6 +281,9 @@ export const invitePerson = name => api('/api/invites', { method: 'POST', body: 
 export const cancelInvite = id => api(`/api/invites/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const removePerson = id => api(`/api/people/${encodeURIComponent(id)}`, { method: 'DELETE' });
 export const readCalendar = url => api('/api/calendar', { method: 'POST', body: { url } });
+// Save now (for example before the server writes a digest from your account data).
+export async function saveNow() { clearTimeout(timer); await push(); }
 export const readDigests = () => api('/api/digests');
-export const readDigest = id => api(`/api/digests/${encodeURIComponent(id)}`);
-export const writeDigest = (profile, timeZone) => api('/api/digests', { method: 'POST', body: { profile, timeZone } });
+export const readDigest = (stream, id) => api(`/api/digests/${encodeURIComponent(stream)}/${encodeURIComponent(id)}`);
+export const writeDigest = (stream, timeZone) => api('/api/digests', { method: 'POST', body: { stream, timeZone } });
+export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

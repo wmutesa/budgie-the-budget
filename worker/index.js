@@ -7,7 +7,8 @@ import {
 } from '@simplewebauthn/server';
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
-import { makeDigest, cleanProfile } from './digest.js';
+import { makeDigest, profileFromAccount } from './digest.js';
+import { geminiResearch } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -94,27 +95,42 @@ async function countFailure(env, key) {
 }
 
 // ---------- digests ----------
-// Write one edition for a person and keep the latest few.
-async function writeDigestFor(env, userId, profile, timeZone = 'UTC') {
-  const prev = await env.DB.prepare('SELECT data FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT 1').bind(userId).first();
-  const edition = await makeDigest(profile, prev ? JSON.parse(prev.data) : null, { timeZone });
+// A person can have several digests ("streams"); "main" is written from their
+// goals and projects, others from a one-line focus. Everything a digest needs
+// (who they are, their goals, their own Gemini key) comes from their account data.
+const STREAM = /^[a-z0-9-]{1,40}$/;
+async function accountData(env, userId) {
+  const row = await env.DB.prepare('SELECT data FROM user_data WHERE user_id = ?').bind(userId).first();
+  try { return row ? JSON.parse(row.data) : {}; } catch { return {}; }
+}
+const streamsOf = data => {
+  const list = Array.isArray(data?.digest?.streams) ? data.digest.streams.filter(x => STREAM.test(x?.id || '')) : [];
+  return list.some(x => x.id === 'main') ? list : [{ id: 'main', name: 'My brief' }, ...list];
+};
+async function writeDigestFor(env, userId, data, stream, timeZone) {
+  const prev = await env.DB.prepare('SELECT data FROM digest_editions WHERE user_id = ? AND stream = ? ORDER BY id DESC LIMIT 1').bind(userId, stream.id).first();
+  const key = String(data?.digest?.geminiKey || '').trim();
+  const edition = await makeDigest(profileFromAccount(data, stream), prev ? JSON.parse(prev.data) : null, {
+    timeZone: timeZone || data?.digest?.timeZone || 'UTC', geminiKey: /^[\w-]{20,80}$/.test(key) ? key : '', research: geminiResearch, name: String(stream.name || 'My brief').slice(0, 60),
+  });
+  edition.stream = stream.id;
   await env.DB.batch([
-    env.DB.prepare('INSERT INTO digests (user_id, id, data, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(user_id, id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at').bind(userId, edition.id, JSON.stringify(edition), now()),
-    env.DB.prepare('DELETE FROM digests WHERE user_id = ? AND id NOT IN (SELECT id FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT ?)').bind(userId, userId, DIGESTS_KEPT),
+    env.DB.prepare('INSERT INTO digest_editions (user_id, stream, id, data, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, stream, id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at').bind(userId, stream.id, edition.id, JSON.stringify(edition), now()),
+    env.DB.prepare('DELETE FROM digest_editions WHERE user_id = ? AND stream = ? AND id NOT IN (SELECT id FROM digest_editions WHERE user_id = ? AND stream = ? ORDER BY id DESC LIMIT ?)').bind(userId, stream.id, userId, stream.id, DIGESTS_KEPT),
   ]);
   return edition;
 }
-// Mondays and Thursdays (see wrangler.jsonc): a new edition for everyone whose
-// digest profile is set up and on automatic. The profile lives in their own
-// account data.
+// Mondays and Thursdays (see wrangler.jsonc): a new edition of every digest
+// that is on automatic, for everyone.
 async function scheduledDigests(env) {
   const rows = await env.DB.prepare('SELECT user_id, data FROM user_data').all();
   for (const r of (rows.results || []).slice(0, 50)) {
-    try {
-      const d = JSON.parse(r.data)?.digest;
-      if (!d?.profile || d.profile.auto === false) continue;
-      await writeDigestFor(env, r.user_id, cleanProfile(d.profile), d.timeZone || 'UTC');
-    } catch (e) { console.error('digest failed', e?.message); }
+    let data;
+    try { data = JSON.parse(r.data); } catch { continue; }
+    if (data?.digest?.off) continue;
+    for (const st of streamsOf(data).filter(x => x.auto !== false).slice(0, 6)) {
+      try { await writeDigestFor(env, r.user_id, data, st); } catch (e) { console.error('digest failed', e?.message); }
+    }
   }
 }
 
@@ -336,7 +352,7 @@ async function routes(request, env, url) {
       env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(user.id),
-      env.DB.prepare('DELETE FROM digests WHERE user_id = ?').bind(user.id),
+      env.DB.prepare('DELETE FROM digest_editions WHERE user_id = ?').bind(user.id),
       env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(user.id),
       env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(user.id),
     ]);
@@ -377,27 +393,35 @@ async function routes(request, env, url) {
     return source ? modelResponse(request, source) : fail(404, 'Not found');
   }
 
-  // --- digests: list, read, generate now ---
+  // --- digests: list, read, write now, remove ---
   if (path === '/api/digests' && method === 'GET') {
-    const rows = await env.DB.prepare('SELECT id, data FROM digests WHERE user_id = ? ORDER BY id DESC LIMIT ?').bind(user.id, DIGESTS_KEPT).all();
-    const list = (rows.results || []).map(r => { const d = JSON.parse(r.data); return { id: r.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader }; });
-    const latest = rows.results?.[0] ? JSON.parse(rows.results[0].data) : null;
-    return json({ list, latest });
+    const rows = await env.DB.prepare('SELECT stream, id, data FROM digest_editions WHERE user_id = ? ORDER BY id DESC LIMIT 200').bind(user.id).all();
+    const editions = {};
+    for (const r of rows.results || []) {
+      const d = JSON.parse(r.data);
+      (editions[r.stream] ||= []).push({ id: r.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader, createdAt: d.createdAt });
+    }
+    return json({ editions });
   }
-  const one = path.match(/^\/api\/digests\/(\d{4}-\d{2}-\d{2})$/);
+  const one = path.match(/^\/api\/digests\/([a-z0-9-]{1,40})\/(\d{4}-\d{2}-\d{2})$/);
   if (one && method === 'GET') {
-    const row = await env.DB.prepare('SELECT data FROM digests WHERE user_id = ? AND id = ?').bind(user.id, one[1]).first();
+    const row = await env.DB.prepare('SELECT data FROM digest_editions WHERE user_id = ? AND stream = ? AND id = ?').bind(user.id, one[1], one[2]).first();
     return row ? json(JSON.parse(row.data)) : fail(404, 'No such edition');
   }
   if (path === '/api/digests' && method === 'POST') {
     const key = `digest:${user.id}`;
-    if (await tooManyAttempts(env, key, DIGESTS_PER_HOUR)) return fail(429, 'You made several digests this hour. Try again later.');
+    if (await tooManyAttempts(env, key, DIGESTS_PER_HOUR)) return fail(429, 'Several digests were written this hour. The next one comes on schedule.');
     await countFailure(env, key);
-    const { profile, timeZone } = await body(request);
-    const p = cleanProfile(profile || {});
-    if (!p.interests.length && !p.companies.length && !p.feeds.length) return fail(400, 'Add a few interests, companies or feeds to your digest profile first.');
-    const edition = await writeDigestFor(env, user.id, p, timeZone);
-    return json(edition);
+    const { stream, timeZone } = await body(request);
+    if (!stream || !STREAM.test(stream.id || '')) return fail(400, 'Which digest?');
+    const data = await accountData(env, user.id);
+    const st = { id: stream.id, name: String(stream.name || '').slice(0, 60), focus: String(stream.focus || '').slice(0, 120) };
+    return json(await writeDigestFor(env, user.id, data, st, typeof timeZone === 'string' ? timeZone.slice(0, 60) : ''));
+  }
+  const gone = path.match(/^\/api\/digests\/([a-z0-9-]{1,40})$/);
+  if (gone && method === 'DELETE') {
+    await env.DB.prepare('DELETE FROM digest_editions WHERE user_id = ? AND stream = ?').bind(user.id, gone[1]).run();
+    return json({ ok: true });
   }
 
   // --- calendar import for the Planner: the link stays in the person's data; it is never logged ---
@@ -490,7 +514,7 @@ async function routes(request, env, url) {
         env.DB.prepare('DELETE FROM credentials WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM invites WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM user_data WHERE user_id = ?').bind(id),
-        env.DB.prepare('DELETE FROM digests WHERE user_id = ?').bind(id),
+        env.DB.prepare('DELETE FROM digest_editions WHERE user_id = ?').bind(id),
         env.DB.prepare('DELETE FROM recovery_codes WHERE user_id = ?').bind(id),
         env.DB.prepare("DELETE FROM users WHERE id = ? AND role <> 'owner'").bind(id),
       ]);

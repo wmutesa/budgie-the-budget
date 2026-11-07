@@ -31,8 +31,29 @@ export function cleanProfile(p = {}) {
     watch: String(p.watch || '').trim().slice(0, 80),
     watchNote: String(p.watchNote || '').trim().slice(0, 140),
     exclude: list(p.exclude, 10),
+    focus: String(p.focus || '').trim().slice(0, 120),
     auto: p.auto !== false,
   };
+}
+
+// Words that say nothing about a topic.
+const STOP = new Set('a an the and or of to for in on at by with my your our i me be get got have make do go run up out about into from this that these those next new first last more less than then very really want would like need learn finish start keep stay try plan goal goals task tasks project projects class classes week weeks month months year years day days today tomorrow summer spring fall winter land become improve reach complete better able some every get-better master'.split(' '));
+const keywords = text => String(text || '').toLowerCase().replace(/[^a-z0-9+#\s-]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w) && !/^\d+$/.test(w));
+
+// The profile a digest is written for, built from the person's account data:
+// "You" in their profile, plus topics taken from their goals, projects and
+// classes (no topic to choose). A digest with its own focus line uses that instead.
+export function profileFromAccount(data = {}, stream = {}) {
+  const me = { ...(data.digest?.profile || {}), ...Object.fromEntries(Object.entries(data.me || {}).filter(([, v]) => v)) };
+  const counts = new Map();
+  const add = (w, n = 1) => counts.set(w, (counts.get(w) || 0) + n);
+  for (const g of data.goals || []) keywords(g.title).forEach(w => add(w, 3));
+  for (const t of (data.tasks || []).slice(0, 300)) if (t.project && !/^digest$/i.test(t.project)) keywords(t.project).forEach(w => add(w, 2));
+  keywords(me.study).forEach(w => add(w, 3));
+  keywords(me.about).forEach(w => add(w, 1));
+  (me.interests || []).forEach(i => add(String(i).toLowerCase(), 4));
+  const topics = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([w]) => w).slice(0, 6);
+  return cleanProfile({ ...me, interests: topics, focus: stream.focus || '', lookingFor: me.lookingFor || [], companies: me.companies || [], feeds: me.feeds || [], exclude: me.exclude || [], auto: stream.auto !== false });
 }
 
 // ---------- fetching ----------
@@ -103,17 +124,21 @@ export async function collect(profile) {
   const topics = p.interests.slice(0, 4);
   const looking = (p.lookingFor.length ? p.lookingFor : ['internships', 'programs', 'events']).slice(0, 4);
   const queries = [];
-  for (const l of looking) queries.push(`${l.replace(/s$/, '')} ${topics.slice(0, 2).join(' OR ')} students ${p.location || ''}`.trim());
-  if (p.school) queries.push(`"${p.school}" ${topics[0] || 'students'}`);
+  if (p.focus) queries.push(p.focus, `${p.focus} students`, `${p.focus} deadline apply`);
+  else {
+    for (const l of looking) queries.push(`${l.replace(/s$/, '')} ${topics.slice(0, 2).join(' OR ') || ''} students ${p.location || ''}`.replace(/\s+/g, ' ').trim());
+    if (p.school) queries.push(`"${p.school}" ${topics[0] || 'students'}`);
+  }
   const jobs = [];
   const tasks = [
     ...queries.slice(0, 5).map(q => getText(news(q)).then(x => parseFeed(x, 'Google News')).catch(() => [])),
     ...p.feeds.map(f => getText(f).then(x => parseFeed(x, (() => { try { return new URL(f).hostname.replace(/^www\./, ''); } catch { return ''; } })())).catch(() => [])),
     ...p.companies.slice(0, 6).map(c => companyJobs(c).then(r => { jobs.push(...r); return []; }).catch(() => [])),
   ];
-  const watch = p.watch ? getText(news(p.watch)).then(x => parseFeed(x, 'Google News')).catch(() => []) : Promise.resolve([]);
+  const watchTopic = p.watch || (p.focus ? '' : topics[0] ? `${topics[0]} news` : '');
+  const watch = watchTopic ? getText(news(watchTopic)).then(x => parseFeed(x, 'Google News')).catch(() => []) : Promise.resolve([]);
   const [lists, watchItems] = await Promise.all([Promise.all(tasks), watch]);
-  return { items: [...lists.flat(), ...jobs], watch: watchItems, profile: p };
+  return { items: [...lists.flat(), ...jobs], watch: watchItems, profile: { ...p, watch: watchTopic } };
 }
 
 // ---------- reading items ----------
@@ -197,7 +222,7 @@ function draftFor(n, story, p) {
 
 // Build one edition from collected items. `previous` keeps stories from
 // repeating and draft numbers going up.
-export function writeEdition({ items, watch, profile }, previous = null, now = new Date()) {
+export function writeEdition({ items, watch, profile, research = null }, previous = null, now = new Date()) {
   const p = cleanProfile(profile);
   const seen = new Set([...(previous?.stories || []).flatMap(s => [s.ctaLink, s.headline.toLowerCase()]), previous?.lead?.ctaLink].filter(Boolean));
   const unique = [];
@@ -217,8 +242,14 @@ export function writeEdition({ items, watch, profile }, previous = null, now = n
       dueIso, org: it.kind === 'job' ? it.source : '', source: it.source,
     };
   });
-  const [top, ...rest] = stories;
-  const lead = top ? {
+  // Research (Gemini) goes first; free finds fill in after, without repeats.
+  if (research?.stories?.length) {
+    const have = new Set(research.stories.map(x => x.ctaLink));
+    stories.splice(0, stories.length, ...research.stories.filter(x => !seen.has(x.ctaLink)), ...stories.filter(x => !have.has(x.ctaLink)));
+    stories.length = Math.min(stories.length, 10);
+  }
+  const [top, ...rest] = research?.lead && !seen.has(research.lead.ctaLink) ? [{ ...research.lead, isLead: true }, ...stories] : stories;
+  const lead = top?.isLead ? (({ isLead, ...l }) => l)(top) : top ? {
     kicker: `${top.tag.charAt(0)}${top.tag.slice(1).toLowerCase()} · ${top.deadline}`, headline: top.headline,
     dek: top.desc.split(/(?<=\.)\s/)[0].slice(0, 220), body: `${top.desc} ${top.fit}.`.replace(/\.\./g, '.'),
     ctaLabel: top.ctaLabel, ctaLink: top.ctaLink, link2Label: 'More like this', link2: top.link2,
@@ -230,13 +261,13 @@ export function writeEdition({ items, watch, profile }, previous = null, now = n
   const drafts = stories.filter(s => ['INTERNSHIP', 'RESEARCH', 'PROGRAM', 'AMBASSADOR'].includes(s.tag)).slice(0, 2).map(s => draftFor(no++, s, p));
   const okWatch = watch.filter(x => !p.exclude.some(e => `${x.title} ${x.desc}`.toLowerCase().includes(e.toLowerCase())));
   const w = okWatch[0];
-  const watchBox = p.watch && w ? { headline: w.title, body: `${w.desc || `Reported by ${w.source}.`}${okWatch[1] ? ` Also: ${okWatch[1].title}.` : ''}`.slice(0, 500), linkLabel: 'Read it', link: w.link, topic: p.watch, note: p.watchNote } : null;
+  const watchBox = research?.watch ? { ...research.watch, note: p.watchNote } : p.watch && w ? { headline: w.title, body: `${w.desc || `Reported by ${w.source}.`}${okWatch[1] ? ` Also: ${okWatch[1].title}.` : ''}`.slice(0, 500), linkLabel: 'Read it', link: w.link, topic: p.watch, note: p.watchNote } : null;
   const soonest = [...stories].filter(s => s.dueIso && s.dueIso >= today).sort((a, b) => a.dueIso.localeCompare(b.dueIso))[0];
-  const action = soonest ? { text: `${soonest.ctaLabel}: ${soonest.headline} (${soonest.deadline.toLowerCase()}).`, label: soonest.ctaLabel, link: soonest.ctaLink }
+  const action = research?.action ? research.action : soonest ? { text: `${soonest.ctaLabel}: ${soonest.headline} (${soonest.deadline.toLowerCase()}).`, label: soonest.ctaLabel, link: soonest.ctaLink }
     : drafts[0] ? { text: `Send draft #${drafts[0].no} to ${drafts[0].to}.`, label: 'Open the outbox', link: '' }
       : lead ? { text: `Read the lead story and decide if it is for you.`, label: lead.ctaLabel, link: lead.ctaLink } : null;
-  const sources = [...new Map(stories.map(s => [s.source, s])).values()].filter(s => s.source).map(s => ({ title: s.source, url: s.ctaLink })).slice(0, 10);
-  const clean = s => { const { dueIso, org, source, ...rest2 } = s; return { ...rest2, dueIso }; };
+  const sources = [...(research?.sources || []), ...[...new Map(stories.map(s => [s.source, s])).values()].filter(s => s.source).map(s => ({ title: s.source, url: s.ctaLink }))].slice(0, 12);
+  const clean = s => { const { dueIso, org, source, isLead, ...rest2 } = s; return { ...rest2, dueIso }; };
   return {
     preheader: `${stories.length} new find${stories.length === 1 ? '' : 's'}, ${deadlines.length} deadline${deadlines.length === 1 ? '' : 's'} in the next two weeks.`,
     lead, stories: rest.map(clean), deadlines, drafts, watch: watchBox, action, sources,
@@ -256,10 +287,18 @@ export function editionMeta(now = new Date(), timeZone = 'UTC') {
   };
 }
 
-// Collect and write, ready to store.
-export async function makeDigest(profile, previous, { timeZone = 'UTC', now = new Date() } = {}) {
+// Collect and write, ready to store. With a Gemini key, Gemini researches at
+// the same time as the free sources are read; if it fails, the edition is
+// still written from the free sources and says why.
+export async function makeDigest(profile, previous, { timeZone = 'UTC', now = new Date(), geminiKey = '', research: researchFn = null, name = '' } = {}) {
   const meta = editionMeta(now, timeZone);
-  const collected = await collect(profile);
-  const content = writeEdition(collected, previous, now);
-  return { ...meta, createdAt: now.toISOString(), provider: 'free sources', counts: { fetched: collected.items.length }, ...content };
+  const p = cleanProfile(profile);
+  const who = [p.name, p.year, p.study && `studying ${p.study}`, p.school && `at ${p.school}`, p.location && `in ${p.location}`, p.about].filter(Boolean).join(', ') || 'a student';
+  const [collected, research] = await Promise.all([
+    collect(p),
+    geminiKey && researchFn ? researchFn(geminiKey, { who, focus: p.focus, topics: p.interests, today: meta.dateLong, previous }).then(r => ({ ok: r }), e => ({ error: String(e?.message || e) })) : Promise.resolve(null),
+  ]);
+  const content = writeEdition({ ...collected, research: research?.ok || null }, previous, now);
+  const provider = research?.ok ? 'Gemini with Google Search and free sources' : 'free sources';
+  return { ...meta, name, createdAt: now.toISOString(), provider, researchError: research?.error || '', topics: p.focus ? [p.focus] : p.interests, counts: { fetched: collected.items.length, researched: research?.ok?.stories?.length || 0 }, ...content };
 }

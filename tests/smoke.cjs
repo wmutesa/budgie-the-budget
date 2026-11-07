@@ -97,14 +97,26 @@ async function fakeApi(page, account = fakeAccount) {
       account.version += 1;
       return route.fulfill({ json: { version: account.version } });
     }
-    if (p === '/api/digests' && req.method() === 'GET') return route.fulfill({ json: { list: account.digests.map(d => ({ id: d.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader })), latest: account.digests[0] || null } });
+    if (p === '/api/digests' && req.method() === 'GET') {
+      const editions = {};
+      for (const d of account.digests) (editions[d.stream] ||= []).push({ id: d.id, edition: d.edition, dateLong: d.dateLong, preheader: d.preheader, createdAt: d.createdAt });
+      return route.fulfill({ json: { editions } });
+    }
+    const one = p.match(/^\/api\/digests\/([a-z0-9-]+)\/(\d{4}-\d{2}-\d{2})$/);
+    if (one) return route.fulfill({ json: account.digests.find(d => d.stream === one[1] && d.id === one[2]) || {} });
     if (p === '/api/digests' && req.method() === 'POST') {
-      const { profile } = JSON.parse(req.postData());
-      if (!profile?.interests?.length) return route.fulfill({ status: 400, json: { error: 'Add a few interests, companies or feeds to your digest profile first.' } });
-      account.lastProfile = profile;
-      const ed = sampleEdition();
-      account.digests = [ed, ...account.digests.filter(d => d.id !== ed.id)];
+      const { stream } = JSON.parse(req.postData());
+      // Like the real server: written from what is saved in the account.
+      account.lastWrite = { stream, me: account.data?.me, key: account.data?.digest?.geminiKey };
+      const ed = { ...sampleEdition(), stream: stream.id, name: stream.name, provider: account.data?.digest?.geminiKey ? 'Gemini with Google Search and free sources' : 'free sources', topics: stream.focus ? [stream.focus] : ['robotics'] };
+      if (stream.focus) ed.lead = { ...ed.lead, headline: `This week in ${stream.focus}` };
+      account.digests = [ed, ...account.digests.filter(d => !(d.stream === ed.stream && d.id === ed.id))];
       return route.fulfill({ json: ed });
+    }
+    if (/^\/api\/digests\/[a-z0-9-]+$/.test(p) && req.method() === 'DELETE') {
+      const id = p.split('/').pop();
+      account.digests = account.digests.filter(d => d.stream !== id);
+      return route.fulfill({ json: { ok: true } });
     }
     if (p === '/api/calendar') {
       const { url } = JSON.parse(req.postData());
@@ -219,27 +231,41 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   await page.click('[data-test="view-tasks"]');
 
-  // Digests: set up the profile, then the first edition is written.
+  // Your details and Gemini key live in your profile.
+  await page.click('[data-test="account"]');
+  await page.waitForSelector('[data-test="profile-you"]');
+  await page.fill('[data-test="you-name"]', 'Sam');
+  await page.fill('[data-test="you-study"]', 'Electrical Engineering');
+  await page.fill('[data-test="you-key"]', 'AIzaTestKey_000000000000000000000000000');
+  assert.equal(await page.getAttribute('[data-test="you-key"]', 'type'), 'password', 'the key is hidden');
+  await page.keyboard.press('Escape');
+  await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
+
+  // Digests: no form. Opening the page writes "My brief" from goals and projects, with the key.
   await page.click(tab('Digests'));
-  await page.waitForSelector('[data-test="digest-profile"]');
-  assert.equal(await page.isDisabled('[data-test="dgp-save"]'), true, 'the profile needs interests, companies or feeds');
-  await page.fill('[data-test="digest-profile"] input[autocomplete="name"]', 'Sam');
-  await page.fill('[data-test="dgp-interests"]', 'robotics, embedded systems');
-  await page.click('[data-test="dgp-save"]');
   await page.waitForSelector('[data-test="digest"]');
-  assert.deepEqual(fakeAccount.lastProfile.interests, ['robotics', 'embedded systems'], 'the profile is sent to write the digest');
-  for (let i = 0; i < 40 && !fakeAccount.data.digest?.profile; i++) await page.waitForTimeout(100);
-  assert.deepEqual(fakeAccount.data.digest.profile.interests, ['robotics', 'embedded systems'], 'the profile is saved in the account');
+  assert.equal(fakeAccount.lastWrite.stream.id, 'main', 'the main digest is written on its own');
+  assert.equal(fakeAccount.lastWrite.me.study, 'Electrical Engineering', 'your profile is saved before the server writes');
+  assert.match(fakeAccount.lastWrite.key, /^AIza/, 'the Gemini key is in your account for the server');
   const paper = await page.textContent('[data-test="digest"]');
-  assert.match(paper, /Saturday Edition[\s\S]*The Brief[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
+  assert.match(paper, /Saturday Edition[\s\S]*My brief[\s\S]*For Sam[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
+  assert.match(await page.textContent('[data-test="digest-made"]'), /Gemini with Google Search[\s\S]*following robotics/, 'it says how it was researched and what it follows');
   const cal = await page.textContent('.dg-cal');
   assert.ok(/Student hackathon/.test(cal) && /Essay 2[\s\S]*in your Planner/.test(cal), 'the calendar mixes digest deadlines and your own');
   assert.match(paper, /Watching: student visa[\s\S]*Not legal advice/, 'the watch box shows its note');
   await page.click('[data-test="draft"]');
   assert.match(await page.textContent('.dg-draft'), /Subject:[\s\S]*Thank you for your time/, 'a draft opens with its email');
+  // A second digest, tracked as its own tab.
+  await page.click('[data-test="digest-add"]');
+  await page.fill('[data-test="digest-name"]', 'AI policy news');
+  await page.click('[data-test="digest-create"]');
+  await page.waitForFunction(() => /This week in AI policy news/.test(document.querySelector('[data-test="digest"]')?.textContent || ''));
+  assert.equal(await page.getAttribute('[data-test="digest-tab-ai-policy-news"]', 'aria-selected'), 'true', 'the new digest has its own tab');
+  await page.click('[data-test="digest-tab-main"]');
+  await page.waitForFunction(() => /Robotics lab opens/.test(document.querySelector('[data-test="digest"]')?.textContent || ''));
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true });
   await page.click('.nb-pages button:has-text("Planner")');
   assert.match(await page.textContent('[data-test="planner"]'), /Student hackathon this month/, 'digest deadlines become Planner tasks');
-  if (process.env.SHOTS) { await page.click(tab('Digests')); await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true }); }
 
   // Today: the day, goals and the latest digest together.
   await page.click(tab('Today'));

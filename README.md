@@ -11,7 +11,7 @@ Budgie is a personal planner: your days, your goals and a twice-weekly digest of
 | | Where it lives | Who can see it |
 | --- | --- | --- |
 | The source code in this repository | GitHub | Anyone |
-| Your tasks, routines, goals, calendar links, digest profile and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
+| Your tasks, routines, goals, calendar links, details about you, your Gemini key (optional) and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
 | Your digests | Your account in Cloudflare D1 | Only you |
 | Passkeys | Your device or your Apple, Google or Microsoft password manager | Only you; Budgie keeps the public half |
 | AI | Runs on your device (in the browser, or Ollama on your computer) | Nobody: no cloud AI service, no API keys |
@@ -37,12 +37,12 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | --- | --- |
 | **Today** | Your day in a sentence, what is on today, deadlines this week, goal progress and the latest digest |
 | **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Calendar with day, week and month, and Focus). Imports Canvas, Google, Apple and Outlook calendars, suggests what to prepare for, breaks tasks into steps, keeps streaks |
-| **Digests** | A short newspaper written for you every Monday and Thursday from free sources: opportunities that fit, deadlines, outreach drafts to copy, a topic you watch, and one thing to do this week. Deadlines go to your Planner |
+| **Digests** | Short newspapers to read, kept up to date on their own (Mondays and Thursdays, and catching up when you open them): opportunities that fit, deadlines, outreach drafts to copy, a watch box and one thing to do this week. "My brief" follows your goals, projects and studies; add more digests with just a name. With your free Gemini key (in your profile), each edition is researched with Google Search as it is written. Deadlines go to your Planner |
 | **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sorts tasks, routines and goals. Life goals get milestones on your calendar; build a daily routine; name and colour projects |
 
 Anywhere in the app: the microphone in the top bar takes several things at once and adds each where it belongs, with Undo; the search finds anything and turns what you type into an action (press `/`).
 
-Budgie starts empty: everything comes from what you add. It costs nothing to run: digests use free sources and rules, and the AI runs on your device. An optional "Research deeper" uses your own free Gemini key.
+Budgie starts empty: everything comes from what you add. It costs nothing to run: digests use free sources and rules (plus Gemini's free tier if you add your own key), and the AI runs on your device.
 
 ## Run it locally
 
@@ -83,6 +83,7 @@ npm run test:accounts  # the real Worker and a local database, with virtual pass
 ```
 worker/index.js           account server: passkeys, invites, sessions, sync, digests, schedule
 worker/digest.js          digests from free sources: news, careers boards, feeds
+worker/gemini.js          optional research with the person's own Gemini key
 worker/ical.js            calendar link checks and the iCal reader
 worker/models.js          AI model files through Budgie's own address
 migrations/               database tables

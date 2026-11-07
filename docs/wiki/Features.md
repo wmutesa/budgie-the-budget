@@ -12,13 +12,13 @@ One place for school, work, projects, events and daily life.
 - **Reminders.** The bell lists what is due today, what is overdue, deadlines tomorrow, goal dates coming up and new digests. Optional reminders on this device ten minutes before timed items, while Budgie is open.
 
 ## Digests
-A short newspaper written for you every Monday and Thursday (and whenever you press **Generate now**), from free sources and with no AI cost:
-- **Sources:** Google News searches built from your interests and what you are looking for; open student roles on the careers boards of companies you name (Greenhouse and Lever); feeds you add (a department, a club, a blog); and one topic you watch closely.
-- **The edition:** a lead story, new finds tagged Internship, Program, Event, Research, Ambassador or Perk with a note on fit, the next 14 days of deadlines (yours from the Planner too), outreach drafts with **Copy subject** and **Copy email**, a watch box and one thing to do this week. Stories are not repeated between editions, and draft numbers keep going up.
-- **Into your Planner:** deadlines in the next two weeks become Planner tasks (you can turn this off); any story can be added with one tap.
-- **Better writing:** when the on-device AI is ready it rewrites the lead more naturally, keeping every fact.
-- **Research deeper (optional):** with your own free Gemini key, Budgie asks Gemini with Google Search for more opportunities. The key is saved in your account and sent only to Google.
-- **Your profile** (school, study, interests, what you are looking for, companies, feeds, a watch topic, words to leave out) is saved in your account, never in Budgie's code.
+Short newspapers to read, kept up to date on their own: a new edition every Monday and Thursday, and a digest that is behind catches up when you open it. No topic to choose:
+- **My brief** follows your goals, your projects and classes, and what you study (from **You** in your profile).
+- **More digests:** add one with just a name, like "Robotics internships" or "AI policy news", and an optional line on what it should follow. Each has its own tab and archive.
+- **Sources:** Google News searches, open student roles on the careers boards of companies you name (Greenhouse and Lever) and feeds you add, all free.
+- **Gemini (optional, free):** add your own key under **You** in your profile, and every edition is also researched by Gemini with Google Search as it is written. Researched stories are marked. If Gemini is busy or over its free limit, the edition is written from the free sources and says so. The key is saved in your account and sent only to Google.
+- **The edition:** a lead story, new finds tagged Internship, Program, Event, Research, Ambassador or Perk with a note on fit, the next 14 days of deadlines (yours from the Planner too), outreach drafts with **Copy subject** and **Copy email**, a watch box, one thing to do this week, and its sources. Stories are not repeated, and draft numbers keep going up.
+- **Into your Planner:** deadlines in the next two weeks become Planner tasks (you can turn this off in your profile); any story can be added with one tap.
 
 ## Playground
 - **Inbox:** write or say anything, one thing per line. Budgie tells tasks (with dates, times and #projects), routines (anything that repeats) and goals ("I want to run a 10K by March") apart, and you can change each choice before adding.
