@@ -3120,3 +3120,9 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .cal-item.chip { background: color-mix(in srgb, var(--k) 7%, #fff) !important; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 26%, #fff); border: 0 !important; border-radius: 6px; color: #18181b; }
 .cal-item.chip i { background: color-mix(in srgb, var(--k) 55%, #fff) !important; }
 .cal-item.chip.done { opacity: .6; }
+/* Focus: Suggested for you stays in view below the top bar and scrolls inside itself */
+@media (min-width: 901px) {
+  .fcs-side { position: relative; }
+  .fcs-side .pln-card { position: sticky !important; top: var(--nav-h, 57px); max-height: calc(100dvh - var(--nav-h, 57px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; align-content: start; }
+  .fcs-side .pln-card-head { position: sticky; top: -20px; z-index: 1; margin: -20px -22px 0; padding: 20px 22px 10px; background: #fcfcfd; }
+}

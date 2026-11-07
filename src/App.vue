@@ -63,11 +63,20 @@ watch(() => [nav.page, nav.anchor], async ([, anchor]) => {
 const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
 let timer = null;
+// The top bar's height, for anything that sticks just below it.
+const navBar = ref(null);
+let navRo = null;
+watch(navBar, el => {
+  navRo?.disconnect();
+  if (!el || typeof ResizeObserver === 'undefined') return;
+  navRo = new ResizeObserver(() => document.documentElement.style.setProperty('--nav-h', `${el.offsetHeight}px`));
+  navRo.observe(el);
+});
 onMounted(() => {
   startAccount();
   timer = setInterval(() => { if (account.status === 'signed-in') refreshFeeds(); }, 30 * 60 * 1000);
 });
-onUnmounted(() => clearInterval(timer));
+onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
 </script>
 
 <template>
@@ -84,7 +93,7 @@ onUnmounted(() => clearInterval(timer));
   <div v-else class="app">
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
-      <header class="cell nav-bar span-12">
+      <header ref="navBar" class="cell nav-bar span-12">
         <div class="nb-brand">
           <span class="brand-word">BUDGIE</span>
           <span class="muted small nb-date">{{ today }}</span>

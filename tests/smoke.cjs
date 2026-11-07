@@ -263,6 +263,13 @@ async function run(url) {
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
   await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  // Suggested for you stays below the top bar while the page scrolls, and scrolls inside itself.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(200);
+  { const nav = await page.locator('.nav-bar').boundingBox(); const card = await page.locator('.fcs-side .pln-card').boundingBox(); const vh = page.viewportSize().height;
+    assert.ok(Math.abs(card.y - (nav.y + nav.height)) < 2 && card.y + card.height <= vh + 1, `the suggestions stay in view below the top bar (${JSON.stringify({ nav, card, vh })})`);
+    assert.equal(await page.locator('.fcs-side .pln-card').evaluate(e => getComputedStyle(e).overflowY), 'auto', 'long suggestions scroll inside the panel'); }
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.click('[data-test="nav-planner"]');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="view-schedule"]');
