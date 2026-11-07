@@ -5,6 +5,7 @@ import { go } from '../lib/nav';
 import { useDictation, canDictate } from '../lib/dictation';
 import MicButton from './MicButton.vue';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 
 // Write or say anything, one thing per line. Budgie works out whether each line
 // is a task, a routine or a goal. Speaking adds everything as soon as you stop;
@@ -18,6 +19,8 @@ async function send(list = rows.value) {
   if (!list.length) return;
   done.value = await sendAll(list);
   text.value = ''; rows.value = [];
+  const n = done.value.made.length;
+  toast(`Added ${n} ${n === 1 ? 'thing' : 'things'}. Switch any of them below.`, { kind: 'success', action: { label: 'Undo', run: undo } });
 }
 const undo = () => { undoSend(done.value); done.value = null; };
 // Switch one added item to another kind (task, routine or goal).
@@ -25,6 +28,7 @@ async function switchTo(i, dest) { done.value.made[i] = await switchMade(done.va
 let base = '';
 const dict = useDictation({
   continuous: true,
+  onError: m => toast(m, { kind: 'error', title: 'Microphone' }),
   onCancel: () => { text.value = base; },
   onText: t => { text.value = `${base}${t}`; },
   // Stopping the recording sorts and adds what you said straight away.

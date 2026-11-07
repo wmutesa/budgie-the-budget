@@ -26,6 +26,24 @@ export function checkFeedUrl(raw) {
 // Google shows several links per calendar and only the secret iCal address
 // works for a private calendar. Returns a message, or '' when nothing is known.
 const GOOGLE_STEPS = 'On a computer, open calendar.google.com → Settings (gear) → under "Settings for my calendars" pick the calendar → Integrate calendar → copy "Secret address in iCal format". The phone app does not show it.';
+// Google's embed links (src=…) and share links (cid=…) name the calendar, so
+// they can be turned into its public feed. That works when the calendar is
+// public; a private one needs its secret address. Returns the feed address or ''.
+export function googleFeedFrom(raw) {
+  let u;
+  try { u = new URL(String(raw || '').trim().replace(/^webcals?:\/\//i, 'https://')); } catch { return ''; }
+  if (!/(^|\.)google\.com$/.test(u.hostname.toLowerCase()) || /\/ical\//.test(u.pathname)) return '';
+  let id = u.searchParams.get('src') || '';
+  if (!id && u.searchParams.get('cid')) {
+    const c = u.searchParams.get('cid');
+    try { id = /[@.]/.test(c) ? c : atob(c.replace(/-/g, '+').replace(/_/g, '/')); } catch { id = ''; }
+  }
+  id = id.trim();
+  if (!/^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(id)) return '';
+  return `https://calendar.google.com/calendar/ical/${encodeURIComponent(id)}/public/basic.ics`;
+}
+export const isFromGoogleLink = raw => Boolean(googleFeedFrom(raw));
+
 export function linkAdvice(raw, status = 0) {
   let u;
   try { u = new URL(String(raw || '').trim().replace(/^webcals?:\/\//i, 'https://')); } catch { return ''; }
@@ -33,8 +51,10 @@ export function linkAdvice(raw, status = 0) {
   const p = u.pathname;
   if (/(^|\.)google\.com$/.test(h)) {
     if (/\/ical\//.test(p) && /\/private-[^/]+\//.test(p)) return status ? `Google refused this secret address. It may have been reset, or your school or work account may block it. Copy it again: ${GOOGLE_STEPS}` : '';
-    if (/\/ical\//.test(p) && /\/public\//.test(p)) return status ? `This is the calendar's public address, which only works when the calendar is public. Use the secret one instead: ${GOOGLE_STEPS}` : '';
-    if (/\/embed/.test(p)) return `That is the link for embedding the calendar in a web page, not its calendar feed. ${GOOGLE_STEPS}`;
+    if (/\/ical\//.test(p) && /\/public\//.test(p)) return status ? `This calendar is private, so its public or embed link cannot be read. Use its secret address instead: ${GOOGLE_STEPS}` : '';
+    // Embed and share links are turned into the public feed and tried first.
+    if (googleFeedFrom(raw)) return '';
+    if (/\/embed/.test(p)) return `That embed link does not name a calendar. ${GOOGLE_STEPS}`;
     return `That is the link for opening Google Calendar, not its calendar feed. ${GOOGLE_STEPS}`;
   }
   if (status && /outlook\.|office365\.com$|live\.com$/.test(h)) return 'Outlook refused this link. In Outlook on the web: Settings → Calendar → Shared calendars → Publish a calendar → copy the ICS link again.';
@@ -144,6 +164,7 @@ export function parseIcs(text, now = Date.now()) {
 
 // Fetch a calendar link, following up to three redirects that are also checked.
 export async function fetchFeed(raw) {
+  raw = googleFeedFrom(raw) || raw;
   let url = checkFeedUrl(raw);
   // Catch links that are pages, not feeds, before asking the service.
   const before = linkAdvice(raw);

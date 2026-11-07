@@ -22,6 +22,7 @@ const OPEN_PER_HOUR = 120; // sign-in and invite requests per network address pe
 const CALENDAR_PER_HOUR = 60; // calendar imports per person per hour
 const DIGESTS_PER_HOUR = 6; // "Generate now" per person per hour
 const DIGESTS_KEPT = 30; // editions kept per person
+const DIGESTS_LIVE = false; // digests are on hold ("coming soon"): no schedule, no new editions
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -409,6 +410,7 @@ async function routes(request, env, url) {
     const row = await env.DB.prepare('SELECT data FROM digest_editions WHERE user_id = ? AND stream = ? AND id = ?').bind(user.id, one[1], one[2]).first();
     return row ? json(JSON.parse(row.data)) : fail(404, 'No such edition');
   }
+  if (path === '/api/digests' && method === 'POST' && !DIGESTS_LIVE) return fail(503, 'Digests are coming soon.');
   if (path === '/api/digests' && method === 'POST') {
     const key = `digest:${user.id}`;
     if (await tooManyAttempts(env, key, DIGESTS_PER_HOUR)) return fail(429, 'Several digests were written this hour. The next one comes on schedule.');
@@ -546,6 +548,6 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(scheduledDigests(env));
+    if (DIGESTS_LIVE) ctx.waitUntil(scheduledDigests(env));
   },
 };

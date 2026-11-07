@@ -5,6 +5,7 @@ import { suggestions, plannerFacts } from '../lib/suggest';
 import { makeTask, today } from '../lib/tasks';
 import { ai, aiSuggestTasks } from '../lib/ai';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 import { planGoal } from '../lib/goals';
 
 // Ideas Budgie spots from your planner and goals. One tap to add.
@@ -16,13 +17,14 @@ function accept(s) {
   if (s.goal) planGoal(s.goal);
   if (s.task) store.tasks.unshift(makeTask({ ...s.task, source: 'suggestion' }));
   store.dismissed.push(s.id);
+  toast(s.goal ? `Milestones planned for “${s.goal.title}”.` : s.run ? 'Done.' : 'Added to your Planner.', { kind: 'success' });
 }
 const dismiss = s => store.dismissed.push(s.id);
 async function askAI() {
   asking.value = true; note.value = '';
   const list = await aiSuggestTasks(plannerFacts()).catch(() => null);
   if (list?.length) extra.value = list.map((x, i) => ({ ...x, id: `ai-${Date.now()}-${i}` }));
-  else note.value = ai.ready ? 'The AI had no new ideas this time.' : 'The AI is still starting on this device. Try again in a minute.';
+  else toast(ai.ready ? 'The AI had no new ideas this time.' : 'The AI is still starting on this device. Try again in a minute.', { kind: 'info' });
   asking.value = false;
 }
 const acceptAI = x => { store.tasks.unshift(makeTask({ title: x.title, notes: x.why, date: today(), source: 'ai' })); extra.value = extra.value.filter(y => y !== x); };

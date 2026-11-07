@@ -2,7 +2,8 @@
 import AvatarPicker from './AvatarPicker.vue';
 import { avatar } from '../lib/profile';
 import Icon from './Icon.vue';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
+import { toast } from '../lib/toast';
 import PasskeyNote from './PasskeyNote.vue';
 import { snapshot } from '../lib/store';
 import QrCode from './QrCode.vue';
@@ -10,6 +11,7 @@ import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
 import ProfileYou from './ProfileYou.vue';
 import DigestSettings from './DigestSettings.vue';
+import { DIGESTS_LIVE } from '../lib/digest';
 import {
   account, signOut, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
@@ -22,7 +24,7 @@ const open = ref(false);
 const tab = ref('profile');
 const TABS = computed(() => [
   ['profile', 'Profile', 'user'],
-  ['digests', 'Digests & AI', 'sparkle'],
+  ['digests', DIGESTS_LIVE ? 'Digests & AI' : 'AI', 'sparkle'],
   ['security', 'Devices & security', 'target'],
   ...(isOwner.value ? [['people', 'People', 'list']] : []),
   ['data', 'Your data', 'download'],
@@ -37,6 +39,7 @@ const link = ref(null);       // { label, url, expires }
 const copied = ref(false);
 const error = ref('');
 const busy = ref(false);
+watch(error, e => { if (e) toast(e, { kind: 'error' }); });
 
 const initial = computed(() => (account.user?.name || '?').trim()[0]?.toUpperCase() || '?');
 const isOwner = computed(() => account.user?.role === 'owner');
@@ -138,7 +141,6 @@ const tour = () => { open.value = false; emit('tour'); };
             <p class="label">{{ account.user?.name }} <span class="acct-role">{{ isOwner ? 'Owner' : 'Member' }}</span></p>
             <p class="acct-sync" :class="account.sync">{{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
           </div>
-          <p v-if="error" class="si-error" role="alert">{{ error }}</p>
           <button class="icon-x" aria-label="Close" @click="open = false">×</button>
         </div>
 
@@ -153,7 +155,7 @@ const tour = () => { open.value = false; emit('tour'); };
         </template>
 
         <template v-else-if="tab === 'digests'">
-          <DigestSettings />
+          <DigestSettings v-if="DIGESTS_LIVE" />
           <AIPanel class="t-violet" />
         </template>
 

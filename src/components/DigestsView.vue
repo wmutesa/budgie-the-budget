@@ -2,16 +2,17 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { store } from '../lib/store';
 import {
-  digests, streams, loadDigests, openStream, openEdition, generate, addStream, removeStream, hasTopics, isRead, markRead,
-  isSaved, toggleSave, isHidden, toggleHide, isPlanned, planStory, actedOn, draftBody, editDraft, isSent, markSent, readingMinutes,
+  DIGESTS_LIVE, digests, streams, loadDigests, openStream, openEdition, generate, addStream, removeStream, hasTopics, isRead, markRead,
+  isSaved, toggleSave, isHidden, toggleHide, isPlanned, planStory, actedOn, draftBody, isSent, markSent, readingMinutes,
 } from '../lib/digest';
 import { occurrences, today, addDays, KINDS, dayDiff, fromIso } from '../lib/tasks';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 
 // Your digests, to read and act on: a lead story, a 14-day deadline strip,
 // finds you can filter, sort, save, plan or hide, an outbox of drafts, and
 // what you saved. "My brief" follows your goals and projects; add others with a name.
-onMounted(() => { if (!digests.loaded) loadDigests(); else openStream(digests.active); });
+onMounted(() => { if (!DIGESTS_LIVE) return; if (!digests.loaded) loadDigests(); else openStream(digests.active); });
 const st = computed(() => streams.value.find(x => x.id === digests.active) || streams.value[0]);
 const ed = computed(() => digests.viewing[digests.active] || null);
 const list = computed(() => digests.editions[digests.active] || []);
@@ -68,7 +69,13 @@ const pct = computed(() => (all.value.length ? Math.round((acted.value / all.val
 const soon = computed(() => strip.value.filter(x => x.items.length && x.d <= addDays(today(), 6)).reduce((n, x) => n + x.items.length, 0));
 
 // ---------- outbox ----------
-const opened = ref(null);
+// Email it: opens your email app with the draft, and counts it as sent (a
+// follow-up goes into your Planner), with Undo.
+function emailed(d) {
+  if (isSent(ed.value, d)) return;
+  markSent(ed.value, d);
+  toast(`A follow-up with ${d.to} is in your Planner for next week.`, { kind: 'success', title: 'Opened in your email', action: { label: 'Undo', run: () => { markSent(ed.value, d); store.tasks = store.tasks.filter(t => t.title !== `Follow up with ${d.to}`.slice(0, 120) || t.done); } } });
+}
 const mailto = d => `mailto:?subject=${encodeURIComponent(d.subject || '')}&body=${encodeURIComponent(draftBody(ed.value, d))}`;
 
 // ---------- digests ----------
@@ -82,7 +89,19 @@ const shortDate = s => (s ? fromIso(s).toLocaleDateString('en-US', { weekday: 's
 </script>
 
 <template>
-  <div class="dz span-12" data-test="digests">
+  <div v-if="!DIGESTS_LIVE" class="dz-soon span-12" data-test="digests">
+    <p class="dz-label">Coming soon</p>
+    <h1>Digests</h1>
+    <p class="dz-soon-lead">A short newspaper written for you twice a week: opportunities that fit your goals, deadlines worth knowing, and draft emails you can send in one click.</p>
+    <ul class="dz-soon-list">
+      <li><Icon name="target" :size="16" /><span><b>Follows your life.</b> Topics come from your goals, projects and classes. Nothing to set up.</span></li>
+      <li><Icon name="calendar" :size="16" /><span><b>Deadlines in your Planner.</b> What is due in the next two weeks lands on your calendar.</span></li>
+      <li><Icon name="external" :size="16" /><span><b>One-click emails.</b> Outreach drafts open in your email app, ready to send.</span></li>
+      <li><Icon name="sparkle" :size="16" /><span><b>Free.</b> Built on free sources, with optional research by your own Gemini key.</span></li>
+    </ul>
+    <p class="muted small">Until then, your Planner, goals and routine work as usual.</p>
+  </div>
+  <div v-else class="dz span-12" data-test="digests">
     <!-- Digests and editions -->
     <header class="dz-top">
       <div class="dz-tabs" role="tablist" aria-label="Your digests">
@@ -217,27 +236,16 @@ const shortDate = s => (s ? fromIso(s).toLocaleDateString('en-US', { weekday: 's
         <button v-if="hiddenCount" type="button" class="link-btn small" data-test="show-hidden" @click="showHidden = !showHidden">{{ showHidden ? 'Hide' : 'Show' }} {{ hiddenCount }} you marked “not for me”</button>
       </section>
 
-      <!-- Outbox -->
+      <!-- Outbox: one click opens the draft in your email app -->
       <section class="dz-sec">
-        <div class="dz-sec-head"><h3>Your outbox <span class="muted">{{ ed.drafts.length }}</span></h3><span class="muted small">Drafts to send yourself</span></div>
+        <div class="dz-sec-head"><h3>Your outbox <span class="muted">{{ ed.drafts.length }}</span></h3><span class="muted small">One click opens it in your email, ready to send</span></div>
         <ul v-if="ed.drafts.length" class="dz-out">
-          <li v-for="d in ed.drafts" :key="d.no" :class="{ open: opened === d.no, sent: isSent(ed, d) }">
-            <button type="button" class="dz-out-row" :aria-expanded="opened === d.no" data-test="draft" @click="opened = opened === d.no ? null : d.no">
+          <li v-for="d in ed.drafts" :key="d.no" :class="{ sent: isSent(ed, d) }" data-test="draft">
+            <div class="dz-out-row">
               <b class="dz-no">#{{ d.no }}</b>
-              <span><b>{{ d.to }}</b><span class="muted small">{{ d.purpose }}</span></span>
-              <span class="dz-status" :class="{ ok: isSent(ed, d) }">{{ isSent(ed, d) ? 'Sent' : d.status }}</span>
-              <span class="muted small">{{ d.sendBy }}</span>
-            </button>
-            <div v-if="opened === d.no" class="dz-draft">
-              <p class="small"><b>Subject:</b> {{ d.subject }}</p>
-              <textarea :value="draftBody(ed, d)" rows="9" aria-label="Email text" data-test="draft-body" @input="editDraft(ed, d, $event.target.value)" />
-              <div class="dz-acts">
-                <button type="button" class="btn small" @click="copy(d.subject, `s${d.no}`)"><Icon :name="copied === `s${d.no}` ? 'check' : 'copy'" :size="14" />{{ copied === `s${d.no}` ? 'Copied' : 'Copy subject' }}</button>
-                <button type="button" class="btn small" data-test="copy-email" @click="copy(draftBody(ed, d), `b${d.no}`)"><Icon :name="copied === `b${d.no}` ? 'check' : 'copy'" :size="14" />{{ copied === `b${d.no}` ? 'Copied' : 'Copy email' }}</button>
-                <a class="btn small" :href="mailto(d)"><Icon name="external" :size="14" />Open in email app</a>
-                <button type="button" class="btn small" :class="{ primary: !isSent(ed, d) }" data-test="draft-sent" @click="markSent(ed, d)"><Icon :name="isSent(ed, d) ? 'refresh' : 'check'" :size="14" />{{ isSent(ed, d) ? 'Not sent yet' : 'Mark sent' }}</button>
-              </div>
-              <p v-if="isSent(ed, d)" class="muted small">A follow-up is in your Planner for a week from now.</p>
+              <span><b>{{ d.to }}</b><span class="muted small">{{ d.subject || d.purpose }}</span></span>
+              <span class="muted small">{{ isSent(ed, d) ? 'Sent' : d.sendBy }}</span>
+              <a class="btn small" :class="{ primary: !isSent(ed, d) }" :href="mailto(d)" data-test="draft-email" @click="emailed(d)"><Icon :name="isSent(ed, d) ? 'check' : 'external'" :size="14" />{{ isSent(ed, d) ? 'Email again' : 'Email it' }}</a>
             </div>
           </li>
         </ul>

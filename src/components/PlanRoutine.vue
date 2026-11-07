@@ -4,6 +4,7 @@ import { store } from '../lib/store';
 import { buildRoutine, saveRoutine, timeLabel, DAY_SHORT } from '../lib/tasks';
 import { ai, aiRefineRoutine, labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 
@@ -30,6 +31,7 @@ async function build() {
 function save() {
   saveRoutine(draft.value.filter(i => i.keep).map(({ keep, ...i }) => i));
   r.builtAt = new Date().toISOString();
+  toast('Your routine is in your Planner, repeating each day.', { kind: 'success', title: 'Routine saved' });
   draft.value = null;
 }
 </script>

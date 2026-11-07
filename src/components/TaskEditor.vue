@@ -4,6 +4,7 @@ import { store, newId } from '../lib/store';
 import { KINDS, DAY_SHORT, removeTask, today } from '../lib/tasks';
 import { breakDown } from '../lib/breakdown';
 import Icon from './Icon.vue';
+import { toast } from '../lib/toast';
 import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 
@@ -20,7 +21,11 @@ const toggleDay = d => { const s = new Set(t.repeat.days || []); s.has(d) ? s.de
 const newSub = ref('');
 const addSub = () => { const v = newSub.value.trim(); if (!v) return; (t.subtasks ||= []).push({ id: newId(), title: v, done: false }); newSub.value = ''; };
 const setKind = v => { t.kind = v; t.kindSet = true; };
-const remove = () => { if (confirm(`Delete "${t.title}"?`)) { removeTask(t); emit('close'); } };
+const remove = () => {
+  const copy = JSON.parse(JSON.stringify(t));
+  removeTask(t); emit('close');
+  toast(`“${copy.title}” deleted.`, { kind: 'info', action: { label: 'Undo', run: () => store.tasks.unshift(copy) } });
+};
 const splitting = ref(false);
 const splitBy = ref('');
 async function split() { splitting.value = true; splitBy.value = await breakDown(t); splitting.value = false; }

@@ -3,7 +3,7 @@ import { computed, ref, watch, onMounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
 import { progress } from '../lib/goals';
-import { digests, loadDigests } from '../lib/digest';
+import { DIGESTS_LIVE, digests, loadDigests } from '../lib/digest';
 import { ai, aiAdvise } from '../lib/ai';
 import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
@@ -76,7 +76,7 @@ watch(() => ai.ready, async ready => {
     <p v-else class="empty-note">No assignments or exams due this week.</p>
   </section>
 
-  <section class="card cell span-6" data-test="today-goals">
+  <section class="card cell" :class="DIGESTS_LIVE ? 'span-6' : 'span-12'" data-test="today-goals">
     <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Open goals" aria-label="Open goals" @click="go('Playground', { anchor: '#goals' })"><Icon name="right" /></button></div>
     <ul v-if="goals.length" class="td-goals">
       <li v-for="x in goals" :key="x.g.id">
@@ -88,7 +88,7 @@ watch(() => ai.ready, async ready => {
     <p v-else class="empty-note">No goals yet. In the Playground, write something like “I want to run a 10K by March” and Budgie plans the milestones.</p>
   </section>
 
-  <section class="card cell span-6 td-digest" data-test="today-digest">
+  <section v-if="DIGESTS_LIVE" class="card cell span-6 td-digest" data-test="today-digest">
     <div class="cell-head"><p class="label">Latest digest</p><button type="button" class="ibtn ghost" title="Open digests" aria-label="Open digests" @click="go('Digests')"><Icon name="right" /></button></div>
     <template v-if="ed">
       <p class="dg-kick">{{ ed.edition }} · {{ ed.dateLong }}</p>

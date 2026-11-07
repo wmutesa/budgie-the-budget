@@ -10,6 +10,9 @@ import { makeTask, today, dayDiff } from './tasks';
 import { readDigests, readDigest, writeDigest, dropDigest, saveNow } from './account';
 import { ai, aiPolishLead } from './ai';
 
+// Digests are on hold ("coming soon"). Set to true to bring them back.
+export const DIGESTS_LIVE = false;
+
 export const digests = reactive({ editions: {}, editionsOf: {}, active: 'main', viewing: {}, busy: {}, error: '', loaded: false, polished: {}, current: null });
 
 export const streams = computed(() => {
@@ -30,6 +33,7 @@ export function lastSlot(now = new Date()) {
 export const hasTopics = () => Boolean(store.me?.study || store.me?.about || store.goals.length || store.tasks.some(t => t.project) || store.digest.geminiKey);
 
 export async function loadDigests() {
+  if (!DIGESTS_LIVE) return;
   digests.error = '';
   try {
     const out = await readDigests();
@@ -58,6 +62,7 @@ export async function openEdition(stream, id) {
 function setCurrent() { digests.current = digests.viewing[digests.active] || digests.viewing.main || null; }
 
 export async function generate(id = digests.active) {
+  if (!DIGESTS_LIVE) return;
   const st = streams.value.find(x => x.id === id);
   if (!st) return;
   digests.busy[id] = true; digests.error = '';

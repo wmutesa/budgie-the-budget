@@ -11,7 +11,9 @@ One place for school, work, projects, events and daily life.
 - **Steps.** Break any task into steps with the AI (or Budgie's rules when the AI is not ready).
 - **Reminders.** The bell lists what is due today, what is overdue, deadlines tomorrow, goal dates coming up and new digests. Optional reminders on this device ten minutes before timed items, while Budgie is open.
 
-## Digests
+## Digests (coming soon)
+Digests are on hold while they are finished. What follows is how they will work.
+
 Short newspapers to read, kept up to date on their own: a new edition every Monday and Thursday, and a digest that is behind catches up when you open it. No topic to choose:
 - **My brief** follows your goals, your projects and classes, and what you study (from **You** in your profile).
 - **More digests:** add one with just a name, like "Robotics internships" or "AI policy news", and an optional line on what it should follow. Each has its own tab and archive.

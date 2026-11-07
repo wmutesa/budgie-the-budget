@@ -15,9 +15,11 @@ import ProjectsCard from './components/ProjectsCard.vue';
 import PlanRoutine from './components/PlanRoutine.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 import Icon from './components/Icon.vue';
+import Toasts from './components/Toasts.vue';
+import { toast } from './lib/toast';
 import { nav, PAGES, go } from './lib/nav';
 import { refreshFeeds } from './lib/calendar';
-import { loadDigests } from './lib/digest';
+import { loadDigests, DIGESTS_LIVE } from './lib/digest';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
@@ -46,6 +48,14 @@ watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCo
 // Skipping recovery codes cancels them so unseen codes cannot be used.
 const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* still hidden; they can be remade later */ } account.recoveryCodes = null; };
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
+// Sync problems and recovery, as notifications.
+let wasOffline = false;
+watch(() => account.sync, s => {
+  if (s === 'offline') { wasOffline = true; toast('Your changes are saved on this device and sync when you are back online.', { kind: 'warn', title: 'Offline', id: 'sync' }); }
+  else if (s === 'error') toast('Your latest changes could not be saved to your account. They are kept on this device; Budgie will try again.', { kind: 'error', title: 'Not synced', id: 'sync' });
+  else if (s === 'saved' && wasOffline) { wasOffline = false; toast('Back online. All changes are saved.', { kind: 'success', id: 'sync' }); }
+});
+watch(() => account.note, n => { if (n) toast(n, { kind: 'info' }); });
 // Jump to a part of a page when something asks for it (search, notices).
 watch(() => [nav.page, nav.anchor], async ([, anchor]) => {
   if (!anchor) return;
@@ -84,7 +94,7 @@ onUnmounted(() => clearInterval(timer));
         </div>
         <nav class="nb-pages" aria-label="Pages">
           <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" @click="active = p">
-            <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
+            <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}<sup v-if="p === 'Digests' && !DIGESTS_LIVE" class="nb-soon">Soon</sup>
           </button>
         </nav>
         <GlobalSearch />
@@ -111,6 +121,7 @@ onUnmounted(() => clearInterval(timer));
       </template>
     </main>
 
+    <Toasts />
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>
 </template>

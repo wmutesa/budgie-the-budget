@@ -5,6 +5,7 @@ import { makeGoal, planGoal, progress, removeGoal, addMilestones, parseGoal } fr
 import { toggleDone, isDone, dayLabel } from '../lib/tasks';
 import { labelFor } from '../lib/ai';
 import Icon from './Icon.vue';
+import { toast, loading, finish } from '../lib/toast';
 import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 
@@ -22,12 +23,13 @@ async function add() {
   const parsed = parseGoal(title.value);
   if (!parsed.title || parsed.title === 'New goal') return;
   busy.value = 'new';
+  const tid = loading('Planning milestones…');
   const g = makeGoal({ title: parsed.title, by: by.value || parsed.by, why: why.value.trim() });
   const who = await planGoal(g);
-  note.value = `Milestones for “${g.title}” planned by ${who}. They are in your Planner.`;
+  finish(tid, `${g.milestones.length} milestones for “${g.title}”, planned by ${who}, are in your Planner.`, { title: 'Goal planned' });
   title.value = ''; by.value = ''; why.value = ''; busy.value = ''; open.value = g.id;
 }
-async function replan(g) { busy.value = g.id; await planGoal(g); busy.value = ''; }
+async function replan(g) { busy.value = g.id; const n = g.milestones.length; await planGoal(g); busy.value = ''; toast(`${g.milestones.length - n} more milestones added.`, { kind: 'success' }); }
 function addStep(g) { const v = step.value.trim(); if (!v) return; addMilestones(g, [v]); step.value = ''; }
 const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milestone tasks that are not done are removed too.`)) removeGoal(g); };
 </script>
@@ -41,7 +43,6 @@ const remove = g => { if (confirm(`Delete the goal “${g.title}”? Its milesto
       <button class="btn primary small" :disabled="!title.trim() || busy === 'new'" data-test="goal-add"><Icon :name="busy === 'new' ? 'refresh' : 'sparkle'" :size="14" />{{ busy === 'new' ? 'Planning…' : 'Plan it' }}</button>
     </form>
     <input v-if="title" v-model="why" class="gl-why" placeholder="Why it matters to you (optional, helps the AI)" aria-label="Why it matters" maxlength="200" />
-    <p v-if="note" class="pln-ok small" role="status">{{ note }}</p>
 
     <ul v-if="list.length" class="gl-list">
       <li v-for="x in list" :key="x.g.id" class="gl-goal" :style="{ '--g': x.g.color }" data-test="goal">

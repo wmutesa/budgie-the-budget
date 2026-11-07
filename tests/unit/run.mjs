@@ -199,12 +199,14 @@ await check('digests: Gemini answers are checked before use', async () => {
     assert.equal(r.action.link, '', 'odd links are removed');
   } finally { globalThis.fetch = real; }
 });
-const { linkAdvice } = await import('../../worker/ical.js');
+const { linkAdvice, googleFeedFrom } = await import('../../worker/ical.js');
 await check('calendar links: Google links that are not feeds get the right advice', () => {
   assert.match(linkAdvice('https://calendar.google.com/calendar/u/0/r'), /link for opening Google Calendar[\s\S]*Secret address in iCal format/);
-  assert.match(linkAdvice('https://calendar.google.com/calendar/embed?src=a%40gmail.com'), /embedding/);
+  assert.equal(googleFeedFrom('https://calendar.google.com/calendar/embed?src=a%40gmail.com&ctz=America%2FNew_York'), 'https://calendar.google.com/calendar/ical/a%40gmail.com/public/basic.ics', 'embed links become the feed');
+  assert.equal(googleFeedFrom('https://calendar.google.com/calendar/u/0?cid=YUBnbWFpbC5jb20'), 'https://calendar.google.com/calendar/ical/a%40gmail.com/public/basic.ics', 'share links become the feed');
+  assert.equal(linkAdvice('https://calendar.google.com/calendar/embed?src=a%40gmail.com'), '', 'so they are tried');
+  assert.match(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/public/basic.ics', 404), /private[\s\S]*secret address/);
   assert.equal(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/private-123/basic.ics'), '', 'the secret address is fine');
-  assert.match(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/public/basic.ics', 404), /public address[\s\S]*secret/);
   assert.match(linkAdvice('https://calendar.google.com/calendar/ical/a%40gmail.com/private-123/basic.ics', 404), /reset[\s\S]*school or work/);
   assert.equal(linkAdvice('https://school.instructure.com/feeds/calendars/user_x.ics'), '', 'other services are tried first');
 });

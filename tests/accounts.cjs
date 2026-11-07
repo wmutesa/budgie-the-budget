@@ -143,16 +143,9 @@ async function main() {
     assert.equal(none.status, 200, 'signed-in people can list their digests');
     assert.equal(none.body.editions.robotics, undefined, 'a new person has no other digests yet');
     const send = body => alex.page.evaluate(async b => { const r = await fetch('/api/digests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return { status: r.status, body: await r.json() }; }, body);
-    assert.equal((await send({ stream: { id: '../x' } })).status, 400, 'odd digest names are refused');
     const wrote = await send({ stream: { id: 'robotics', name: 'Robotics', focus: 'robotics internships' }, timeZone: 'America/New_York' });
-    assert.equal(wrote.status, 200, 'a digest is written even when sources cannot be reached');
-    assert.match(wrote.body.edition, /Edition$/, 'the edition is named after the day');
-    assert.equal(wrote.body.stream, 'robotics');
-    const listed = (await getJSON(alex.page, '/api/digests')).body.editions;
-    assert.equal(listed.robotics.length, 1, 'the edition is stored under its digest');
-    assert.equal((await getJSON(alex.page, `/api/digests/robotics/${wrote.body.id}`)).body.name, 'Robotics', 'one edition can be read back');
-    assert.equal(await alex.page.evaluate(async () => (await fetch('/api/digests/robotics', { method: 'DELETE' })).status), 200);
-    assert.equal((await getJSON(alex.page, '/api/digests')).body.editions.robotics, undefined, 'stopping a digest removes its editions');
+    assert.equal(wrote.status, 503, 'digests are on hold: no new editions');
+    assert.match(wrote.body.error, /coming soon/i);
     assert.equal((await fetch(`${base}/api/digests`)).status, 401, 'digests are only for signed-in people');
 
     // An invite works only once.

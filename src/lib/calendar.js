@@ -3,9 +3,10 @@
 // fetch other sites' calendars directly), and events become Planner items.
 // Links are kept in your private account data and refresh on their own.
 import { store, newId } from './store';
+import { toast } from './toast';
 import { readCalendar } from './account';
 import { makeTask, isoDay, toMins, guessKind, today, dayDiff } from './tasks';
-import { linkAdvice } from '../../worker/ical.js';
+import { linkAdvice, googleFeedFrom } from '../../worker/ical.js';
 
 export const FEED_KINDS = {
   canvas: { name: 'Canvas', help: 'Canvas → Calendar → Calendar Feed (bottom right) → copy the link.' },
@@ -75,7 +76,7 @@ export function mergeEvents(feed, events) {
   return { added: added.length, removed: gone.size };
 }
 
-export async function syncFeed(feed) {
+export async function syncFeed(feed, { quiet = false } = {}) {
   feed.busy = true;
   try {
     const out = await readCalendar(feed.url);
@@ -85,7 +86,9 @@ export async function syncFeed(feed) {
     Object.assign(feed, { lastSync: new Date().toISOString(), count: (out.events || []).length, error: '' });
     return r;
   } catch (e) {
+    const before = feed.error;
     feed.error = e.message || 'The calendar could not be read.';
+    if (feed.lastSync && feed.error !== before && !quiet) toast(feed.error, { kind: 'warn', title: `${feed.name} did not update`, ms: 12000 });
     feed.lastSync = new Date().toISOString();
     return null;
   } finally {
@@ -94,7 +97,9 @@ export async function syncFeed(feed) {
 }
 
 export async function addFeed(raw, name = '') {
-  const url = raw.trim().replace(/^webcals?:\/\//i, 'https://');
+  // Google embed and share links become the calendar's feed address.
+  const typed = raw.trim().replace(/^webcals?:\/\//i, 'https://');
+  const url = googleFeedFrom(typed) || typed;
   const advice = linkAdvice(url);
   if (advice) throw new Error(advice);
   if (store.feeds.some(f => f.url === url)) throw new Error('That calendar is already imported.');

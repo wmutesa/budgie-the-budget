@@ -37,7 +37,7 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | --- | --- |
 | **Today** | Your day in a sentence, what is on today, deadlines this week, goal progress and the latest digest |
 | **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Calendar with day, week and month, and Focus). Imports Canvas, Google, Apple and Outlook calendars, suggests what to prepare for, breaks tasks into steps, keeps streaks |
-| **Digests** | Short newspapers to read, kept up to date on their own (Mondays and Thursdays, and catching up when you open them): opportunities that fit, deadlines, outreach drafts to copy, a watch box and one thing to do this week. "My brief" follows your goals, projects and studies; add more digests with just a name. With your free Gemini key (in your profile), each edition is researched with Google Search as it is written. Deadlines go to your Planner |
+| **Digests** | Coming soon: a short newspaper written for you twice a week, with opportunities that fit your goals, deadlines worth knowing and draft emails you can send in one click. The code is in place and switched off for now |
 | **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sorts tasks, routines and goals. Life goals get milestones on your calendar; build a daily routine; name and colour projects |
 
 In the Playground, say several things at once and Budgie adds each where it belongs, with chips to switch and Undo; the search in the top bar finds anything and turns what you type into an action (press `/`).

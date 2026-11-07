@@ -128,7 +128,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Four pages, starting with Today. The money side is gone.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.trim())), ['Today', 'Planner', 'Digests', 'Playground'], 'the four pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Today', 'Planner', 'Digests', 'Playground'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -142,7 +142,7 @@ async function run(url) {
 
   // Playground: write anything; Budgie sorts tasks, routines and goals.
   assert.equal(await page.$('[data-test="new"]'), null, 'there is no Add button in the top bar');
-  assert.ok(fakeAccount.digests.some(d => d.stream === 'main'), 'My brief is written on its own, even for an empty account');
+  assert.ok(!fakeAccount.lastWrite, 'digests are on hold: nothing is written');
   await page.click(tab('Playground'));
   await page.fill('[data-test="inbox-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nI want to land a summer internship by March\nhaircut today');
   await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 4);
@@ -151,6 +151,7 @@ async function run(url) {
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/playground.png` });
   await page.click('[data-test="inbox-send"]');
   assert.match(await page.textContent('[data-test="inbox-done"]'), /Added 4 things/, 'the inbox says what it added');
+  assert.match(await page.textContent('[data-test="toasts"]'), /Added 4 things[\s\S]*Undo/, 'a notification confirms it, with Undo');
   // Switch something already added: the haircut becomes a routine, then back to a task.
   const haircut = page.locator('[data-test="inbox-made"]', { hasText: 'Haircut' });
   await haircut.locator('[data-test="made-routine"]').click();
@@ -189,6 +190,11 @@ async function run(url) {
   await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
   await page.click('[data-test="feed-add"]');
   await page.waitForFunction(() => /Imported/.test(document.querySelector('[data-test="calendars"]').textContent));
+  assert.match(await page.textContent('[data-test="toasts"]'), /Calendar imported/, 'a notification says the calendar was imported');
+  // A Google embed link is turned into the calendar's feed and tried; if it is private, the advice says what to copy.
+  await page.fill('[data-test="feed-url"]', 'https://calendar.google.com/calendar/u/0/r');
+  await page.click('[data-test="feed-add"]');
+  await page.waitForFunction(() => /Calendar not imported[\s\S]*Secret address in iCal format/.test(document.querySelector('[data-test="toasts"]').textContent));
   assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
   // AI breakdown (rules here, since no model runs in the test).
   await page.click('.pln-group[data-group="Tomorrow"] [data-test="row-breakdown"]');
@@ -237,89 +243,37 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   await page.click('[data-test="view-tasks"]');
 
-  // Your details and Gemini key live in your profile.
+  // Your details live in your profile; the AI page has no digest settings while digests are on hold.
   await page.click('[data-test="account"]');
   await page.waitForSelector('[data-test="profile-you"]');
   await page.fill('[data-test="you-name"]', 'Sam');
   await page.fill('[data-test="you-study"]', 'Electrical Engineering');
+  assert.equal(await page.textContent('[data-test="acct-tab-digests"]'), 'AI', 'the settings page is called AI for now');
   await page.click('[data-test="acct-tab-digests"]');
-  await page.fill('[data-test="you-key"]', ' "AIzaTestKey_000000000000000000000000000" ');
-  assert.equal(await page.inputValue('[data-test="you-key"]'), 'AIzaTestKey_000000000000000000000000000', 'spaces and quotes are cleaned off a pasted key');
-  assert.equal(await page.getAttribute('[data-test="you-key"]', 'type'), 'password', 'the key is hidden');
+  assert.equal(await page.$('[data-test="you-key"]'), null, 'no Gemini key while digests are on hold');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/settings.png` });
   await page.keyboard.press('Escape');
   await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
 
-  // Digests: no form. My brief is always there; a fresh edition uses your profile and key.
+  // Digests: coming soon.
+  assert.match(await page.textContent(tab('Digests')), /Soon/, 'the tab says it is coming soon');
   await page.click(tab('Digests'));
-  await page.waitForSelector('[data-test="digest"]');
-  await page.click('[data-test="generate"]');
-  await page.waitForFunction(() => !document.querySelector('[data-test="digest-busy"]'));
-  assert.equal(fakeAccount.lastWrite.stream.id, 'main', 'the main digest is written on its own');
-  assert.equal(fakeAccount.lastWrite.me.study, 'Electrical Engineering', 'your profile is saved before the server writes');
-  assert.match(fakeAccount.lastWrite.key, /^AIza/, 'the Gemini key is in your account for the server');
-  const paper = await page.textContent('[data-test="digest"]');
-  assert.match(paper, /Saturday Edition[\s\S]*My brief[\s\S]*Robotics lab opens first-year research roles/, 'the edition has a masthead and a lead');
-  assert.equal(await page.locator('[data-test="digest-archive"] button').count(), 3, 'past editions show as a timeline');
-  assert.match(await page.textContent('[data-test="digest-made"]'), /Gemini with Google Search[\s\S]*following robotics/, 'it says how it was researched and what it follows');
-  // The 14-day strip: tap a day to see what is due, from the digest and your Planner.
-  await page.click('[data-test="digest-strip"] button.has >> nth=0');
-  assert.ok((await page.locator('.dz-dayitems li').count()) >= 1, 'a day shows what is due');
-  await page.click('[data-test="digest-strip"] button.on');
-  // Finds: filter, search, sort, save, plan, hide.
-  assert.equal(await page.locator('[data-test="digest-story"]').count(), 10, 'all finds show');
-  await page.click('[data-test="filter-event"]');
-  assert.equal(await page.locator('[data-test="digest-story"]').count(), 2, 'filtering by kind');
-  await page.click('[data-test="filter-event"]');
-  await page.fill('[data-test="digest-search"]', 'solar');
-  assert.match(await page.textContent('[data-test="digest-story"]'), /solar microgrids/, 'searching the edition');
-  await page.fill('[data-test="digest-search"]', '');
-  await page.selectOption('[data-test="digest-sort"]', 'deadline');
-  assert.match(await page.textContent('[data-test="digest-story"] >> nth=0'), /Due today[\s\S]*Open source mentorship/, 'sorting by deadline, with a countdown');
-  await page.selectOption('[data-test="digest-sort"]', 'fit');
-  assert.match(await page.textContent('[data-test="digest-story"] >> nth=0'), /Embedded systems intern[\s\S]*92% fit/, 'best fit first');
-  const first = page.locator('[data-test="digest-story"] >> nth=0');
-  await first.locator('[data-test="story-save"]').click();
-  assert.equal(await first.locator('[data-test="story-plan"]').isDisabled(), true, 'finds due in two weeks are already in the Planner');
-  await page.locator('[data-test="digest-story"]', { hasText: 'Free cloud credits' }).locator('[data-test="story-plan"]').click();
-  await page.locator('[data-test="digest-story"]', { hasText: 'Remote software internship' }).locator('[data-test="story-hide"]').click();
-  assert.equal(await page.locator('[data-test="digest-story"]').count(), 9, '“not for me” hides a find');
-  assert.match(await page.textContent('[data-test="digest-saved"]'), /Embedded systems intern/, 'saved finds are kept');
-  assert.match(await page.textContent('[data-test="digest-briefing"]'), /3 of 11[\s\S]*acted on/, 'the briefing counts what you acted on');
-  assert.match(paper, /Watching: student visa[\s\S]*Not legal advice/, 'the watch box shows its note');
-  await page.click('[data-test="draft"]');
-  assert.match(await page.inputValue('[data-test="draft-body"]'), /Thank you for your time/, 'a draft opens with its email');
-  await page.fill('[data-test="draft-body"]', 'Hello,\n\nA shorter note.\n\nSam');
-  await page.click('[data-test="draft-sent"]');
-  assert.match(await page.textContent('.dz-out li >> nth=0'), /Sent/, 'a draft can be marked sent');
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest.png`, fullPage: true });
-  // A second digest, tracked as its own tab.
-  await page.click('[data-test="digest-add"]');
-  await page.fill('[data-test="digest-name"]', 'AI policy news');
-  await page.click('[data-test="digest-create"]');
-  await page.waitForFunction(() => /This week in AI policy news/.test(document.querySelector('[data-test="digest"]')?.textContent || ''));
-  assert.equal(await page.getAttribute('[data-test="digest-tab-ai-policy-news"]', 'aria-selected'), 'true', 'the new digest has its own tab');
-  await page.click('[data-test="digest-tab-main"]');
-  await page.waitForFunction(() => /Robotics lab opens/.test(document.querySelector('[data-test="digest"]')?.textContent || ''));
-  await page.click('.nb-pages button:has-text("Planner")');
-  const plannerText = await page.textContent('[data-test="planner"]');
-  assert.match(plannerText, /Student hackathon this month/, 'digest deadlines become Planner tasks');
-  assert.match(plannerText, /Follow up with Robotics Lab/, 'marking a draft sent adds a follow-up');
+  assert.match(await page.textContent('[data-test="digests"]'), /Coming soon[\s\S]*Digests[\s\S]*Follows your life/, 'the page explains what is coming');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/digest-soon.png`, fullPage: true });
+  assert.ok(!fakeAccount.lastWrite, 'opening the page writes nothing');
 
   // Today: the day, goals and the latest digest together.
   await page.click(tab('Today'));
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   const tg = await page.textContent('[data-test="today-goals"]');
   assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
-  assert.match(await page.textContent('[data-test="today-digest"]'), /Robotics lab opens/, 'the latest digest is on Today');
+  assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
 
   // Search everything; typed text becomes an action.
   await page.fill('[data-test="search"]', 'essay');
   await page.waitForSelector('[data-test="search-pop"]');
   assert.match(await page.textContent('[data-test="search-pop"]'), /Planner[\s\S]*Essay 2/, 'tasks show up in search');
-  await page.fill('[data-test="search"]', 'robotics lab');
-  assert.match(await page.textContent('[data-test="search-pop"]'), /Digest[\s\S]*Robotics lab/, 'digest stories show up in search');
   await page.fill('[data-test="search"]', 'I want to learn Spanish this year');
   assert.equal(await page.getAttribute('[data-test="search-pop"] .gs-item >> nth=0', 'data-test'), 'act-goal', 'goal-like text offers a goal first');
   await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
@@ -370,7 +324,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Four pages[\s\S]*Goals with milestones[\s\S]*Your digest/, 'the guide covers the four pages');
+  assert.match(seen, /Four pages[\s\S]*Goals with milestones[\s\S]*Digests, coming soon/, 'the guide covers the four pages');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Today'));
