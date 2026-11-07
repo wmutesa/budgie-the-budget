@@ -2890,15 +2890,11 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 /* Search results grow leftwards when the search box is narrow, never past the screen */
 @media (min-width: 761px) { .gs-pop { left: auto; right: 0; width: 100%; } }
 /* Focus page: tick buttons a softer black, full black on hover or press */
-.fcs .ibtn.primary { background: #3f3f46; border-color: #3f3f46; transition: background .15s, border-color .15s; }
-.fcs .ibtn.primary:hover, .fcs .ibtn.primary:active, .fcs .ibtn.primary:focus-visible { background: #000; border-color: #000; }
 /* Icon-only buttons (task and agenda rows, the calendar card, Focus) are full circles */
 .ibtn[aria-label] { border-radius: 50% !important; padding: 0 !important; aspect-ratio: 1; flex: none; }
 /* Overview: the two actions sit apart from the summary and from each other, a little larger */
 .brief-acts { display: flex !important; flex-wrap: wrap; gap: 12px !important; margin-top: 24px !important; }
 .brief-acts .btn { height: 42px !important; padding: 0 18px !important; font-size: 14px !important; gap: 8px; }
-.fcs .pln-idea-acts .ibtn.primary { background: #3f3f46 !important; border-color: #3f3f46 !important; }
-.fcs .pln-idea-acts .ibtn.primary:hover, .fcs .pln-idea-acts .ibtn.primary:active, .fcs .pln-idea-acts .ibtn.primary:focus-visible { background: #000 !important; border-color: #000 !important; }
 /* Task columns: the actions float in the card's bottom-right corner on hover,
    so a card never grows and the sections never move */
 .pln-col .tk { position: relative; }
@@ -2917,10 +2913,11 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 /* Only the action buttons take clicks; the faded strip behind them lets clicks through to the card */
 .pln-col .tk:hover .tk-tools, .pln-col .tk:focus-within .tk-tools { pointer-events: none !important; }
 .pln-col .tk:hover .tk-tools .ibtn, .pln-col .tk:focus-within .tk-tools .ibtn { pointer-events: auto; }
-/* Tick buttons everywhere: a softer black, full black on hover or press */
-.ibtn.primary[aria-label], .pln-idea-acts .ibtn.primary { background: #3f3f46 !important; border-color: #3f3f46 !important; color: #fff !important; transition: background .15s, border-color .15s; }
-.ibtn.primary[aria-label]:hover:not(:disabled), .ibtn.primary[aria-label]:active, .ibtn.primary[aria-label]:focus-visible,
-.pln-idea-acts .ibtn.primary:hover, .pln-idea-acts .ibtn.primary:active { background: #000 !important; border-color: #000 !important; }
+/* Tick buttons everywhere: light grey with a dark tick, a shade darker on hover and press */
+.ibtn.primary[aria-label], .pln-idea-acts .ibtn.primary { background: #ececee !important; border-color: #e4e4e7 !important; color: #3f3f46 !important; transition: background .15s, border-color .15s, color .15s; }
+.ibtn.primary[aria-label]:hover:not(:disabled), .ibtn.primary[aria-label]:focus-visible,
+.pln-idea-acts .ibtn.primary:hover { background: #dcdce0 !important; border-color: #d4d4d8 !important; color: #18181b !important; }
+.ibtn.primary[aria-label]:active, .pln-idea-acts .ibtn.primary:active { background: #c9c9ce !important; border-color: #c4c4c9 !important; color: #18181b !important; }
 /* Profile: task reminders switch */
 .you-remind { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .you-remind p { margin: 2px 0 0; }

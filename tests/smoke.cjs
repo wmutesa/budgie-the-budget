@@ -270,8 +270,9 @@ async function run(url) {
   const boxes = await page.locator('[data-test="sch-box"]').count();
   assert.ok(boxes >= 1, 'timed items sit on the time line');
   await page.click('[data-test="plan-day"]');
-  await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n, boxes);
-  assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
+  // Late in the day there may be no free time left; then Budgie says so instead.
+  await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n || /no free time left/.test(document.querySelector('[data-test="toasts"]')?.textContent || ''), boxes);
+  if (await page.locator('[data-test="sch-box"]').count() > boxes) assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
   await page.locator('[data-test="sch-box"]').first().click({ position: { x: 12, y: 10 } });
   await page.waitForSelector('.sch-sheet [data-test="task-edit"]');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
@@ -477,7 +478,7 @@ server.listen(0, '127.0.0.1', async () => {
     console.log('smoke test passed');
     code = 0;
   } catch (err) {
-    console.error('smoke test failed:', err.message);
+    console.error('smoke test failed:', err.message); if (process.env.STACK) console.error(err.stack);
   } finally {
     server.close();
     server.closeAllConnections();
