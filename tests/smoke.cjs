@@ -128,7 +128,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner'], 'the two pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner', 'Focus'], 'the three pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -247,10 +247,13 @@ async function run(url) {
   await page.keyboard.press('Escape');
   await page.click('[data-test="cal-month"]');
   assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
-  await page.click('[data-test="view-focus"]');
+  await page.click('[data-test="nav-focus"]');
+  // Close earlier notifications so none covers the page.
+  while (await page.locator('[data-test="toast"] .toast-x').count()) await page.locator('[data-test="toast"] .toast-x').first().click();
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
   await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  await page.click('[data-test="nav-planner"]');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-day"]');
@@ -352,7 +355,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Two pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
+  assert.match(seen, /Three pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Overview'));
@@ -388,7 +391,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Planner']) {
+  for (const p of ['Overview', 'Planner', 'Focus']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -1,25 +1,27 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
-import { parseTask, addFromText, occurrences, openTasks, summary, today, addDays, dayLabel, fromIso, isoDay, timeLabel, toMins, isDone, toggleDone, KINDS, streak } from '../lib/tasks';
+import { parseTask, addFromText, occurrences, summary, today, addDays, dayLabel, fromIso, isoDay, timeLabel, isDone, KINDS } from '../lib/tasks';
 import { refreshFeeds } from '../lib/calendar';
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
-import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
+import { focus, finishFocus, mmss } from '../lib/focus';
 import { nav, go } from '../lib/nav';
+import { catColor } from '../lib/cats';
 let showDoneFirst = false;
 
 // Planner: school, work, projects, routines and events in one place.
+// Focus has its own page in the navbar.
 // Type or say anything; Budgie works out the date, time, repeat and priority.
-const VIEWS = [['Schedule', 'clock'], ['Tasks', 'list'], ['Agenda', 'agenda'], ['Focus', 'target']];
+const VIEWS = [['Schedule', 'clock'], ['Tasks', 'list'], ['Agenda', 'agenda']];
 // The Schedule is new: show it once to everyone, then remember their choice.
 if (!store.planner.schSeen) { store.planner.schSeen = true; if (!nav.task) store.planner.view = 'Schedule'; }
 // Schedule and calendar are one view now; it opens on the day.
 if (!store.planner.schOne) { store.planner.schOne = true; store.planner.cal = 'day'; }
-const view = computed({ get: () => (['Week', 'Calendar'].includes(store.planner.view) ? 'Schedule' : VIEWS.some(([v]) => v === store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
+const view = computed({ get: () => (['Week', 'Calendar', 'Focus'].includes(store.planner.view) ? 'Schedule' : VIEWS.some(([v]) => v === store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
 const now = ref(today());
 const clock = ref(new Date());
 let tick = null;
@@ -63,7 +65,7 @@ const groups = computed(() => {
     const all = [...one.filter(t => !t.date || t.date >= addDays(d, -60)), ...store.tasks.filter(t => t.repeat && inFilter(t))];
     const m = new Map();
     for (const t of all) { const k = t.project ? `#${t.project}` : (KINDS[t.kind]?.label || 'Task'); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
-    return [...m.entries()].map(([name, list]) => ({ name, list: sorted(list), color: list[0].project ? store.projects[list[0].project]?.color : KINDS[list[0].kind]?.color })).sort((a, b) => b.list.length - a.list.length);
+    return [...m.entries()].map(([name, list]) => ({ name, list: sorted(list), color: catColor(list[0]) })).sort((a, b) => b.list.length - a.list.length);
   }
   return rows.filter(g => g.list.length);
 });
@@ -90,19 +92,6 @@ const agenda = computed(() => {
   return days;
 });
 
-// ---------- Focus ----------
-const todayItems = computed(() => occurrences(now.value, now.value));
-const progress = computed(() => { const all = todayItems.value.length; const done = todayItems.value.filter(x => x.done).length; return { all, done, pct: all ? Math.round((done / all) * 100) : 0 }; });
-const nowItem = computed(() => {
-  const m = clock.value.getHours() * 60 + clock.value.getMinutes();
-  const timed = todayItems.value.filter(x => x.task.time && !x.done);
-  const current = timed.find(x => toMins(x.task.time) <= m && m < toMins(x.task.time) + (x.task.mins || 30));
-  if (current) return { label: 'Now', item: current };
-  const next = timed.find(x => toMins(x.task.time) > m);
-  return next ? { label: `Next at ${timeLabel(next.task.time)}`, item: next } : null;
-});
-const top3 = computed(() => openTasks(now.value).filter(t => t.kind !== 'routine' && !(t.repeat && t.kind === 'class')).filter(t => !t.date || t.date <= addDays(now.value, 3) || t.priority === 'high').slice(0, 3));
-const routineToday = computed(() => todayItems.value.filter(x => x.task.kind === 'routine'));
 // ---------- reminders on this device ----------
 const canNotify = typeof Notification !== 'undefined';
 async function toggleRemind() {
@@ -146,7 +135,7 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
       
     </div>
 
-    <div v-if="focus.task && view !== 'Focus'" class="pln-focusbar" role="status">
+    <div v-if="focus.task" class="pln-focusbar" role="status">
       <Icon name="target" /><b>{{ focus.task.title }}</b><span class="pln-clock small">{{ mmss(focus.left) }}</span>
       <button type="button" class="ibtn ghost" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
       <button type="button" class="ibtn ghost" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
@@ -155,7 +144,7 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     <template v-if="view === 'Schedule'">
       <PlanSchedule @view="v => view = v" />
     </template>
-    <div v-else class="pln-body" :class="{ cols: view === 'Tasks' || view === 'Agenda' }">
+    <div v-else class="pln-body cols">
       <div class="pln-main">
         <!-- Tasks: columns, by when or by category; each column stays short -->
         <template v-if="view === 'Tasks'">
@@ -179,7 +168,7 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         </template>
 
         <!-- Agenda: the next two weeks, one column per day -->
-        <template v-else-if="view === 'Agenda'">
+        <template v-else>
           <div class="pln-cols">
             <section v-for="d in agenda" :key="d.date" class="pln-group pln-col" :class="{ today: d.date === now }" data-test="agenda-day">
               <h2 class="pln-gh">{{ dayLabel(d.date, now) }} <span class="muted">{{ fromIso(d.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) }}</span></h2>
@@ -190,43 +179,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
           </div>
         </template>
 
-        <!-- Focus: what matters now -->
-        <template v-else>
-          <div class="pln-focus" data-test="focus">
-            <div class="pln-ring" :style="{ '--p': progress.pct }" role="img" :aria-label="`${progress.done} of ${progress.all} done today`">
-              <b>{{ progress.done }}/{{ progress.all }}</b><span>done today</span>
-            </div>
-            <div v-if="nowItem" class="pln-now">
-              <p class="label">{{ nowItem.label }}</p>
-              <h2>{{ nowItem.item.task.title }}</h2>
-              <button type="button" class="ibtn primary" title="Mark done" aria-label="Mark done" @click="toggleDone(nowItem.item.task, nowItem.item.date)"><Icon name="check" /></button>
-            </div>
-            <div v-else class="pln-now"><p class="label">Now</p><h2>Free time</h2><p class="muted small">Nothing else is scheduled today.</p></div>
-          </div>
-          <div v-if="focus.task" class="pln-timer" data-test="timer">
-            <span class="label">Focusing on</span><b>{{ focus.task.title }}</b>
-            <span class="pln-clock">{{ mmss(focus.left) }}</span>
-            <button type="button" class="ibtn" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
-            <button type="button" class="ibtn primary" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
-            <button type="button" class="ibtn" title="Stop" aria-label="Stop" @click="stopFocus"><Icon name="x" /></button>
-          </div>
-          <div class="pln-group">
-            <h2 class="pln-gh">Top three</h2>
-            <ol v-if="top3.length" class="pln-top">
-              <li v-for="t in top3" :key="t.id">
-                <span class="pln-top-t"><b>{{ t.title }}</b><span class="muted small">{{ t.date ? dayLabel(t.date, now) : 'Any time' }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }} · {{ KINDS[t.kind].label }}</span></span>
-                <button type="button" class="ibtn" title="Focus for 25 minutes" :aria-label="`Focus on ${t.title}`" data-test="top-focus" @click="startFocus(t)"><Icon name="play" /></button>
-                <button type="button" class="ibtn primary" title="Mark done" :aria-label="`Done: ${t.title}`" @click="toggleDone(t)"><Icon name="check" /></button>
-              </li>
-            </ol>
-            <p v-else class="muted small">Nothing urgent. Enjoy it, or pick something from Later.</p>
-          </div>
-          <div v-if="routineToday.length" class="pln-group">
-            <h2 class="pln-gh">Routine today</h2>
-            <ul class="tk-list"><TaskRow v-for="x in routineToday" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-            <p v-if="Math.max(0, ...routineToday.map(x => streak(x.task))) > 1" class="muted small">Best streak: {{ Math.max(0, ...routineToday.map(x => streak(x.task))) }} days in a row.</p>
-          </div>
-        </template>
       </div>
 
       <aside class="pln-side">

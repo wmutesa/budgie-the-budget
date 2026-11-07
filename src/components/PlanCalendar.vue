@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted, onUpdated, watch } from 'vue';
 import { store } from '../lib/store';
 import {
   occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, timeLabel, KINDS, toggleDone, isDone,
@@ -9,6 +9,7 @@ import { breakDown } from '../lib/breakdown';
 import { startFocus } from '../lib/focus';
 import { ai, aiSuggestTasks } from '../lib/ai';
 import { plannerFacts } from '../lib/suggest';
+import { catColor } from '../lib/cats';
 import TaskEditor from './TaskEditor.vue';
 import { deleteTask } from '../lib/undo';
 import Icon from './Icon.vue';
@@ -18,12 +19,18 @@ import Icon from './Icon.vue';
 // drag an item to move it.
 // Inside the Schedule (embedded) it shows week and month; a day opens the
 // Schedule's own day time line.
-const props = defineProps({ filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false } });
-const emit = defineEmits(['focus', 'day']);
+// `fill`: the height to grow to (the Schedule's activity list), 0 for its own size.
+const props = defineProps({ filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false }, fill: { type: Number, default: 0 }, listHidden: { type: Boolean, default: false } });
+const emit = defineEmits(['focus', 'day', 'range', 'list']);
 const MODES = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
 const mode = computed({ get: () => (['day', 'week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'week'), set: v => { store.planner.cal = v; } });
 const anchor = ref(today());
-const HOUR = 48;                  // pixels per hour
+// Pixels per hour: 48, or taller to fill `fill`.
+const root = ref(null);
+const monthEl = ref(null);
+const over = ref(0);
+const HOUR = computed(() => (props.fill && mode.value !== 'month' ? Math.max(48, Math.floor((props.fill - over.value - 2) / hours.value.length)) : 48));
+const monthFill = computed(() => (props.fill && mode.value === 'month' ? Math.max(0, props.fill - over.value) : 0));
 const clock = ref(new Date());
 let tick = null;
 
@@ -36,6 +43,12 @@ const days = computed(() => {
   const start = weekStart(isoDay(first));
   return Array.from({ length: 42 }, (_, i) => addDays(start, i));
 });
+// Tell the Schedule which days are shown (the month itself, not the weeks around it).
+watch(days, d => {
+  if (mode.value !== 'month') return emit('range', [d[0], d[d.length - 1]]);
+  const a = fromIso(anchor.value); a.setDate(1); const b = new Date(a); b.setMonth(b.getMonth() + 1); b.setDate(0);
+  emit('range', [isoDay(a), isoDay(b)]);
+}, { immediate: true });
 const items = computed(() => occurrences(days.value[0], days.value[days.value.length - 1]).filter(x => props.filter(x.task)));
 const title = computed(() => {
   const a = fromIso(days.value[0]);
@@ -48,7 +61,6 @@ const step = n => { anchor.value = mode.value === 'month' ? (() => { const d = f
 const goToday = () => { anchor.value = today(); nextTick(scrollToNow); };
 
 // ---------- time grid layout ----------
-const allDay = d => items.value.filter(x => x.date === d && !x.task.time);
 // Timed items with side-by-side lanes when they overlap.
 function timed(d) {
   const list = items.value.filter(x => x.date === d && x.task.time).map(x => {
@@ -69,17 +81,26 @@ function timed(d) {
   return list;
 }
 const boxStyle = x => ({
-  top: `${((x.s - startH.value * 60) / 60) * HOUR}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR - 2)}px`,
-  left: `calc(${(x.lane / x.lanes) * 100}% + 2px)`, width: `calc(${100 / x.lanes}% - 4px)`, '--k': KINDS[x.task.kind]?.color,
+  top: `${((x.s - startH.value * 60) / 60) * HOUR.value}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR.value - 2)}px`,
+  left: `calc(${(x.lane / x.lanes) * 100}% + 2px)`, width: `calc(${100 / x.lanes}% - 4px)`, '--k': catColor(x.task),
 });
-const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR);
+const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR.value);
 // Full size, no inner scrolling: show 7 AM to 10 PM, widened to fit anything earlier or later.
 const startH = computed(() => Math.min(7, ...items.value.filter(x => x.task.time).map(x => Math.floor(toMins(x.task.time) / 60))));
 const endH = computed(() => Math.max(22, ...items.value.filter(x => x.task.time).map(x => Math.min(24, Math.ceil((toMins(x.task.time) + (x.task.mins || 45)) / 60)))));
 const hours = computed(() => Array.from({ length: endH.value - startH.value }, (_, i) => startH.value + i));
 const hourLabel = h => (h === startH.value ? '' : timeLabel(fromMins(h * 60)).replace(':00', ''));
 const grid = ref(null);
-function scrollToNow() { if (grid.value) grid.value.scrollTop = Math.max(0, nowTop.value - HOUR * 2.5); }
+function scrollToNow() { if (grid.value) grid.value.scrollTop = Math.max(0, nowTop.value - HOUR.value * 2.5); }
+// Everything around the hours or the month cells, so the rest can fill `fill`.
+function measureOver() {
+  if (!props.fill || !root.value) return;
+  const inner = mode.value === 'month' ? monthEl.value : grid.value;
+  if (!inner) return;
+  const v = root.value.offsetHeight - inner.offsetHeight;
+  if (Math.abs(v - over.value) > 1) over.value = v;
+}
+onUpdated(measureOver);
 
 // ---------- month layout ----------
 const monthOf = computed(() => fromIso(anchor.value).getMonth());
@@ -114,7 +135,7 @@ function newAt(e, date, timedClick) {
   let time = '';
   if (timedClick) {
     const r = e.currentTarget.getBoundingClientRect();
-    const mins = Math.floor((((e.clientY - r.top) / HOUR) * 60 + startH.value * 60) / 30) * 30;
+    const mins = Math.floor((((e.clientY - r.top) / HOUR.value) * 60 + startH.value * 60) / 30) * 30;
     time = fromMins(Math.min(23 * 60 + 30, Math.max(0, mins)));
   }
   pop.value = { kind: 'new', date, time };
@@ -174,7 +195,7 @@ function dropOn(e, date, timedDrop) {
   if (timedDrop) {
     const r = e.currentTarget.getBoundingClientRect();
     const grab = Number(e.dataTransfer.getData('grab') || 0);
-    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR) * 60 + startH.value * 60) / 15) * 15)));
+    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR.value) * 60 + startH.value * 60) / 15) * 15)));
   } else if (!timedDrop && mode.value !== 'month') t.time = '';
   if (!t.repeat) t.date = date;
   setTimeout(() => { dragging.value = null; }, 0);
@@ -196,17 +217,18 @@ onMounted(() => {
   tick = setInterval(() => { clock.value = new Date(); }, 60000);
   document.addEventListener('keydown', onKey);
   document.addEventListener('mousedown', outside);
-  nextTick(scrollToNow);
+  nextTick(() => { scrollToNow(); measureOver(); });
 });
 onUnmounted(() => { clearInterval(tick); document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', outside); });
-watch(mode, () => { pop.value = null; nextTick(scrollToNow); });
+watch(mode, () => { pop.value = null; nextTick(() => { scrollToNow(); measureOver(); }); });
+watch(() => props.fill, () => nextTick(measureOver));
 const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString('en-US', { weekday: 'short' }), num: x.getDate() }; };
 </script>
 
 <template>
-  <div class="cal" data-test="calendar">
+  <div ref="root" class="cal" data-test="calendar">
     <div class="cal-bar">
-      <button type="button" class="btn small" title="Today (T)" @click="goToday">Today</button>
+      <button v-if="listHidden" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="emit('list')"><Icon name="list" :size="16" /></button>
       <span class="cal-nav">
         <button type="button" class="ibtn ghost" :title="`Previous ${mode}`" :aria-label="`Previous ${mode}`" @click="step(-1)"><Icon name="left" /></button>
         <button type="button" class="ibtn ghost" :title="`Next ${mode}`" :aria-label="`Next ${mode}`" @click="step(1)"><Icon name="right" /></button>
@@ -218,11 +240,11 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
     </div>
 
     <!-- Month -->
-    <div v-if="mode === 'month'" class="cal-month" data-test="cal-month">
+    <div v-if="mode === 'month'" ref="monthEl" class="cal-month" :class="{ fill: monthFill }" :style="monthFill ? { minHeight: `${monthFill}px` } : {}" data-test="cal-month">
       <span v-for="n in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="n" class="cal-mhead">{{ n }}</span>
       <div v-for="d in days" :key="d" class="cal-mcell" :class="{ other: fromIso(d).getMonth() !== monthOf, today: d === today() }" @click.self="newAt($event, d, false)" @dragover.prevent @drop="dropOn($event, d, false)">
         <button type="button" class="cal-mnum" :aria-label="`Open ${d}`" @click="openDay(d)">{{ fromIso(d).getDate() }}</button>
-        <button v-for="x in monthItems(d).slice(0, 3)" :key="x.key" type="button" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': KINDS[x.task.kind]?.color }" draggable="true" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
+        <button v-for="x in monthItems(d).slice(0, 3)" :key="x.key" type="button" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': catColor(x.task) }" draggable="true" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
           <i />{{ x.task.time ? `${timeLabel(x.task.time).replace(':00', '').replace(' ', '').toLowerCase()} ` : '' }}{{ x.task.title }}
         </button>
         <button v-if="monthItems(d).length > 3" type="button" class="cal-more" @click="openDay(d)">{{ monthItems(d).length - 3 }} more</button>
@@ -237,12 +259,6 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
         <button v-for="d in days" :key="d" type="button" class="cal-dh" :class="{ today: d === today() }" @click="openDay(d)">
           <span>{{ dayHead(d).name }}</span><b>{{ dayHead(d).num }}</b>
         </button>
-      </div>
-      <div class="cal-allday" :style="{ '--cols': days.length }">
-        <span class="cal-gutter small muted">All day</span>
-        <div v-for="d in days" :key="d" class="cal-allday-cell" @click.self="newAt($event, d, false)" @dragover.prevent @drop="dropOn($event, d, false)">
-          <button v-for="x in allDay(d)" :key="x.key" type="button" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': KINDS[x.task.kind]?.color }" draggable="true" @dragstart="dragStart($event, x)" @click="openItem($event, x)">{{ x.task.title }}</button>
-        </div>
       </div>
       <div ref="grid" class="cal-grid" :style="{ '--cols': days.length, '--hour': `${HOUR}px` }" data-test="cal-grid">
         <div class="cal-hours">
@@ -272,7 +288,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           </form>
           <div v-if="unscheduled.length" class="cal-pop-sec">
             <p class="label">Schedule here</p>
-            <button v-for="t in unscheduled" :key="t.id" type="button" class="cal-pick" :style="{ '--k': KINDS[t.kind]?.color }" @click="scheduleHere(t)"><i />{{ t.title }}<Icon name="plus" :size="14" /></button>
+            <button v-for="t in unscheduled" :key="t.id" type="button" class="cal-pick" :style="{ '--k': catColor(t) }" @click="scheduleHere(t)"><i />{{ t.title }}<Icon name="plus" :size="14" /></button>
           </div>
           <div class="cal-pop-sec">
             <button v-if="ai.enabled" type="button" class="ibtn ai" :disabled="thinking" data-test="cal-ai" @click="aiIdeas"><Icon name="sparkle" :size="14" />{{ thinking ? 'Thinking…' : 'Ideas for this slot' }}</button>
@@ -281,7 +297,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           </div>
         </template>
         <template v-else-if="cur">
-          <div class="cal-pop-head" :style="{ '--k': KINDS[cur.task.kind]?.color }">
+          <div class="cal-pop-head" :style="{ '--k': catColor(cur.task) }">
             <span class="cal-pop-kind"><i />{{ KINDS[cur.task.kind]?.label }}<template v-if="cur.task.project"> · #{{ cur.task.project }}</template></span>
             <button type="button" class="ibtn ghost" title="Close" aria-label="Close" @click="pop = null"><Icon name="x" /></button>
           </div>

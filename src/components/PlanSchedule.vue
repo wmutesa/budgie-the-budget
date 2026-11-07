@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, fromIso, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
-import { nav } from '../lib/nav';
+import { catKey, catLabel, catColor } from '../lib/cats';
+import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
 import TaskEditor from './TaskEditor.vue';
 import PlanCalendar from './PlanCalendar.vue';
@@ -10,15 +11,16 @@ import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
 import { placeFree, unplace } from '../lib/schedule';
 
-// Schedule: the day's activity on the left, grouped by category, and a time
-// line on the right with one column per category.
+// Schedule: the activity for the day, week or month on the left, grouped by
+// category, and on the right the day's time line (one column per category)
+// or the week and month calendar, stretched to the list's height.
 const emit = defineEmits(['view']);
 // The day shown; others (search, the review) can open a day here.
 const day = computed({ get: () => nav.day || today(), set: v => { nav.day = v === today() ? '' : v; } });
 const clock = ref(new Date());
 let tick = null;
-onMounted(() => { tick = setInterval(() => { clock.value = new Date(); }, 30000); nextTick(scrollToStart); });
-onUnmounted(() => clearInterval(tick));
+onMounted(() => { tick = setInterval(() => { clock.value = new Date(); }, 30000); nextTick(scrollToStart); window.addEventListener('resize', measure); });
+onUnmounted(() => { clearInterval(tick); ro?.disconnect(); window.removeEventListener('resize', measure); });
 const isToday = computed(() => day.value === today());
 const dateLabel = computed(() => fromIso(day.value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
 const step = n => { day.value = addDays(day.value, n); };
@@ -37,32 +39,80 @@ const range = computed({ get: () => (['week', 'month'].includes(store.planner.ca
 const openDayFromCal = d => { day.value = d; range.value = 'day'; nextTick(scrollToStart); };
 
 // ---------- categories: your #projects, or the kind of thing ----------
-const PALETTE = ['#7c3aed', '#0ea5e9', '#f59e0b', '#16a34a', '#e11d48', '#6366f1'];
-const catOf = t => (t.project ? `#${t.project}` : KINDS[t.kind]?.label || 'Task');
+// The week or month the calendar shows, so the list can follow it.
+const calRange = ref([today(), today()]);
+const span = computed(() => (range.value === 'day' ? [day.value, day.value] : calRange.value));
 const items = computed(() => occurrences(day.value, day.value));
-const cats = computed(() => {
+const spanItems = computed(() => (range.value === 'day' ? items.value : occurrences(span.value[0], span.value[1])));
+// Over a week or month, something that repeats is one row with how many times it was done.
+const rows = computed(() => {
+  if (range.value === 'day') return spanItems.value;
+  const seen = new Map(); const out = [];
+  for (const x of spanItems.value) {
+    if (!x.task.repeat) { out.push(x); continue; }
+    let r = seen.get(x.task.id);
+    if (!r) { r = { ...x, key: `r-${x.task.id}`, times: 0, timesDone: 0, summary: true }; seen.set(x.task.id, r); out.push(r); }
+    r.times++; if (x.done) r.timesDone++;
+  }
+  return out;
+});
+const groupCats = list => {
   const m = new Map();
-  for (const x of items.value) {
-    const k = catOf(x.task);
-    if (!m.has(k)) m.set(k, { key: k, project: x.task.project || '', kind: x.task.project ? '' : x.task.kind, list: [] });
+  for (const x of list) {
+    const k = catKey(x.task);
+    if (!m.has(k)) m.set(k, { key: k, label: catLabel(x.task), color: catColor(x.task), list: [] });
     m.get(k).list.push(x);
   }
-  let i = 0;
   return [...m.values()]
     .sort((a, b) => b.list.length - a.list.length || a.key.localeCompare(b.key))
-    .map(c => ({ ...c, label: c.project || c.key, color: c.project ? store.projects[c.project]?.color || PALETTE[i++ % PALETTE.length] : KINDS[c.kind]?.color || '#52525b', done: c.list.filter(x => x.done).length }));
+    .map(c => ({ ...c, all: c.list.reduce((n, x) => n + (x.summary ? x.times : 1), 0), done: c.list.reduce((n, x) => n + (x.summary ? x.timesDone : x.done ? 1 : 0), 0) }));
+};
+const cats = computed(() => groupCats(rows.value));
+const dayCats = computed(() => groupCats(items.value));
+const colorOf = key => dayCats.value.find(c => c.key === key)?.color || '#52525b';
+const progress = computed(() => { const all = spanItems.value.length; const done = spanItems.value.filter(x => x.done).length; return { all, done, pct: all ? Math.round((done / all) * 100) : 0 }; });
+const listTitle = computed(() => {
+  if (range.value === 'day') return isToday.value ? 'Today' : dateLabel.value;
+  const [a] = span.value; const t = today();
+  if (range.value === 'month') return fromIso(a).toLocaleDateString('en-US', { month: 'long' });
+  return a <= t && t <= span.value[1] ? 'This week' : `Week of ${fromIso(a).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 });
-const colorOf = key => cats.value.find(c => c.key === key)?.color || '#52525b';
-const progress = computed(() => { const all = items.value.length; const done = items.value.filter(x => x.done).length; return { all, done, pct: all ? Math.round((done / all) * 100) : 0 }; });
+// Over a week or month, categories start folded so the list stays a summary.
+const openCats = ref(new Set());
+const folded = c => range.value !== 'day' && !openCats.value.has(c.key);
+const flip = c => { const s = new Set(openCats.value); s.has(c.key) ? s.delete(c.key) : s.add(c.key); openCats.value = s; };
+const rowDate = x => fromIso(x.date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+
+// ---------- the calendar is as tall as the list beside it ----------
+const listEl = ref(null);
+const headEl = ref(null);
+const listH = ref(0);
+const headH = ref(0);
+let ro = null;
+function measure() {
+  const side = typeof window !== 'undefined' && window.innerWidth > 900;
+  listH.value = side && listOpen.value && listEl.value ? listEl.value.offsetHeight : 0;
+  headH.value = headEl.value?.offsetHeight || 0;
+}
+watch(listEl, (el, old) => {
+  if (typeof ResizeObserver === 'undefined') return;
+  ro ??= new ResizeObserver(measure);
+  if (old) ro.unobserve(old);
+  if (el) ro.observe(el);
+  measure();
+});
+watch([listOpen, range], () => nextTick(measure));
 
 // ---------- the time line ----------
-const HOUR = 64;
-const timedAll = computed(() => items.value.filter(x => x.task.time).map(x => { const s = toMins(x.task.time); return { ...x, s, e: s + Math.max(15, x.task.mins || 30), cat: catOf(x.task) }; }));
+const BASE = 64;
+// Taller hours when the list is taller than the day; 34px is the grid's top and bottom padding.
+const HOUR = computed(() => Math.max(BASE, Math.floor((listH.value - headH.value - 34) / Math.max(1, hours.value.length - 1))));
+const timedAll = computed(() => items.value.filter(x => x.task.time).map(x => { const s = toMins(x.task.time); return { ...x, s, e: s + Math.max(15, x.task.mins || 30), cat: catKey(x.task) }; }));
 // Up to four columns; the rest share "Other".
 const columns = computed(() => {
-  const keys = cats.value.filter(c => timedAll.value.some(x => x.cat === c.key)).map(c => c.key);
+  const keys = dayCats.value.filter(c => timedAll.value.some(x => x.cat === c.key)).map(c => c.key);
   const shown = keys.length > 4 ? keys.slice(0, 3) : keys;
-  const cols = shown.map(k => ({ key: k, label: cats.value.find(c => c.key === k).label, color: colorOf(k) }));
+  const cols = shown.map(k => ({ key: k, label: dayCats.value.find(c => c.key === k).label, color: colorOf(k) }));
   if (keys.length > 4) cols.push({ key: '*other', label: 'Other', color: '#71717a' });
   if (!cols.length) cols.push({ key: '*all', label: 'Your day', color: '#7c3aed' });
   return cols;
@@ -86,18 +136,18 @@ function laid(key) {
   return list;
 }
 const boxStyle = x => ({
-  top: `${((x.s - startH.value * 60) / 60) * HOUR + 2}px`,
-  height: `${Math.max(26, ((x.e - x.s) / 60) * HOUR - 4)}px`,
+  top: `${((x.s - startH.value * 60) / 60) * HOUR.value + 2}px`,
+  height: `${Math.max(26, ((x.e - x.s) / 60) * HOUR.value - 4)}px`,
   left: `calc(${(x.lane / x.lanes) * 100}% + 6px)`, width: `calc(${100 / x.lanes}% - 12px)`,
-  '--c': colorOf(x.cat) === '#52525b' ? '#7c3aed' : colorOf(x.cat),
+  '--c': catColor(x.task),
 });
 const hhmm = m => fromMins(m);
-const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR);
+const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR.value);
 const grid = ref(null);
 function scrollToStart() {
   if (!grid.value) return;
   const first = timedAll.value.length ? Math.min(...timedAll.value.map(x => x.s)) : 8 * 60;
-  const target = isToday.value ? Math.min(nowTop.value - HOUR, ((first - startH.value * 60) / 60) * HOUR) : ((first - startH.value * 60) / 60) * HOUR;
+  const target = isToday.value ? Math.min(nowTop.value - HOUR.value, ((first - startH.value * 60) / 60) * HOUR.value) : ((first - startH.value * 60) / 60) * HOUR.value;
   grid.value.scrollTop = Math.max(0, target - 12);
 }
 const dur = m => { const n = m || 0; return n ? `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` : ''; };
@@ -137,24 +187,25 @@ const tickX = x => toggleDone(x.task, x.date);
       <div v-if="calOpen" class="sch-cal-pop"><PlanCalendars /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
     </div>
 
-    <PlanCalendar v-if="range !== 'day'" embedded class="sch-cal" @day="openDayFromCal" @focus="emit('view', 'Focus')" />
-    <div v-else class="sch-body">
-      <section v-if="listOpen" class="sch-list" aria-label="Activity">
+    <div class="sch-body">
+      <section v-if="listOpen" ref="listEl" class="sch-list" aria-label="Activity" data-test="sch-list">
         <div class="sch-list-head">
-          <div><h3>{{ isToday ? 'Today' : dateLabel }} activity</h3><p class="muted small">{{ hello }} {{ progress.done }} of {{ progress.all }} done.</p></div>
+          <div><h3>{{ listTitle }} activity</h3><p class="muted small">{{ hello }} {{ progress.done }} of {{ progress.all }} done.</p></div>
           <button type="button" class="sch-icon" title="Hide the list" aria-label="Hide the list" @click="listOpen = false"><Icon name="collapse" :size="16" /></button>
         </div>
         <span class="sch-prog" role="img" :aria-label="`${progress.pct}% done`"><i :style="{ width: `${progress.pct}%` }" /></span>
-        <button type="button" class="sch-plan" data-test="plan-day" @click="planDay">Plan my day <Icon name="sparkle" :size="15" /></button>
+        <button v-if="range === 'day'" type="button" class="sch-plan" data-test="plan-day" @click="planDay">Plan my day <Icon name="sparkle" :size="15" /></button>
 
         <div v-for="c in cats" :key="c.key" class="sch-group" :style="{ '--c': c.color }" :data-cat="c.label">
-          <h4><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.list.length }}</span></h4>
-          <ul>
+          <h4 v-if="range === 'day'"><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.all }}</span></h4>
+          <h4 v-else><button type="button" class="sch-fold" :aria-expanded="!folded(c)" data-test="sch-fold" @click="flip(c)"><i />{{ c.label }}<span class="sch-fold-bar"><b :style="{ width: `${c.all ? Math.round((c.done / c.all) * 100) : 0}%` }" /></span><span class="muted">{{ c.done }}/{{ c.all }}</span><Icon name="right" :size="13" class="sch-fold-ic" /></button></h4>
+          <ul v-if="!folded(c)">
             <li v-for="x in c.list" :key="x.key" class="sch-row" :class="{ done: x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
-              <button type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
+              <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
+              <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
                 <span class="sch-row-t">{{ x.task.title }}</span>
-                <span class="sch-tags"><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
+                <span class="sch-tags"><span v-if="range !== 'day'" class="sch-tag">{{ x.summary ? 'Repeats' : rowDate(x) }}</span><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
               </span>
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
               <button type="button" class="sch-icon" :aria-expanded="editRow === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" @click="editRow = editRow === x.key ? '' : x.key"><Icon name="more" :size="16" /></button>
@@ -163,13 +214,14 @@ const tickX = x => toggleDone(x.task, x.date);
           </ul>
         </div>
         <div v-if="!cats.length" class="sch-empty">
-          <p><b>Nothing planned{{ isToday ? ' today' : '' }}.</b></p>
+          <p><b>Nothing planned{{ range === 'day' ? (isToday ? ' today' : '') : range === 'week' ? ' this week' : ' this month' }}.</b></p>
           <p class="muted small">Tap <b>Add</b> and say what is coming up.</p>
         </div>
       </section>
 
-      <section class="sch-time" aria-label="Time line">
-        <div class="sch-cols-head" :style="{ '--n': columns.length }">
+      <PlanCalendar v-if="range !== 'day'" embedded class="sch-cal" :fill="listH" :class="{ 'with-list': listOpen }" @day="openDayFromCal" @focus="go('Focus')" @range="r => (calRange = r)" @list="listOpen = true" :list-hidden="!listOpen" />
+      <section v-else class="sch-time" aria-label="Time line">
+        <div ref="headEl" class="sch-cols-head" :style="{ '--n': columns.length }">
           <span class="sch-axis-h"><button v-if="!listOpen" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="listOpen = true"><Icon name="list" :size="16" /></button><template v-else>{{ isToday ? 'Today' : fromIso(day).toLocaleDateString('en-US', { weekday: 'short' }) }}</template></span>
           <span v-for="col in columns" :key="col.key" class="sch-col-h">{{ col.label }}<i :style="{ background: col.color }" /></span>
         </div>

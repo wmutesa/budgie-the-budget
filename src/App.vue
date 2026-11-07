@@ -8,6 +8,7 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
+import FocusView from './components/FocusView.vue';
 import CaptureButton from './components/CaptureButton.vue';
 import CaptureReview from './components/CaptureReview.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
@@ -22,10 +23,10 @@ import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
-// Two pages: Overview (your day and goals) and Planner (schedule, tasks,
-// focus). The Add button adds anything from anywhere.
+// Three pages: Overview (your day and goals), Planner (schedule, tasks,
+// agenda) and Focus (what matters now). The Add button adds anything from anywhere.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Planner: 'planner' };
+const PAGE_ICONS = { Overview: 'home', Planner: 'planner', Focus: 'target' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -88,7 +89,7 @@ onUnmounted(() => clearInterval(timer));
           <span class="muted small nb-date">{{ today }}</span>
         </div>
         <nav class="nb-pages" aria-label="Pages">
-          <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" @click="active = p">
+          <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase()}`" @click="active = p">
             <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
           </button>
         </nav>
@@ -104,6 +105,9 @@ onUnmounted(() => clearInterval(timer));
       </template>
       <template v-else-if="active === 'Planner'">
         <PlannerView />
+      </template>
+      <template v-else-if="active === 'Focus'">
+        <FocusView />
       </template>
     </main>
 

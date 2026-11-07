@@ -2857,3 +2857,45 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .pln-top .ibtn, .pln-timer .ibtn, .pln-now .ibtn, .pln-focusbar .ibtn { width: 36px !important; height: 36px !important; min-width: 36px; padding: 0 !important; border-radius: 50% !important; display: inline-grid !important; place-items: center; }
 .pln-filter .pln-cols-bar { margin-left: auto; }
 .pln-filter { align-items: center; }
+
+/* ---------- Focus page: suggestions are the right side bar, top to bottom ---------- */
+.fcs { grid-template-columns: minmax(0, 1fr) 360px !important; align-items: stretch; }
+.fcs-main { min-width: 0; display: grid; align-content: start; }
+.fcs-side { border-left: 1px solid var(--line); background: #fcfcfd; min-width: 0; }
+.fcs-side .pln-card { border-bottom: 0; position: sticky; top: 0; }
+@media (max-width: 900px) {
+  .fcs { grid-template-columns: minmax(0, 1fr) !important; }
+  .fcs-side { border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* ---------- Schedule: the list sits beside day, week and month; the calendar grows to its height ---------- */
+.sch-list { align-self: start; border-right: 0 !important; }
+.sch-body > .sch-time, .sch-body > .sch-cal { align-self: start; border-left: 1px solid #e4e4e7 !important; min-width: 0; }
+.sch.no-list .sch-body > .sch-time, .sch.no-list .sch-body > .sch-cal { border-left: 0 !important; }
+.sch-body > .sch-cal { padding: 12px 16px 16px; }
+.sch-count { flex: none; min-width: 30px; height: 18px; margin-top: 1px; padding: 0 4px; display: inline-grid; place-items: center; font: 600 11px var(--mono, var(--sans)); color: var(--c, #52525b); background: color-mix(in srgb, var(--c, #52525b) 10%, #fff); }
+.cal-month.fill { grid-template-rows: auto repeat(6, minmax(0, 1fr)); }
+.cal-month.fill .cal-mcell { min-height: 0; }
+@media (max-width: 900px) {
+  .sch-body > .sch-time, .sch-body > .sch-cal { border-left: 0 !important; border-top: 1px solid #e4e4e7; }
+  .sch-list { border-bottom: 0 !important; }
+}
+.sch-fold { all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; }
+.sch-fold i { width: 8px; height: 8px; background: var(--c); flex: none; }
+.sch-fold:focus-visible { outline: 2px solid var(--violet); outline-offset: 2px; }
+.sch-fold-bar { flex: 1; min-width: 30px; height: 4px; background: #f4f4f5; margin-left: auto; }
+.sch-fold-bar b { display: block; height: 100%; background: var(--c); }
+.sch-fold .muted { margin-left: 0 !important; }
+.sch-fold-ic { flex: none; transition: transform .15s; } .sch-fold[aria-expanded="true"] .sch-fold-ic { transform: rotate(90deg); }
+/* Search results grow leftwards when the search box is narrow, never past the screen */
+@media (min-width: 761px) { .gs-pop { left: auto; right: 0; width: 100%; } }
+/* Focus page: tick buttons a softer black, full black on hover or press */
+.fcs .ibtn.primary { background: #3f3f46; border-color: #3f3f46; transition: background .15s, border-color .15s; }
+.fcs .ibtn.primary:hover, .fcs .ibtn.primary:active, .fcs .ibtn.primary:focus-visible { background: #000; border-color: #000; }
+/* Icon-only buttons (task and agenda rows, the calendar card, Focus) are full circles */
+.ibtn[aria-label] { border-radius: 50% !important; padding: 0 !important; aspect-ratio: 1; flex: none; }
+/* Overview: the two actions sit apart from the summary and from each other, a little larger */
+.brief-acts { display: flex !important; flex-wrap: wrap; gap: 12px !important; margin-top: 24px !important; }
+.brief-acts .btn { height: 42px !important; padding: 0 18px !important; font-size: 14px !important; gap: 8px; }
+.fcs .pln-idea-acts .ibtn.primary { background: #3f3f46 !important; border-color: #3f3f46 !important; }
+.fcs .pln-idea-acts .ibtn.primary:hover, .fcs .pln-idea-acts .ibtn.primary:active, .fcs .pln-idea-acts .ibtn.primary:focus-visible { background: #000 !important; border-color: #000 !important; }

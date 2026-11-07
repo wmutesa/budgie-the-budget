@@ -64,8 +64,8 @@ const nextStep = computed(() => {
       <template v-if="nextStep">{{ nextStep.text }}<template v-if="nextStep.what">{{ ' ' }}<b>{{ nextStep.what }}</b> <span class="lede-note">({{ nextStep.note }})</span></template>. </template>
     </p>
     <p class="brief-acts">
-      <button type="button" class="btn small primary" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="14" />Add something</button>
-      <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="14" />Open Planner</button>
+      <button type="button" class="btn small primary" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="16" />Add something</button>
+      <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="16" />Open Planner</button>
     </p>
   </section>
   <section class="card cell" data-test="today-list">

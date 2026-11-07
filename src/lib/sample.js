@@ -4,13 +4,17 @@ import { store, newId } from './store';
 import { makeTask, today, addDays, fromIso, isoDay } from './tasks';
 import { ruleMilestones, GOAL_COLORS } from './goals';
 
-const PROJECTS = { Chemistry: '#7c3aed', English: '#0ea5e9', Work: '#f59e0b', Health: '#16a34a', Personal: '#e11d48' };
+const PROJECTS = {
+  Chemistry: '#7c3aed', English: '#0ea5e9', Work: '#f59e0b', Health: '#16a34a', Personal: '#e11d48',
+  Calculus: '#6366f1', History: '#a16207', Spanish: '#db2777', Finance: '#0d9488', Family: '#ea580c',
+  Music: '#9333ea', 'Side project': '#0891b2', Volunteering: '#65a30d', Home: '#64748b',
+};
 const pick = (list, i) => list[i % list.length];
 
 export const hasSample = () => store.tasks.some(t => t.sample) || store.goals.some(g => g.sample);
 
 // `size` is roughly how many one-off tasks to spread over the past and next few weeks.
-export function addSample(size = 240) {
+export function addSample(size = 420) {
   removeSample();
   const d0 = today();
   const out = [];
@@ -23,7 +27,14 @@ export function addSample(size = 240) {
   add({ title: 'Team stand-up', kind: 'event', project: 'Work', time: '09:00', mins: 15, repeat: { every: 'weekdays' }, date: addDays(d0, -21) });
   add({ title: 'Gym', kind: 'routine', project: 'Health', time: '18:00', mins: 60, repeat: { every: 'week', days: [1, 3, 5] }, date: addDays(d0, -21) });
   add({ title: 'Read before bed', kind: 'routine', project: 'Personal', time: '22:00', mins: 30, repeat: { every: 'day' }, date: addDays(d0, -21) });
-  add({ title: 'Call home', kind: 'routine', project: 'Personal', time: '17:00', mins: 30, repeat: { every: 'week', days: [0] }, date: addDays(d0, -21) });
+  add({ title: 'Call home', kind: 'routine', project: 'Family', time: '17:00', mins: 30, repeat: { every: 'week', days: [0] }, date: addDays(d0, -21) });
+  add({ title: 'MATH 201 lecture', kind: 'class', project: 'Calculus', time: '08:30', mins: 50, repeat: { every: 'week', days: [1, 3, 5] }, date: addDays(d0, -21), notes: 'Hall B' });
+  add({ title: 'HIST 140 discussion', kind: 'class', project: 'History', time: '11:00', mins: 50, repeat: { every: 'week', days: [2, 4] }, date: addDays(d0, -21) });
+  add({ title: 'Spanish practice', kind: 'routine', project: 'Spanish', time: '07:30', mins: 15, repeat: { every: 'day' }, date: addDays(d0, -21) });
+  add({ title: 'Piano practice', kind: 'routine', project: 'Music', time: '19:30', mins: 30, repeat: { every: 'week', days: [1, 2, 4] }, date: addDays(d0, -21) });
+  add({ title: 'Food bank shift', kind: 'event', project: 'Volunteering', time: '10:00', mins: 180, repeat: { every: 'week', days: [6] }, date: addDays(d0, -21) });
+  add({ title: 'Check spending', kind: 'routine', project: 'Finance', time: '20:30', mins: 15, repeat: { every: 'week', days: [0] }, date: addDays(d0, -21) });
+  add({ title: 'Laundry', kind: 'routine', project: 'Home', time: '16:00', mins: 45, repeat: { every: 'week', days: [6] }, date: addDays(d0, -21) });
   // Ticked days, so streaks show.
   for (const t of out) {
     if (!t.repeat) continue;
@@ -43,6 +54,10 @@ export function addSample(size = 240) {
   add({ title: 'Give feedback on the design', kind: 'task', project: 'Work', date: d0, time: '15:40', mins: 20 });
   add({ title: 'Buy groceries', kind: 'task', project: 'Personal', date: d0 });
   add({ title: 'Reply to the advisor', kind: 'task', project: 'English', date: d0, done: true, doneAt: new Date().toISOString() });
+  add({ title: 'Calculus problem set 8', kind: 'assignment', project: 'Calculus', date: d0, time: '14:00', mins: 60 });
+  add({ title: 'Pay the phone bill', kind: 'task', project: 'Finance', date: d0, priority: 'high' });
+  add({ title: 'Deploy the landing page', kind: 'task', project: 'Side project', date: d0, time: '19:00', mins: 45 });
+  add({ title: 'Message Grandma', kind: 'task', project: 'Family', date: d0 });
 
   // Many one-off items over the past two weeks and the next four.
   const ITEMS = [
@@ -51,12 +66,21 @@ export function addSample(size = 240) {
     ['Prepare the client slides', 'task', 'Work'], ['Update the budget sheet', 'task', 'Work'], ['One-on-one with Priya', 'event', 'Work'],
     ['Dentist appointment', 'event', 'Health'], ['Yoga class', 'event', 'Health'], ['Meal prep', 'task', 'Health'],
     ['Fix the bike', 'task', 'Personal'], ['Book the trip to Denver', 'task', 'Personal'], ['Birthday dinner for Leo', 'event', 'Personal'],
+    ['Derivatives worksheet', 'assignment', 'Calculus'], ['Calculus midterm', 'exam', 'Calculus'], ['Office hours with Dr. Ng', 'event', 'Calculus'],
+    ['Primary source analysis', 'assignment', 'History'], ['Read chapter 9', 'task', 'History'], ['History quiz', 'exam', 'History'],
+    ['Conversation club', 'event', 'Spanish'], ['Vocabulary list 12', 'task', 'Spanish'], ['Oral exam prep', 'task', 'Spanish'],
+    ['Review the monthly budget', 'task', 'Finance'], ['Transfer to savings', 'task', 'Finance'], ['File the tax form', 'task', 'Finance'],
+    ['Family dinner', 'event', 'Family'], ['Help Sam with homework', 'task', 'Family'], ['Video call with cousins', 'event', 'Family'],
+    ['Band rehearsal', 'event', 'Music'], ['Learn a new song', 'task', 'Music'], ['Recital', 'event', 'Music'],
+    ['Write the README', 'task', 'Side project'], ['Fix the login bug', 'task', 'Side project'], ['Ship version 0.2', 'task', 'Side project'],
+    ['Beach clean-up', 'event', 'Volunteering'], ['Tutor at the library', 'event', 'Volunteering'], ['Sort donations', 'task', 'Volunteering'],
+    ['Clean the kitchen', 'task', 'Home'], ['Water the plants', 'task', 'Home'], ['Call the landlord', 'task', 'Home'],
   ];
   for (let i = 0; i < size; i++) {
     const offset = (i * 7) % 43 - 14;               // -14 .. +28 days
     const date = addDays(d0, offset);
     const timed = i % 3 !== 0;
-    const [title, kind, project] = pick(ITEMS, i * 4 + 1);
+    const [title, kind, project] = pick(ITEMS, i * 13 + Math.floor(i / 43) * 7);
     add({
       title, kind, project, date,
       time: timed ? `${String(8 + (i % 12)).padStart(2, '0')}:${i % 2 ? '30' : '00'}` : '',
@@ -88,6 +112,8 @@ export function addSample(size = 240) {
   store.goals = [...goals, ...store.goals];
   const colors = { ...store.projects };
   for (const [p, c] of Object.entries(PROJECTS)) if (!colors[p]) colors[p] = { color: c, sample: true };
+  // Each goal's milestones share the goal's colour.
+  for (const g of goals) { const p = g.title.slice(0, 40); if (!colors[p]) colors[p] = { color: g.color, sample: true }; }
   store.projects = colors;
   return { tasks: out.length, goals: goals.length };
 }
