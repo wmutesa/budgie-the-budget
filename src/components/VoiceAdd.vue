@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onUnmounted } from 'vue';
-import { routeSpoken, sendAll, undoSend, DESTS } from '../lib/router';
+import { routeSpoken, sendAll, undoSend, switchMade, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { go } from '../lib/nav';
 import Icon from './Icon.vue';
@@ -27,6 +27,8 @@ const dict = useDictation({
 });
 const start = () => { error.value = ''; result.value = null; live.value = ''; dict.toggle(); };
 const undo = () => { undoSend(result.value); result.value = null; };
+// Switch one added item to another kind; keep the note open while you do.
+async function switchTo(i, dest) { clearTimeout(hide); result.value.made[i] = await switchMade(result.value.made[i], dest); }
 const open = to => { go(to === 'goal' ? 'Playground' : 'Planner', { anchor: to === 'goal' ? '#goals' : '' }); result.value = null; };
 onUnmounted(() => clearTimeout(hide));
 </script>
@@ -34,7 +36,7 @@ onUnmounted(() => clearTimeout(hide));
 <template>
   <span v-if="canDictate" class="voice">
     <button type="button" class="voice-btn" :class="{ on: dict.listening.value }" :aria-pressed="dict.listening.value" :title="dict.listening.value ? 'Stop and add' : 'Say anything to add it'" :aria-label="dict.listening.value ? 'Stop and add' : 'Add by voice'" data-test="voice" @click="start">
-      <span v-if="dict.listening.value" class="mic-stop" aria-hidden="true" />
+      <span v-if="dict.listening.value" class="mic-stop" aria-hidden="true"><i /></span>
       <svg v-else viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" fill="currentColor" /></svg>
     </button>
     <Teleport to="body">
@@ -51,6 +53,9 @@ onUnmounted(() => clearTimeout(hide));
             <button type="button" class="voice-item" :title="`Open ${DESTS[m.to].label}`" @click="open(m.to)">
               <Icon :name="DESTS[m.to].icon" :size="14" /><b>{{ m.label }}</b><span class="muted small">{{ m.sub }}</span><span class="voice-to">{{ DESTS[m.to].label }}</span>
             </button>
+            <span class="inbox-dests voice-switch" role="radiogroup" :aria-label="`What is ${m.label}`">
+              <button v-for="(d, id) in DESTS" :key="id" type="button" role="radio" class="inbox-dest" :class="[`to-${id}`, { on: m.to === id }]" :aria-checked="m.to === id" @click="switchTo(result.made.indexOf(m), id)"><Icon :name="d.icon" :size="12" />{{ d.label }}</button>
+            </span>
           </li>
         </ul>
         <div class="voice-acts">

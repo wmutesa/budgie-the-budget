@@ -47,12 +47,6 @@ watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCo
 // Skipping recovery codes cancels them so unseen codes cannot be used.
 const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* still hidden; they can be remade later */ } account.recoveryCodes = null; };
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
-// The + button opens the Playground inbox, ready to type.
-async function newThing() {
-  go('Playground', { anchor: '#inbox' });
-  await nextTick();
-  document.querySelector('[data-test="inbox-text"]')?.focus();
-}
 // Jump to a part of a page when something asks for it (search, notices).
 watch(() => [nav.page, nav.anchor], async ([, anchor]) => {
   if (!anchor) return;
@@ -96,7 +90,6 @@ onUnmounted(() => clearInterval(timer));
         </nav>
         <GlobalSearch />
         <div class="nb-actions">
-          <button class="btn primary small" data-test="new" title="Add anything" @click="newThing"><Icon name="plus" :size="14" />Add</button>
           <VoiceAdd />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />

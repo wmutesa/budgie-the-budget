@@ -176,6 +176,7 @@ await check('digests: topics come from goals, projects and studies, not a form',
   assert.ok(p.interests.includes('robotics') && p.interests.includes('embedded') && p.interests.includes('electrical'), p.interests.join());
   assert.ok(!p.interests.includes('digest') && !p.interests.includes('land'), 'filler words and the Digest project are skipped');
   assert.equal(profileFromAccount({}, { focus: 'AI policy news' }).focus, 'AI policy news', 'other digests follow their focus line');
+  assert.deepEqual(profileFromAccount({}).interests, ['students', 'scholarships'], 'My brief is filled in even before you add anything');
 });
 await check('digests: research from Gemini leads, free finds fill in', () => {
   const research = { lead: { kicker: 'Program · Rolling', headline: 'Open source mentorship for students', dek: 'Paid mentorship.', body: 'Details.', ctaLabel: 'Apply', ctaLink: 'https://example.org/mentor' },

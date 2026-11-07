@@ -111,6 +111,7 @@ async function main() {
 
     // The owner invites someone.
     await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="acct-tab-people"]');
     await owner.page.fill('.acct-invite .field', 'Alex');
     await owner.page.click('.acct-invite button');
     await owner.page.waitForSelector('.acct-link .field');
@@ -140,7 +141,7 @@ async function main() {
     // Digests: each person has their own, in one or more digests; written from their account data.
     const none = await getJSON(alex.page, '/api/digests');
     assert.equal(none.status, 200, 'signed-in people can list their digests');
-    assert.deepEqual(none.body, { editions: {} }, 'a new person has no digests');
+    assert.equal(none.body.editions.robotics, undefined, 'a new person has no other digests yet');
     const send = body => alex.page.evaluate(async b => { const r = await fetch('/api/digests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); return { status: r.status, body: await r.json() }; }, body);
     assert.equal((await send({ stream: { id: '../x' } })).status, 400, 'odd digest names are refused');
     const wrote = await send({ stream: { id: 'robotics', name: 'Robotics', focus: 'robotics internships' }, timeZone: 'America/New_York' });
@@ -151,7 +152,7 @@ async function main() {
     assert.equal(listed.robotics.length, 1, 'the edition is stored under its digest');
     assert.equal((await getJSON(alex.page, `/api/digests/robotics/${wrote.body.id}`)).body.name, 'Robotics', 'one edition can be read back');
     assert.equal(await alex.page.evaluate(async () => (await fetch('/api/digests/robotics', { method: 'DELETE' })).status), 200);
-    assert.deepEqual((await getJSON(alex.page, '/api/digests')).body.editions, {}, 'stopping a digest removes its editions');
+    assert.equal((await getJSON(alex.page, '/api/digests')).body.editions.robotics, undefined, 'stopping a digest removes its editions');
     assert.equal((await fetch(`${base}/api/digests`)).status, 401, 'digests are only for signed-in people');
 
     // An invite works only once.
@@ -161,6 +162,7 @@ async function main() {
     await late.context.close();
 
     // The owner adds a second device to their own account.
+    await owner.page.click('[data-test="acct-tab-security"]');
     await owner.page.click('.acct-sec-head button:has-text("Add a device")');
     await owner.page.waitForFunction(old => { const v = document.querySelector('.acct-link .field')?.value; return v && v !== old; }, inviteLink);
     const deviceLink = await owner.page.inputValue('.acct-link .field');
@@ -191,6 +193,7 @@ async function main() {
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
     await lost.page.click('[data-test="account"]');
+    await lost.page.click('[data-test="acct-tab-security"]');
     await lost.page.waitForSelector('[data-test="codes-left"]:has-text("7 unused codes")');
     await lost.page.click('[data-test="new-codes"]');
     await lost.page.waitForSelector('.acct-sheet .rc-list code');
@@ -201,9 +204,9 @@ async function main() {
     // The owner removes Alex, whose session stops working.
     await owner.page.click('.acct-sheet .icon-x');
     await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="acct-tab-people"]');
     const alexRow = owner.page.locator('.acct-sheet .acct-list li', { hasText: 'Alex' }).getByRole('button', { name: 'Remove' });
     await alexRow.waitFor();
-    await owner.page.waitForFunction(() => document.querySelector('[data-test="codes-left"]')?.textContent.trim());
     // Click until the server sees the removal (a click during a re-render can miss).
     let removed = false;
     for (let attempt = 0; attempt < 3 && !removed; attempt++) {
@@ -234,6 +237,7 @@ async function main() {
     const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
     assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');
     await owner.page.click('[data-test="account"]').catch(() => {});
+    await owner.page.click('[data-test="acct-tab-people"]');
     await owner.page.waitForSelector('.acct-invite .field');
     await owner.page.fill('.acct-invite .field', 'Sam');
     await owner.page.click('.acct-invite button');
@@ -247,6 +251,8 @@ async function main() {
     await sam.page.waitForSelector('[data-test="guide-skip"]');
     await sam.page.click('[data-test="guide-skip"]');
     await sam.page.click('[data-test="account"]');
+    await sam.page.click('[data-test="acct-tab-data"]');
+    assert.equal(await sam.page.$('[data-test="acct-tab-people"]'), null, 'members do not see People');
     sam.page.removeAllListeners('dialog');
     sam.page.once('dialog', d => d.accept('DELETE'));
     await sam.page.click('[data-test="delete-account"]');

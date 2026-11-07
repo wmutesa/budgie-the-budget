@@ -7,7 +7,7 @@ Budgie is a web app. There is nothing to download or install: open the Budgie ad
 1. Open the invite link you were sent and create a passkey. Your device asks for your fingerprint, face or PIN.
 2. Save your recovery codes, or skip them if your passkey syncs with iCloud Keychain or Google Password Manager.
 3. Follow the short tour. Your data syncs to your account, so you can open Budgie on any of your devices.
-4. On the **Digests** page, fill in your digest profile to get your first edition.
+4. Open the account menu (your avatar, top right): fill in **Profile**, and add a free Gemini key under **Digests & AI** for deeper research. **My brief** on the Digests page is written for you straight away.
 
 To use another device, open the account menu (your initial in the top bar), choose **Add a device**, and scan the QR code with that device.
 

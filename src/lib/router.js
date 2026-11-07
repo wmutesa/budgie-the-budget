@@ -59,12 +59,12 @@ export async function sendAll(list) {
     if (r.dest === 'goal') {
       const g = makeGoal({ title: r.goal.title, by: r.goal.by });
       await planGoal(g);
-      n.made.push({ to: 'goal', id: g.id, label: g.title, sub: `${g.milestones.length} milestones${g.by ? ` · by ${dayLabel(g.by)}` : ''}` });
+      n.made.push({ r, to: 'goal', id: g.id, label: g.title, sub: `${g.milestones.length} milestones${g.by ? ` · by ${dayLabel(g.by)}` : ''}` });
     } else {
       const routine = r.dest === 'routine';
       const t = makeTask({ title: p.title, date: p.date || (routine ? today() : ''), time: p.time, mins: p.mins, repeat: routine ? (p.repeat || { every: 'day' }) : null, priority: p.priority, project: p.project, kind: routine && p.kind === 'task' ? 'routine' : p.kind, source: 'playground' });
       store.tasks.unshift(t);
-      n.made.push({ to: r.dest, id: t.id, label: t.title, sub: preview({ ...r, task: { ...p, repeat: t.repeat } }, r.dest).split(' · ').slice(2).join(' · ') });
+      n.made.push({ r, to: r.dest, id: t.id, label: t.title, sub: preview({ ...r, task: { ...p, repeat: t.repeat } }, r.dest).split(' · ').slice(2).join(' · ') });
     }
     n[r.dest]++;
   }
@@ -76,4 +76,13 @@ export function undoSend(n) {
   const ids = new Set(n.made.map(m => m.id));
   store.goals = store.goals.filter(g => !ids.has(g.id));
   store.tasks = store.tasks.filter(t => !ids.has(t.id) && !ids.has(t.goalId));
+}
+
+// Switch something already added: a task becomes a routine or a goal, and so on.
+// Returns the new entry for the list of what was added.
+export async function switchMade(m, dest) {
+  if (m.to === dest || !m.r) return m;
+  undoSend({ made: [m] });
+  const out = await sendAll([{ ...m.r, dest }]);
+  return out.made[0];
 }

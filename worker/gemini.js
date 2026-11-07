@@ -5,6 +5,30 @@
 import { TAGS } from './digest.js';
 
 const MODEL = 'gemini-2.5-flash';
+const API = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+// Keys come in more than one format (the classic "AIza…" and newer ones with
+// dots), and pasting can add spaces or quotes. Tidy it, then only check that
+// it is a plausible token; Google decides whether it works.
+export const tidyKey = raw => String(raw || '').replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '');
+export const keyShapeOk = key => /^[A-Za-z0-9._~+\/=-]{20,256}$/.test(key);
+const googleSays = (status, j) => {
+  const m = String(j?.error?.message || '').slice(0, 160);
+  if (status === 429) return 'Gemini free limit reached for now';
+  if (status === 400 || status === 401 || status === 403) return `Google did not accept the key${m ? ` (${m})` : ''}`;
+  return `Gemini answered ${status}${m ? ` (${m})` : ''}`;
+};
+
+// Ask Google whether a key works, without spending a request on research.
+export async function checkKey(raw) {
+  const key = tidyKey(raw);
+  if (!keyShapeOk(key)) return { ok: false, message: 'That does not look like an API key. Copy it again from Google AI Studio.' };
+  const res = await fetch(`${API}/${MODEL}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
+  if (res.ok) return { ok: true, message: 'Google accepted the key. Your digests will be researched with Gemini.' };
+  const j = await res.json().catch(() => ({}));
+  if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Research resumes when it resets.' };
+  return { ok: false, message: googleSays(res.status, j) };
+}
 const https = u => typeof u === 'string' && /^https:\/\/[^\s<>"]+$/i.test(u) && u.length < 600;
 const text = (s, n) => String(s ?? '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
 const isoDate = s => (/^\d{4}-\d{2}-\d{2}$/.test(s || '') ? s : '');
@@ -23,14 +47,14 @@ Reply with one JSON object inside <digest></digest> tags and nothing after it:
 "action":{"text":the one thing to do this week,"link":https URL or ""},
 "sources":[{"title":string,"url":https URL}]}
 Plain text in every field, no markdown.`;
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const res = await fetch(`${API}/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.3 } }),
     signal: AbortSignal.timeout(90000),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(res.status === 429 ? 'Gemini free limit reached for now' : res.status === 400 || res.status === 403 ? 'Gemini did not accept the key' : `Gemini answered ${res.status}`);
+  if (!res.ok) throw new Error(googleSays(res.status, j));
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   const m = raw.match(/<digest>([\s\S]*?)<\/digest>/) || [null, raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)];
   let out;

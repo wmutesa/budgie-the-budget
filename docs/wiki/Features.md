@@ -21,11 +21,11 @@ Short newspapers to read, kept up to date on their own: a new edition every Mond
 - **Into your Planner:** deadlines in the next two weeks become Planner tasks (you can turn this off in your profile); any story can be added with one tap.
 
 ## Playground
-- **Inbox:** write or say anything, one thing per line. Budgie tells tasks (with dates, times and #projects), routines (anything that repeats) and goals ("I want to run a 10K by March") apart, and you can change each choice before adding.
+- **Inbox:** write or say anything. Budgie tells tasks (with dates, times and #projects), routines (anything that repeats) and goals ("I want to run a 10K by March") apart. Speaking adds everything as soon as you stop; typing adds on **Add**. Every added item has Task, Routine and Goal chips to switch it afterwards, and the whole batch can be undone.
 - **Goals:** each goal gets milestones spread out up to its date, as Planner tasks, from the AI or Budgie's rules. Ticking them moves the goal forward; link any other task to a goal from its editor.
 - **Routine:** give your wake and sleep times and a few words about your week; Budgie drafts a daily routine and you choose what to keep. Repeating items keep a streak.
 - **Projects:** every #project from your tasks, with a colour and a one-click rename.
 
 ## Voice and search
-- **Voice from anywhere:** tap the microphone in the top bar and say one or more things ("essay due Friday at 5, then gym every Monday at 6, and I want to read 12 books this year"). Budgie splits what you said and adds each one where it belongs, then shows what went where with Undo.
+- **Voice from anywhere:** tap the microphone in the top bar and say one or more things ("essay due Friday at 5, then gym every Monday at 6, and I want to read 12 books this year"). Budgie splits what you said and adds each one where it belongs, then shows what went where, with chips to switch any item and Undo.
 - **Search:** finds tasks, goals, digest stories, calendars and pages, and turns typed text into "add to Planner" or "set a goal". Press `/` to jump to it.

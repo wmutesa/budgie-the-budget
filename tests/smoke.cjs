@@ -146,7 +146,7 @@ async function run(url) {
   assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.trim())), ['Today', 'Planner', 'Digests', 'Playground'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
-  assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty[\s\S]*Playground/, 'an empty Today says how to start');
+  assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
   assert.doesNotMatch(await page.textContent('body'), /Net worth|Transactions|Subscriptions|Exchange rates|Emergency fund|Old shop/i, 'no money anywhere');
   await page.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await page.waitForTimeout(1200);
@@ -156,15 +156,22 @@ async function run(url) {
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today-empty.png` });
 
   // Playground: write anything; Budgie sorts tasks, routines and goals.
-  await page.click('[data-test="new"]');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.test), 'inbox-text', 'Add opens the inbox ready to type');
+  assert.equal(await page.$('[data-test="new"]'), null, 'there is no Add button in the top bar');
+  assert.ok(fakeAccount.digests.some(d => d.stream === 'main'), 'My brief is written on its own, even for an empty account');
+  await page.click(tab('Playground'));
   await page.fill('[data-test="inbox-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nI want to land a summer internship by March\nhaircut today');
   await page.waitForFunction(() => document.querySelectorAll('[data-test="inbox-rows"] li').length === 4);
   const dests = await page.$$eval('[data-test="inbox-rows"] li', rows => rows.map(r => r.querySelector('.inbox-dest.on').textContent.trim()));
   assert.deepEqual(dests, ['Task', 'Routine', 'Goal', 'Task'], 'each line is sorted');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/playground.png` });
   await page.click('[data-test="inbox-send"]');
-  assert.match(await page.textContent('[data-test="inbox-done"]'), /Added 2 tasks, 1 routine and 1 goal/, 'the inbox says what it added');
+  assert.match(await page.textContent('[data-test="inbox-done"]'), /Added 4 things/, 'the inbox says what it added');
+  // Switch something already added: the haircut becomes a routine, then back to a task.
+  const haircut = page.locator('[data-test="inbox-made"]', { hasText: 'Haircut' });
+  await haircut.locator('[data-test="made-routine"]').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-test="inbox-made"]')].some(li => /Haircut/.test(li.textContent) && li.classList.contains('to-routine')));
+  await page.locator('[data-test="inbox-made"]', { hasText: 'Haircut' }).locator('[data-test="made-task"]').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-test="inbox-made"]')].some(li => /Haircut/.test(li.textContent) && li.classList.contains('to-task')));
   // Goals: milestones are planned (by rules here) and land in the Planner.
   await page.waitForSelector('[data-test="goal"]');
   assert.match(await page.textContent('[data-test="goals"]'), /Land a summer internship[\s\S]*0 of 6 steps[\s\S]*by/, 'the goal gets six milestones and its date');
@@ -236,14 +243,19 @@ async function run(url) {
   await page.waitForSelector('[data-test="profile-you"]');
   await page.fill('[data-test="you-name"]', 'Sam');
   await page.fill('[data-test="you-study"]', 'Electrical Engineering');
-  await page.fill('[data-test="you-key"]', 'AIzaTestKey_000000000000000000000000000');
+  await page.click('[data-test="acct-tab-digests"]');
+  await page.fill('[data-test="you-key"]', ' "AIzaTestKey_000000000000000000000000000" ');
+  assert.equal(await page.inputValue('[data-test="you-key"]'), 'AIzaTestKey_000000000000000000000000000', 'spaces and quotes are cleaned off a pasted key');
   assert.equal(await page.getAttribute('[data-test="you-key"]', 'type'), 'password', 'the key is hidden');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/settings.png` });
   await page.keyboard.press('Escape');
   await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
 
-  // Digests: no form. Opening the page writes "My brief" from goals and projects, with the key.
+  // Digests: no form. My brief is always there; a fresh edition uses your profile and key.
   await page.click(tab('Digests'));
   await page.waitForSelector('[data-test="digest"]');
+  await page.click('[data-test="generate"]');
+  await page.waitForFunction(() => !document.querySelector('[data-test="digest-busy"]'));
   assert.equal(fakeAccount.lastWrite.stream.id, 'main', 'the main digest is written on its own');
   assert.equal(fakeAccount.lastWrite.me.study, 'Electrical Engineering', 'your profile is saved before the server writes');
   assert.match(fakeAccount.lastWrite.key, /^AIza/, 'the Gemini key is in your account for the server');
@@ -299,6 +311,7 @@ async function run(url) {
   await voice.click('[data-test="voice"]');
   await voice.waitForSelector('[data-test="voice-live"]');
   await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="voice-live"]').textContent));
+  if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png`, clip: { x: 1000, y: 0, width: 440, height: 70 } });
   await voice.click('[data-test="voice-stop"]');
   await voice.waitForSelector('[data-test="voice-done"]');
   const said = await voice.textContent('[data-test="voice-done"]');
@@ -341,14 +354,19 @@ async function run(url) {
   const sheet = await guide.locator('.acct-sheet').boundingBox();
   const vp = guide.viewportSize();
   assert.ok(Math.abs(sheet.x - 75) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.width - sheet.x - sheet.width - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card leaves 75px on every side (${JSON.stringify(sheet)})`);
+  await guide.click('[data-test="acct-tab-data"]');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
+  await guide.click('[data-test="acct-tab-profile"]');
   assert.match(dl.suggestedFilename(), /^budgie-data-.*\.json$/, 'you can download a copy of your data');
   // Avatar colour: picked at random, changed with the picker.
   await guide.click('[data-test="avatar"]');
   await guide.click('[data-test="avatar-swatch"] >> nth=3');
+  await guide.keyboard.press('Escape');
+  assert.equal(await guide.$('[data-test="avatar-pop"]'), null, 'Escape closes the colour picker');
   await guide.waitForTimeout(400);
   assert.equal(await guide.evaluate(() => getComputedStyle(document.querySelector('[data-test="avatar"]')).backgroundColor), 'rgb(5, 150, 105)', 'the colour picker changes your avatar');
   // The AI helper falls back without breaking when models cannot download.
+  await guide.click('[data-test="acct-tab-digests"]');
   await guide.waitForSelector('[data-test="ai-panel"]');
   assert.match(await guide.textContent('[data-test="ai-panel"]'), /Qwen 2\.5[\s\S]*Llama 3\.2/, 'both browser models are listed');
   await guide.waitForFunction(() => /Not available|Downloading|Waiting|cannot run|could not/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });

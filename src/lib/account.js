@@ -286,4 +286,5 @@ export async function saveNow() { clearTimeout(timer); await push(); }
 export const readDigests = () => api('/api/digests');
 export const readDigest = (stream, id) => api(`/api/digests/${encodeURIComponent(stream)}/${encodeURIComponent(id)}`);
 export const writeDigest = (stream, timeZone) => api('/api/digests', { method: 'POST', body: { stream, timeZone } });
+export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', body: { key } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

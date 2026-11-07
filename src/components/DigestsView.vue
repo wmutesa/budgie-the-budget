@@ -63,16 +63,13 @@ const unread = id => { const l = digests.editions[id]; return Boolean(l?.length 
     <p v-if="digests.error" class="pln-err small dg-pad" role="alert">{{ digests.error }}</p>
 
     <div v-if="!ed && !busy" class="dg-empty">
-      <template v-if="st.id === 'main' && !hasTopics()">
-        <h2>Your brief follows your life</h2>
-        <p>Add a goal or a project in the Playground, or tell Budgie what you study in your profile, and your first edition is written straight away. Add a free Gemini key in your profile for deeper research.</p>
-        <button type="button" class="btn primary" @click="openProfile"><Icon name="user" :size="14" />Open my profile</button>
-      </template>
-      <template v-else>
-        <h2>No edition yet</h2>
-        <p>New editions arrive every Monday and Thursday.</p>
-        <button type="button" class="btn primary" data-test="generate-first" @click="generate()"><Icon name="refresh" :size="14" />Write it now</button>
-      </template>
+      <h2>No edition yet</h2>
+      <p>New editions arrive every Monday and Thursday.</p>
+      <button type="button" class="btn primary" data-test="generate-first" @click="generate()"><Icon name="refresh" :size="14" />Write it now</button>
+    </div>
+    <div v-if="!ed && busy" class="dg-empty" aria-busy="true">
+      <h2>Writing {{ st.name }}…</h2>
+      <p>{{ st.id === 'main' && !hasTopics() ? 'Your first brief covers opportunities for students. Add goals and projects in the Playground, and details about you in your profile, and it follows them.' : 'Gathering stories, deadlines and drafts for you.' }}</p>
     </div>
 
     <article v-if="ed" class="dg-paper" data-test="digest">

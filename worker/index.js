@@ -8,7 +8,7 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
-import { geminiResearch } from './gemini.js';
+import { geminiResearch, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -109,11 +109,12 @@ const streamsOf = data => {
 };
 async function writeDigestFor(env, userId, data, stream, timeZone) {
   const prev = await env.DB.prepare('SELECT data FROM digest_editions WHERE user_id = ? AND stream = ? ORDER BY id DESC LIMIT 1').bind(userId, stream.id).first();
-  const key = String(data?.digest?.geminiKey || '').trim();
+  const key = tidyKey(data?.digest?.geminiKey);
   const edition = await makeDigest(profileFromAccount(data, stream), prev ? JSON.parse(prev.data) : null, {
-    timeZone: timeZone || data?.digest?.timeZone || 'UTC', geminiKey: /^[\w-]{20,80}$/.test(key) ? key : '', research: geminiResearch, name: String(stream.name || 'My brief').slice(0, 60),
+    timeZone: timeZone || data?.digest?.timeZone || 'UTC', geminiKey: keyShapeOk(key) ? key : '', research: geminiResearch, name: String(stream.name || 'My brief').slice(0, 60),
   });
   edition.stream = stream.id;
+  if (key && !keyShapeOk(key)) edition.researchError = 'the saved Gemini key does not look like an API key; check it in your profile';
   await env.DB.batch([
     env.DB.prepare('INSERT INTO digest_editions (user_id, stream, id, data, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id, stream, id) DO UPDATE SET data = excluded.data, created_at = excluded.created_at').bind(userId, stream.id, edition.id, JSON.stringify(edition), now()),
     env.DB.prepare('DELETE FROM digest_editions WHERE user_id = ? AND stream = ? AND id NOT IN (SELECT id FROM digest_editions WHERE user_id = ? AND stream = ? ORDER BY id DESC LIMIT ?)').bind(userId, stream.id, userId, stream.id, DIGESTS_KEPT),
@@ -417,6 +418,12 @@ async function routes(request, env, url) {
     const data = await accountData(env, user.id);
     const st = { id: stream.id, name: String(stream.name || '').slice(0, 60), focus: String(stream.focus || '').slice(0, 120) };
     return json(await writeDigestFor(env, user.id, data, st, typeof timeZone === 'string' ? timeZone.slice(0, 60) : ''));
+  }
+  if (path === '/api/gemini/check' && method === 'POST') {
+    const key = `gemini-check:${user.id}`;
+    if (await tooManyAttempts(env, key, 20)) return fail(429, 'Too many checks this hour. Try again later.');
+    await countFailure(env, key);
+    try { return json(await checkKey((await body(request)).key)); } catch { return json({ ok: false, message: 'Google could not be reached. Try again in a minute.' }); }
   }
   const gone = path.match(/^\/api\/digests\/([a-z0-9-]{1,40})$/);
   if (gone && method === 'DELETE') {

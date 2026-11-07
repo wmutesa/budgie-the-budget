@@ -9,6 +9,7 @@ import QrCode from './QrCode.vue';
 import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
 import ProfileYou from './ProfileYou.vue';
+import DigestSettings from './DigestSettings.vue';
 import {
   account, signOut, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
   listPeople, invitePerson, cancelInvite, removePerson,
@@ -17,6 +18,15 @@ import {
 // The account button in the navigation, and the sheet it opens: sync status,
 // your devices, and (for the owner) the people who can use Budgie.
 const open = ref(false);
+// One page at a time, chosen from the menu on the left.
+const tab = ref('profile');
+const TABS = computed(() => [
+  ['profile', 'Profile', 'user'],
+  ['digests', 'Digests & AI', 'sparkle'],
+  ['security', 'Devices & security', 'target'],
+  ...(isOwner.value ? [['people', 'People', 'list']] : []),
+  ['data', 'Your data', 'download'],
+]);
 const passkeys = ref([]);
 const codesLeft = ref(null);
 const freshCodes = ref(null);
@@ -53,7 +63,7 @@ async function load() {
     if (pp) ({ people: people.value, invites: invites.value } = pp);
   } catch (e) { if (seq === loadSeq) error.value = e.message; }
 }
-function show() { open.value = true; link.value = null; freshCodes.value = null; load(); }
+function show() { open.value = true; tab.value = 'profile'; link.value = null; freshCodes.value = null; load(); }
 
 async function act(fn) {
   busy.value = true;
@@ -62,12 +72,12 @@ async function act(fn) {
 }
 const makeDeviceLink = () => act(async () => {
   const r = await deviceLink();
-  link.value = { label: 'Open this on your other device within 24 hours to add it', url: r.link };
+  link.value = { kind: 'device', label: 'Open this on your other device within 24 hours to add it', url: r.link };
 });
 const sendInvite = () => act(async () => {
   if (!inviteName.value.trim()) return;
   const r = await invitePerson(inviteName.value.trim());
-  link.value = { label: `Send this to ${inviteName.value.trim()}. It works once and expires in ${r.expiresInDays} days`, url: r.link };
+  link.value = { kind: 'invite', label: `Send this to ${inviteName.value.trim()}. It works once and expires in ${r.expiresInDays} days`, url: r.link };
   inviteName.value = '';
   await load();
 });
@@ -132,89 +142,113 @@ const tour = () => { open.value = false; emit('tour'); };
           <button class="icon-x" aria-label="Close" @click="open = false">×</button>
         </div>
 
-        <div class="acct-grid">
-        <div class="acct-col">
-        <ProfileYou />
+        <div class="acct-body">
+        <nav class="acct-nav" aria-label="Settings">
+          <button v-for="[id, label, ic] in TABS" :key="id" type="button" :class="{ on: tab === id }" :aria-current="tab === id ? 'page' : undefined" :data-test="`acct-tab-${id}`" @click="tab = id"><Icon :name="ic" :size="15" />{{ label }}</button>
+        </nav>
 
-        <section class="acct-sec t-a">
-          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink"><Icon name="plus" :size="14" />Add a device</button></div>
-          <ul class="acct-list">
-            <li v-for="p in passkeys" :key="p.id">
-              <span>{{ p.label || 'Passkey' }}</span>
-              <span class="muted small">Added {{ date(p.created_at) }} · last used {{ date(p.last_used_at) }}</span>
-              <button v-if="passkeys.length > 1" class="btn small" :disabled="busy" @click="dropPasskey(p)">Remove</button>
-            </li>
-          </ul>
-        </section>
+        <div class="acct-page" :data-page="tab">
+        <template v-if="tab === 'profile'">
+          <ProfileYou />
+        </template>
 
-        <section class="acct-sec t-b">
-          <div class="acct-sec-head">
-            <p class="kicker"><span class="acct-ico" aria-hidden="true">✳</span>Recovery codes</p>
-            <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes"><Icon name="sparkle" :size="14" />{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
+        <template v-else-if="tab === 'digests'">
+          <DigestSettings />
+          <AIPanel class="t-violet" />
+        </template>
+
+        <template v-else-if="tab === 'security'">
+          <section class="acct-sec t-a">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">◎</span>Your devices</p><button class="btn small" :disabled="busy" @click="makeDeviceLink"><Icon name="plus" :size="14" />Add a device</button></div>
+          <div v-if="link?.kind === 'device'" class="acct-link">
+            <p class="small">{{ link.label }}</p>
+            <div class="acct-link-row">
+              <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
+              <button class="btn primary small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button>
+            </div>
+            <div class="acct-qr">
+              <QrCode :text="link.url" :size="110" />
+              <p class="small muted">Or scan this with the other device's camera.</p>
+            </div>
           </div>
-          <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
-            {{ codesLeft === null ? '' : codesLeft === 0 ? 'No recovery codes. That is fine if your passkey syncs with iCloud or Google, or you have added a second device. Otherwise, make some.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
-          </p>
-          <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
-        </section>
+            <ul class="acct-list">
+              <li v-for="p in passkeys" :key="p.id">
+                <span>{{ p.label || 'Passkey' }}</span>
+                <span class="muted small">Added {{ date(p.created_at) }} · last used {{ date(p.last_used_at) }}</span>
+                <button v-if="passkeys.length > 1" class="btn small" :disabled="busy" @click="dropPasskey(p)"><Icon name="trash" :size="14" />Remove</button>
+              </li>
+            </ul>
+          </section>
+          <section class="acct-sec t-b">
+            <div class="acct-sec-head">
+              <p class="kicker"><span class="acct-ico" aria-hidden="true">✳</span>Recovery codes</p>
+              <button class="btn small" :disabled="busy" data-test="new-codes" @click="makeCodes"><Icon name="sparkle" :size="14" />{{ codesLeft ? 'Make new codes' : 'Make codes' }}</button>
+            </div>
+            <p class="small" :class="{ 'acct-warn': codesLeft !== null && codesLeft < 3 }" data-test="codes-left">
+              {{ codesLeft === null ? '' : codesLeft === 0 ? 'No recovery codes. That is fine if your passkey syncs with iCloud or Google, or you have added a second device. Otherwise, make some.' : `${codesLeft} unused ${codesLeft === 1 ? 'code' : 'codes'} left.` }}
+            </p>
+            <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
+          </section>
+          <PasskeyNote :owner="isOwner" />
+          <section class="acct-sec t-a">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇥</span>Sessions</p><button class="btn small" type="button" data-test="sign-out-everywhere" :disabled="busy" @click="leaveEverywhere"><Icon name="logout" :size="14" />Sign out everywhere</button></div>
+            <p class="small muted">Ends every session, on every device, including this one.</p>
+          </section>
+        </template>
 
-        <section class="acct-sec t-a">
-          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Your data</p><button class="btn small" type="button" data-test="download-data" @click="downloadData"><Icon name="download" :size="14" />Download a copy</button></div>
-          <p class="small muted">Everything you have added, as one file: tasks, routines, goals, calendars and your digest profile.</p>
-        </section>
-        </div>
-
-        <div class="acct-col">
-        <div v-if="link" class="acct-link">
-          <p class="small">{{ link.label }}</p>
-          <div class="acct-link-row">
-            <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
-            <button class="btn primary small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button>
+        <template v-else-if="tab === 'people'">
+          <section class="acct-sec t-b">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">☺</span>People</p><span class="muted small">{{ people.length }} with access</span></div>
+            <ul class="acct-list">
+              <li v-for="p in people" :key="p.id">
+                <span>{{ p.name }}<span v-if="p.id === account.user.id" class="muted small"> · you</span></span>
+                <span class="muted small">{{ p.role === 'owner' ? 'Owner' : 'Member' }} · last seen {{ date(p.last_seen) }}</span>
+                <button v-if="p.role !== 'owner'" class="btn small" :disabled="busy" @click="dropPerson(p)"><Icon name="trash" :size="14" />Remove</button>
+              </li>
+              <li v-for="i in invites" :key="i.id" class="pending">
+                <span>{{ i.name }}</span>
+                <span class="muted small">Invited · expires {{ date(i.expires_at) }}</span>
+                <button class="btn small btn-icon" :disabled="busy" @click="dropInvite(i.id)" title="Cancel" aria-label="Cancel"><Icon name="x" :size="14" /></button>
+              </li>
+            </ul>
+            <form class="acct-invite" @submit.prevent="sendInvite">
+              <input v-model="inviteName" class="field" placeholder="Name of the person to invite" aria-label="Name of the person to invite" maxlength="60" />
+              <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()"><Icon name="plus" :size="14" />Create invite link</button>
+            </form>
+          <div v-if="link?.kind === 'invite'" class="acct-link">
+            <p class="small">{{ link.label }}</p>
+            <div class="acct-link-row">
+              <input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" />
+              <button class="btn primary small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button>
+            </div>
+            <div class="acct-qr">
+              <QrCode :text="link.url" :size="110" />
+              <p class="small muted">Or scan this with the other device's camera.</p>
+            </div>
           </div>
-          <div class="acct-qr">
-            <QrCode :text="link.url" :size="110" />
-            <p class="small muted">Or scan this with the other device's camera.</p>
-          </div>
-        </div>
+          </section>
+        </template>
 
-        <section v-if="isOwner" class="acct-sec t-b">
-          <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">☺</span>People</p><span class="muted small">{{ people.length }} with access</span></div>
-          <ul class="acct-list">
-            <li v-for="p in people" :key="p.id">
-              <span>{{ p.name }}<span v-if="p.id === account.user.id" class="muted small"> · you</span></span>
-              <span class="muted small">{{ p.role === 'owner' ? 'Owner' : 'Member' }} · last seen {{ date(p.last_seen) }}</span>
-              <button v-if="p.role !== 'owner'" class="btn small" :disabled="busy" @click="dropPerson(p)"><Icon name="trash" :size="14" />Remove</button>
-            </li>
-            <li v-for="i in invites" :key="i.id" class="pending">
-              <span>{{ i.name }}</span>
-              <span class="muted small">Invited · expires {{ date(i.expires_at) }}</span>
-              <button class="btn small btn-icon" :disabled="busy" @click="dropInvite(i.id)" title="Cancel" aria-label="Cancel"><Icon name="x" :size="14" /></button>
-            </li>
-          </ul>
-          <form class="acct-invite" @submit.prevent="sendInvite">
-            <input v-model="inviteName" class="field" placeholder="Name of the person to invite" aria-label="Name of the person to invite" maxlength="60" />
-            <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()"><Icon name="plus" :size="14" />Create invite link</button>
-          </form>
-        </section>
-
-
-        <PasskeyNote v-if="!isOwner" :owner="isOwner" />
-        </div>
-
-        <div class="acct-col">
-        <!-- In its own column: its progress updates must not shift the lists beside it. -->
-        <AIPanel class="t-violet" />
-        <PasskeyNote v-if="isOwner" :owner="isOwner" />
+        <template v-else>
+          <section class="acct-sec t-a">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">⇩</span>Download a copy</p><button class="btn small" type="button" data-test="download-data" @click="downloadData"><Icon name="download" :size="14" />Download</button></div>
+            <p class="small muted">Everything you have added, as one file: tasks, routines, goals, calendars, details about you and settings.</p>
+          </section>
+          <section class="acct-sec t-b">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">▶</span>The tour</p><button class="btn small" type="button" data-test="replay-guide" @click="tour"><Icon name="play" :size="14" />Take the tour again</button></div>
+            <p class="small muted">A one-minute walk through the four pages.</p>
+          </section>
+          <section v-if="!isOwner" class="acct-sec t-a">
+            <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true">✕</span>Delete my account</p><button class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe"><Icon name="trash" :size="14" />Delete</button></div>
+            <p class="small muted">Removes your account, digests and all of your data for good.</p>
+          </section>
+        </template>
         </div>
         </div>
 
         <div class="acct-foot">
-          <button class="btn small" type="button" data-test="replay-guide" @click="tour"><Icon name="play" :size="14" />Take the tour again</button>
-          <span class="acct-foot-right">
-            <button v-if="!isOwner" class="btn small acct-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe"><Icon name="trash" :size="14" />Delete my account</button>
-            <button class="btn small" type="button" data-test="sign-out-everywhere" :disabled="busy" @click="leaveEverywhere"><Icon name="logout" :size="14" />Sign out everywhere</button>
-            <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="14" />Sign out</button>
-          </span>
+          <span class="muted small">Changes save as you type.</span>
+          <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="14" />Sign out</button>
         </div>
       </div>
     </div>

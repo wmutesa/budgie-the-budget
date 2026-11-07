@@ -52,7 +52,9 @@ export function profileFromAccount(data = {}, stream = {}) {
   keywords(me.study).forEach(w => add(w, 3));
   keywords(me.about).forEach(w => add(w, 1));
   (me.interests || []).forEach(i => add(String(i).toLowerCase(), 4));
+  // Nothing yet to go on: a general brief for students, sharpened as goals and details are added.
   const topics = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([w]) => w).slice(0, 6);
+  if (!topics.length && !stream.focus) topics.push('students', 'scholarships');
   return cleanProfile({ ...me, interests: topics, focus: stream.focus || '', lookingFor: me.lookingFor || [], companies: me.companies || [], feeds: me.feeds || [], exclude: me.exclude || [], auto: stream.auto !== false });
 }
 

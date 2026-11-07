@@ -44,7 +44,8 @@ export async function openStream(id) {
   const list = digests.editions[id] || [];
   const st = streams.value.find(x => x.id === id);
   const behind = !list.length || Date.parse(list[0].createdAt || 0) < lastSlot().getTime();
-  if (st && st.auto !== false && behind && (id !== 'main' || hasTopics()) && !digests.busy[id]) {
+  // My brief is always there: it is written even before you add goals or details.
+  if (st && (st.auto !== false || !list.length) && behind && !digests.busy[id]) {
     if (list.length) await openEdition(id, list[0].id);
     return generate(id);
   }

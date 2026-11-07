@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { SWATCHES, avatar, inkFor, randomColor } from '../lib/profile';
 import Icon from './Icon.vue';
@@ -7,11 +7,16 @@ import Icon from './Icon.vue';
 // Your avatar with a colour picker: curated swatches, shuffle, or any colour.
 defineProps({ initial: { type: String, default: '?' }, name: { type: String, default: '' } });
 const open = ref(false);
+const root = ref(null);
+const outside = e => { if (open.value && root.value && !root.value.contains(e.target)) open.value = false; };
+const onKey = e => { if (e.key === 'Escape' && open.value) { open.value = false; e.stopPropagation(); } };
+onMounted(() => { document.addEventListener('mousedown', outside); document.addEventListener('keydown', onKey, true); });
+onUnmounted(() => { document.removeEventListener('mousedown', outside); document.removeEventListener('keydown', onKey, true); });
 const set = c => { store.profile = { ...(store.profile || {}), color: c.toLowerCase() }; };
 </script>
 
 <template>
-  <div class="avp">
+  <div ref="root" class="avp">
     <button type="button" class="avp-face" :style="{ background: avatar.bg, color: avatar.ink }" :aria-expanded="open" title="Change your colour" aria-label="Change your avatar colour" data-test="avatar" @click="open = !open">
       {{ initial }}<span class="avp-badge"><Icon name="palette" :size="11" /></span>
     </button>
