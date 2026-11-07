@@ -1617,3 +1617,9 @@ body:has(.overlay) .notice { display: none; }
   .mkt-lead { grid-template-columns: 1fr; } .mkt-art { height: 70px; }
   .mkt-watch li { grid-template-columns: minmax(0, 1fr) 70px; } .mkt-watch .mk-bar { display: none; }
 }
+/* One column on narrow screens: the sheet scrolls and the bottom row stays below the content. */
+@media (max-width: 1000px), (max-height: 640px) {
+  .acct-sheet { align-content: start; }
+  .acct-grid { min-height: auto; }
+  .acct-col { min-height: auto; }
+}

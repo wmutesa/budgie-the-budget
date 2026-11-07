@@ -257,7 +257,11 @@ export async function startBrowserModels({ force = false } = {}) {
   // After a failed automatic start, wait a day before trying again on its own.
   const failed = Number(read(FAIL_KEY)) || 0;
   if (!force && failed && Date.now() - failed < 864e5) {
-    if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'error', error: 'The AI did not start last time. Use Try again to retry now.' });
+    // The graphics chip failed recently: skip it and go straight to the processor engine.
+    if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'skipped', error: 'The graphics chip did not work last time, so Budgie uses the processor instead.' });
+    if (ai.medium.state === 'idle') Object.assign(ai.medium, { state: 'skipped', error: '' });
+    refreshLabel();
+    if (!meteredConnection()) await loadCpuModel();
     return;
   }
   if (!force && meteredConnection()) {
