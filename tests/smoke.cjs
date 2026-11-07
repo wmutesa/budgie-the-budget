@@ -167,6 +167,10 @@ async function run(url) {
 
   // Planner: what the inbox sent is here.
   await page.click(tab('Planner'));
+  await page.waitForSelector('[data-test="schedule"]');
+  { const r = await page.locator('[data-test="remind"]').boundingBox(); if (r) assert.ok(Math.abs(r.width - r.height) < 0.5, `the reminders button is a perfect circle (${r.width}x${r.height})`); }
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/planner-head.png`, clip: { x: 0, y: 60, width: 1440, height: 200 } });
+  assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Planner opens on the Schedule, with today\'s activity by category');
   await page.click('[data-test="view-tasks"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority, with its time on the right');
   assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits repeat on their days');
@@ -238,6 +242,24 @@ async function run(url) {
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
   await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  // Schedule: today's list by category and a time line with a column per category.
+  await page.click('[data-test="view-schedule"]');
+  const boxes = await page.locator('[data-test="sch-box"]').count();
+  assert.ok(boxes >= 1, 'timed items sit on the time line');
+  await page.click('[data-test="plan-day"]');
+  await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n, boxes);
+  assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
+  await page.click('[data-test="sch-col"] >> nth=0', { position: { x: 30, y: 20 } });
+  await page.fill('[data-test="sch-slot"]', 'Coffee with Ana');
+  await page.press('[data-test="sch-slot"]', 'Enter');
+  await page.waitForSelector('[data-test="sch-box"]:has-text("Coffee with Ana")');
+  await page.locator('[data-test="sch-box"]', { hasText: 'Coffee with Ana' }).click();
+  await page.waitForSelector('.sch-sheet [data-test="task-edit"]');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
+  await page.keyboard.press('Escape');
+  await page.click('.sch-sheet [aria-label="Close"]').catch(() => {});
+  await page.click('[data-test="sch-next"]');
+  await page.click('[data-test="sch-today"]');
   await page.click('[data-test="view-tasks"]');
 
   // Your details live in your profile; the AI page has no digest settings while digests are on hold.
