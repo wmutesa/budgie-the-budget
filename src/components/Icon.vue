@@ -18,6 +18,7 @@ const P = {
   left: 'M15 5l-7 7 7 7',
   right: 'M9 5l7 7-7 7',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
+  capture: 'M10 5v14M3 12h14M20 9v6M23.2 10.5v3',
   collapse: 'M20 12H9M13 7l-5 5 5 5M4 5v14',
   list: 'M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01',
   agenda: 'M4 5h16v15H4zM4 10h16M9 3v4M15 3v4M8 14h3M8 17h6',

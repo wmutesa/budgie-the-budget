@@ -14,7 +14,7 @@ import { deleteTask } from '../lib/undo';
 import Icon from './Icon.vue';
 
 // A calendar like the ones you know: day, week and month, with a time grid.
-// Click an empty slot to add something there, click an item for its actions,
+// Click an item for its actions, a day to open it,
 // drag an item to move it.
 // Inside the Schedule (embedded) it shows week and month; a day opens the
 // Schedule's own day time line.
@@ -106,6 +106,8 @@ async function place(e) {
 }
 // Click an empty part of a day: add something at that time.
 function newAt(e, date, timedClick) {
+  // Adding happens with the Add button; in the Schedule a click on a day opens it.
+  if (props.embedded) { if (!timedClick) openDay(date); return; }
   if (dragging.value) return;
   let time = '';
   if (timedClick) {
@@ -227,7 +229,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
     </div>
 
     <!-- Day and week: a time grid -->
-    <template v-else>
+    <div v-else class="cal-tgrid">
       <div class="cal-head" :style="{ '--cols': days.length }">
         <span class="cal-gutter" />
         <button v-for="d in days" :key="d" type="button" class="cal-dh" :class="{ today: d === today() }" @click="openDay(d)">
@@ -251,8 +253,8 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           </button>
         </div>
       </div>
-      <p class="muted small cal-tip">Click an empty slot to add, an item for actions; drag to move. Keys: ← → T D W M.</p>
-    </template>
+      <p class="muted small cal-tip">Click an item for its actions, drag it to move it, or click a day to open it. Keys: ← → T D W M.</p>
+    </div>
 
     <!-- The card for a slot or an item -->
     <Teleport to="body">

@@ -8,7 +8,8 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
-import PlayInbox from './components/PlayInbox.vue';
+import CaptureButton from './components/CaptureButton.vue';
+import CaptureReview from './components/CaptureReview.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 import Icon from './components/Icon.vue';
 import Toasts from './components/Toasts.vue';
@@ -21,10 +22,10 @@ import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
-// Three pages: Today (your day and goals), Planner (schedule, tasks,
-// calendar, focus) and Playground (add anything).
+// Two pages: Today (your day and goals) and Planner (schedule, tasks,
+// focus). The Add button adds anything from anywhere.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Today: 'home', Planner: 'planner', Playground: 'shapes' };
+const PAGE_ICONS = { Today: 'home', Planner: 'planner' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -104,12 +105,10 @@ onUnmounted(() => clearInterval(timer));
       <template v-else-if="active === 'Planner'">
         <PlannerView />
       </template>
-      <template v-else>
-        <PlayInbox />
-      </template>
     </main>
 
     <Toasts />
+    <template v-if="account.status === 'signed-in'"><CaptureButton /><CaptureReview /></template>
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>
 </template>

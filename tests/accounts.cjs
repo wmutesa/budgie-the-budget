@@ -89,10 +89,10 @@ async function main() {
     assert.equal(new URL(owner.page.url()).hash, '', 'the invite token is removed from the address bar');
 
     // A task added on one device is saved to the account.
-    await owner.page.click('.nb-pages button:has-text("Playground")');
-    await owner.page.fill('[data-test="inbox-text"]', 'Call Blue Bottle about the internship tomorrow');
-    await owner.page.waitForSelector('[data-test="inbox-rows"] li');
-    await owner.page.click('[data-test="inbox-send"]');
+    await owner.page.click('[data-test="capture"]');
+    await owner.page.fill('[data-test="capture-text"]', 'Call Blue Bottle about the internship tomorrow');
+    await owner.page.click('[data-test="capture-sort"]');
+    await owner.page.click('[data-test="review-keep"]');
     await owner.page.waitForFunction(async () => {
       const r = await fetch('/api/data');
       return JSON.stringify((await r.json()).data || {}).includes('Blue Bottle');

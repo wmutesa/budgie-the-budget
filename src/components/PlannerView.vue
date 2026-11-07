@@ -5,7 +5,6 @@ import { parseTask, addFromText, occurrences, openTasks, summary, today, addDays
 import { refreshFeeds } from '../lib/calendar';
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
-import PlanCalendars from './PlanCalendars.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
 import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
@@ -24,6 +23,7 @@ const now = ref(today());
 const clock = ref(new Date());
 let tick = null;
 // Something asked to open one item (search): show it in the task list.
+if (nav.anchor === '#calendars') store.planner.view = 'Schedule';
 if (nav.task) {
   const t = store.tasks.find(x => x.id === nav.task);
   if (t) { store.planner.view = 'Tasks'; if (t.done && !t.repeat) showDoneFirst = true; }
@@ -36,7 +36,6 @@ onUnmounted(() => clearInterval(tick));
 
 // Adding happens in the Playground's inbox; flash shows notes here.
 const flash = ref('');
-const addElsewhere = () => go('Playground', { anchor: '#inbox' });
 
 // ---------- filters ----------
 const project = ref('');
@@ -112,7 +111,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         <div class="seg pln-views" role="tablist" aria-label="Planner views">
           <button v-for="[v, ic] in VIEWS" :key="v" type="button" role="tab" :aria-selected="view === v" :class="{ on: view === v }" :title="v" :data-test="`view-${v.toLowerCase()}`" @click="view = v"><Icon :name="ic" :size="15" /><span class="pln-vlabel">{{ v }}</span></button>
         </div>
-        <button type="button" class="ibtn primary" title="Add in the Playground inbox" aria-label="Add" data-test="planner-add" @click="addElsewhere"><Icon name="plus" /></button>
         <button v-if="canNotify" type="button" class="ibtn" :class="{ on: store.planner.remind }" :aria-pressed="store.planner.remind" :title="store.planner.remind ? 'Reminders on: tap to turn off' : 'Remind me 10 minutes before timed items'" :aria-label="store.planner.remind ? 'Turn reminders off' : 'Turn reminders on'" data-test="remind" @click="toggleRemind"><Icon :name="store.planner.remind ? 'bell' : 'bell-off'" /></button>
       </div>
     </section>
@@ -131,7 +129,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
 
     <template v-if="view === 'Schedule'">
       <PlanSchedule @view="v => view = v" />
-      <div class="sch-extras"><PlanCalendars /></div>
     </template>
     <div v-else class="pln-body">
       <div class="pln-main">
@@ -201,7 +198,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
 
       <aside class="pln-side">
         <PlanSuggest />
-        <PlanCalendars />
       </aside>
     </div>
   </div>

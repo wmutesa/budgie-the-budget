@@ -12,7 +12,6 @@ const PLACES = [
   ['Planner', 'Schedule', 'Your day by category, plus week and month', /calendar|week|month|day view|schedule|timeline/, 'Schedule'],
   ['Planner', 'Focus', 'Top three and a focus timer', /focus|timer|pomodoro|top three/, 'Focus'],
   ['Planner', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
-  ['Playground', 'Playground', 'Add anything: tasks, routines and goals', /playground|inbox|add|write|say/],
 ];
 
 const has = (hay, q) => String(hay || '').toLowerCase().includes(q);
@@ -56,5 +55,4 @@ export function search(text, page) {
 export const HINTS = {
   Today: 'Search or add anything: tasks and goals',
   Planner: 'Search tasks, or type one to add it',
-  Playground: 'Search goals and tasks, or add one',
 };

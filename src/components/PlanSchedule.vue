@@ -1,19 +1,20 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
-import { occurrences, today, addDays, fromIso, toMins, fromMins, KINDS, toggleDone, isDone, makeTask, score, parseTask } from '../lib/tasks';
+import { occurrences, today, addDays, fromIso, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
+import { nav } from '../lib/nav';
+import PlanCalendars from './PlanCalendars.vue';
 import TaskEditor from './TaskEditor.vue';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
-import { toast, loading, finish, fail } from '../lib/toast';
-import { addAnything, placeFree, unplace, isIcs } from '../lib/schedule';
-import { useDictation, canDictate } from '../lib/dictation';
-import MicButton from './MicButton.vue';
+import { toast } from '../lib/toast';
+import { placeFree, unplace } from '../lib/schedule';
 
 // Schedule: the day's activity on the left, grouped by category, and a time
 // line on the right with one column per category.
 const emit = defineEmits(['view']);
-const day = ref(today());
+// The day shown; others (search, the review) can open a day here.
+const day = computed({ get: () => nav.day || today(), set: v => { nav.day = v === today() ? '' : v; } });
 const clock = ref(new Date());
 let tick = null;
 onMounted(() => { tick = setInterval(() => { clock.value = new Date(); }, 30000); nextTick(scrollToStart); });
@@ -21,7 +22,11 @@ onUnmounted(() => clearInterval(tick));
 const isToday = computed(() => day.value === today());
 const dateLabel = computed(() => fromIso(day.value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
 const step = n => { day.value = addDays(day.value, n); };
-const listOpen = computed({ get: () => store.planner.schList !== false, set: v => { store.planner.schList = v; } });
+// The activity list starts open on wide screens and folded on phones.
+const wide = ref(typeof window === 'undefined' || window.innerWidth >= 900);
+const listOpen = computed({ get: () => store.planner.schList ?? wide.value, set: v => { store.planner.schList = v; } });
+// Calendars: link, file, holidays. Opened from the header.
+const calOpen = ref(nav.anchor === '#calendars');
 const hello = computed(() => {
   const name = (store.me?.name || '').split(' ')[0];
   const h = clock.value.getHours();
@@ -97,34 +102,6 @@ function scrollToStart() {
 }
 const dur = m => { const n = m || 0; return n ? `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` : ''; };
 
-// ---------- adding ----------
-const drafts = ref({});
-function addTo(c) {
-  const v = (drafts.value[c.key] || '').trim();
-  if (!v) return;
-  const p = parseTask(v);
-  store.tasks.unshift(makeTask({ title: p.title, date: p.date || day.value, time: p.time, mins: p.mins, priority: p.priority, repeat: p.repeat, kind: c.kind && !p.project ? (p.kind !== 'task' ? p.kind : c.kind) : p.kind, project: p.project || c.project }));
-  drafts.value[c.key] = '';
-}
-// Click an empty spot on the time line to add something there.
-const slot = ref(null);
-const slotText = ref('');
-const slotInput = ref(null);
-function pick(col, e) {
-  if (e.target.closest('.sch-box')) return;
-  const y = e.offsetY;
-  const m = Math.round(((y / HOUR) * 60 + startH.value * 60) / 15) * 15;
-  slot.value = { col, m }; slotText.value = '';
-  nextTick(() => slotInput.value?.[0]?.focus?.() || slotInput.value?.focus?.());
-}
-function addSlot() {
-  const v = slotText.value.trim(); const s = slot.value; slot.value = null;
-  if (!v || !s) return;
-  const p = parseTask(v);
-  const c = cats.value.find(x => x.key === s.col.key);
-  store.tasks.unshift(makeTask({ title: p.title, date: day.value, time: p.time || hhmm(s.m), mins: p.mins || 30, priority: p.priority, kind: c?.kind || p.kind, project: p.project || c?.project || '' }));
-}
-
 // ---------- plan my day: give untimed things a free slot ----------
 function planDay() {
   const open = items.value.filter(x => !x.task.time && !x.done && !x.task.repeat).map(x => x.task);
@@ -134,47 +111,8 @@ function planDay() {
   toast(`${moved.length} ${moved.length === 1 ? 'thing has' : 'things have'} a time now.`, { kind: 'success', title: 'Day planned', action: { label: 'Undo', run: () => unplace(moved) } });
 }
 
-// ---------- add anything: type, paste, say it, drop a file ----------
-const quick = ref('');
-const busy = ref(false);
-async function addQuick(text = quick.value) {
-  const v = String(text || '').trim();
-  if (!v || busy.value) return;
-  busy.value = true;
-  const tid = /:\/\//.test(v) ? loading('Importing your calendar…') : null;
-  const r = await addAnything(v, day.value);
-  busy.value = false;
-  quick.value = '';
-  const n = r.made.length;
-  const bits = [n && `${n} ${n === 1 ? 'thing' : 'things'} added`, r.links && `${r.links} calendar${r.links === 1 ? '' : 's'} imported`, r.moved.length && `${r.moved.length} given a free time`].filter(Boolean).join(' · ');
-  if (r.errors?.length && !n && !r.links) { tid ? fail(tid, r.errors[0]) : toast(r.errors[0], { kind: 'error' }); return; }
-  const undo = { label: 'Undo', run: () => { const ids = new Set(r.made.map(t => t.id)); store.tasks = store.tasks.filter(t => !ids.has(t.id)); } };
-  if (tid) finish(tid, bits || 'Nothing new.', { title: 'Added' }); else toast(bits || 'Nothing new.', { kind: 'success', title: 'Added', action: n ? undo : undefined });
-}
-const onQuickKey = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addQuick(); } };
-let base = '';
-const dict = useDictation({
-  continuous: true,
-  onError: m => toast(m, { kind: 'error', title: 'Microphone' }),
-  onCancel: () => { quick.value = base; },
-  onText: t => { quick.value = `${base}${t}`; },
-  onFinal: t => { quick.value = ''; addQuick(`${base}${t}`); },
-});
-const talk = () => { if (!dict.listening.value) base = quick.value ? `${quick.value}\n` : ''; dict.toggle(); };
-// Drop or pick a calendar file (.ics) or a text timetable.
-const dragging = ref(false);
-const fileIn = ref(null);
-async function readFiles(files) {
-  dragging.value = false;
-  for (const f of [...(files || [])].slice(0, 5)) {
-    if (f.size > 2e6) { toast(`${f.name} is too big to read.`, { kind: 'error' }); continue; }
-    const text = await f.text();
-    if (isIcs(text) || /\.(txt|csv|md|ics)$/i.test(f.name) || f.type.startsWith('text')) await addQuick(text);
-    else toast(`${f.name}: drop a calendar file (.ics) or a text list.`, { kind: 'warn' });
-  }
-}
-const onDrop = e => readFiles(e.dataTransfer?.files);
-
+// Jump the time line to now.
+function toNow() { if (!isToday.value) day.value = today(); nextTick(() => { if (grid.value) grid.value.scrollTo({ top: Math.max(0, nowTop.value - HOUR * 1.5), behavior: 'smooth' }); }); }
 // ---------- editing ----------
 const editing = ref(null);
 const editRow = ref('');
@@ -182,7 +120,7 @@ const tickX = x => toggleDone(x.task, x.date);
 </script>
 
 <template>
-  <div class="sch" :class="{ 'no-list': !listOpen, dragging }" data-test="schedule" @dragover.prevent="dragging = true" @dragleave.self="dragging = false" @drop.prevent="onDrop">
+  <div class="sch" :class="{ 'no-list': !listOpen }" data-test="schedule">
     <div class="sch-bar">
       <h2 class="sch-title">Schedule</h2>
       <div v-if="range === 'day'" class="sch-date">
@@ -190,19 +128,13 @@ const tickX = x => toggleDone(x.task, x.date);
         <button type="button" class="sch-step" title="Previous day" aria-label="Previous day" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
         <button type="button" class="sch-step" title="Next day" aria-label="Next day" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
       </div>
+      <button v-if="range === 'day'" type="button" class="sch-now-btn" title="Jump to now" data-test="sch-now" @click="toNow"><Icon name="clock" :size="14" />Now</button>
       <div class="sch-modes" role="group" aria-label="Range">
         <button v-for="[id, label] in [['day', 'Day'], ['week', 'Week'], ['month', 'Month']]" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`cal-${id}`" @click="range = id; id === 'day' && nextTick(scrollToStart)">{{ label }}</button>
       </div>
+      <button type="button" class="sch-cal-btn" :aria-expanded="calOpen" data-test="calendars-open" @click="calOpen = !calOpen"><Icon name="calendar" :size="15" />Calendars<b v-if="store.feeds.length">{{ store.feeds.length }}</b></button>
+      <div v-if="calOpen" class="sch-cal-pop"><PlanCalendars /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
     </div>
-
-    <form class="sch-quick" :class="{ live: dict.listening.value }" @submit.prevent="addQuick()">
-      <Icon name="plus" :size="16" />
-      <textarea v-model="quick" rows="1" placeholder="Add to your schedule: “gym 6pm”, “MATH 101 TTh 1:30–2:45”, a pasted timetable or a calendar link" aria-label="Add to your schedule" data-test="sch-quick" @keydown="onQuickKey" />
-      <MicButton v-if="canDictate" :listening="dict.listening.value" label="Say it" @toggle="talk" />
-      <button type="button" class="sch-icon" title="Add a calendar file (.ics) or a text list" aria-label="Add a file" @click="fileIn.click()"><Icon name="download" :size="16" /></button>
-      <input ref="fileIn" type="file" accept=".ics,.txt,.csv,text/calendar,text/plain" multiple hidden data-test="sch-file" @change="readFiles($event.target.files); $event.target.value = ''" />
-      <button class="btn primary small" :disabled="!quick.trim() || busy" data-test="sch-quick-add">Add</button>
-    </form>
 
     <PlanCalendar v-if="range !== 'day'" embedded class="sch-cal" @day="openDayFromCal" @focus="emit('view', 'Focus')" />
     <div v-else class="sch-body">
@@ -217,7 +149,7 @@ const tickX = x => toggleDone(x.task, x.date);
         <div v-for="c in cats" :key="c.key" class="sch-group" :style="{ '--c': c.color }" :data-cat="c.label">
           <h4><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.list.length }}</span></h4>
           <ul>
-            <li v-for="x in c.list" :key="x.key" class="sch-row" :class="{ done: x.done }" data-test="sch-row">
+            <li v-for="x in c.list" :key="x.key" class="sch-row" :class="{ done: x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
               <button type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
                 <span class="sch-row-t">{{ x.task.title }}</span>
@@ -228,11 +160,10 @@ const tickX = x => toggleDone(x.task, x.date);
               <TaskEditor v-if="editRow === x.key" :task="x.task" @close="editRow = ''" />
             </li>
           </ul>
-          <form class="sch-add" @submit.prevent="addTo(c)"><span class="sch-check ghost" aria-hidden="true" /><input v-model="drafts[c.key]" :placeholder="`Add to ${c.label}…`" :aria-label="`Add to ${c.label}`" maxlength="160" /></form>
         </div>
         <div v-if="!cats.length" class="sch-empty">
           <p><b>Nothing planned{{ isToday ? ' today' : '' }}.</b></p>
-          <form class="sch-add" @submit.prevent="addTo({ key: '*', project: '', kind: '' })"><span class="sch-check ghost" aria-hidden="true" /><input v-model="drafts['*']" placeholder="Add something, e.g. “Study 2pm 1h #Biology”" aria-label="Add something" maxlength="160" data-test="sch-add-first" /></form>
+          <p class="muted small">Tap <b>Add</b> and say what is coming up.</p>
         </div>
       </section>
 
@@ -245,17 +176,14 @@ const tickX = x => toggleDone(x.task, x.date);
           <div class="sch-axis">
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
-          <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col" @click="pick(col, $event)">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, narrow: x.lanes > 1 }" :style="boxStyle(x)" data-test="sch-box" @click="editing = x">
+          <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, narrow: x.lanes > 1, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" @click="editing = x">
               <span class="sch-box-top"><b>{{ x.task.title }}</b><span>{{ hhmm(x.s) }} - {{ hhmm(x.e) }}</span></span>
               <span v-if="x.task.notes && x.e - x.s >= 60" class="sch-box-note">{{ x.task.notes }}</span>
               <span v-if="x.task.subtasks?.length && x.e - x.s >= 60" class="sch-box-subs">
                 <label v-for="s in x.task.subtasks" :key="s.id" :class="{ done: s.done }" @click.stop><input v-model="s.done" type="checkbox" />{{ s.title }}</label>
               </span>
             </button>
-            <form v-if="slot && slot.col.key === col.key" class="sch-slot" :style="{ top: `${((slot.m - startH * 60) / 60) * HOUR}px` }" @submit.prevent="addSlot" @click.stop>
-              <span>{{ hhmm(slot.m) }}</span><input ref="slotInput" v-model="slotText" placeholder="What is it?" aria-label="New item" data-test="sch-slot" @keydown.esc="slot = null" @blur="addSlot" />
-            </form>
           </div>
           <div v-if="isToday && nowTop >= 0 && nowTop <= (hours.length - 1) * HOUR" class="sch-now" :style="{ top: `${nowTop}px` }" aria-hidden="true" />
         </div>

@@ -1,4 +1,4 @@
-// The Playground's inbox (and voice): write or say anything, one thing per
+// The Add button (and voice): write or say anything, one thing per
 // line, and Budgie decides what each line is: a task (or event, class,
 // deadline), a routine (something that repeats), or a life goal. You can
 // change any choice before sending.

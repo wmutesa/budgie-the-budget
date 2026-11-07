@@ -12,6 +12,7 @@
     "test": "node tests/smoke.cjs",
     "test:accounts": "node tests/accounts.cjs",
     "test:unit": "node tests/unit/run.mjs",
+    "test:responsive": "node tests/responsive.cjs",
     "dev:api": "wrangler dev --local --port 8787"
   },
   "devDependencies": {

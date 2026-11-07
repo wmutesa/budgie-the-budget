@@ -49,7 +49,7 @@ async function split() { splitting.value = true; await breakDown(t); splitting.v
 </script>
 
 <template>
-  <li ref="el" class="tk" :class="{ done, open, urgent, overdue }" :style="{ '--k': kind.color }" data-test="task" @keydown.delete="onDeleteKey">
+  <li ref="el" class="tk" :class="{ done, open, urgent, overdue, pending: t.pending }" :data-task-id="t.id" :style="{ '--k': kind.color }" data-test="task" @keydown.delete="onDeleteKey">
     <button class="tk-check" type="button" role="checkbox" :aria-checked="done" :aria-label="`${done ? 'Undo' : 'Done'}: ${t.title}`" data-test="task-check" @click="tick">
       <Icon name="check" :size="14" />
     </button>

@@ -7,6 +7,7 @@ import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
 import { deleteGoal } from '../lib/undo';
+import { capture } from '../lib/capture';
 
 // Today: your day first (what is on, what is next, deadlines, streaks), then
 // and your goals. Everything comes from your own planner.
@@ -33,15 +34,16 @@ const nextStep = computed(() => {
   if (next.value || deadlines.value.some(t => t.date === d)) return null;
   const behind = goals.value.filter(x => x.p.next).sort((a, b) => a.p.pct - b.p.pct)[0];
   if (behind) return { text: left.value.length ? 'When you have a moment:' : 'A quiet day. Good time for', what: behind.p.next.title, note: behind.g.title };
-  return items.value.length ? null : { text: 'A quiet day. Set a goal in the Playground to give it direction.', what: '', note: '' };
+  return items.value.length ? null : { text: 'A quiet day. Tap Add to set a goal and give it direction.', what: '', note: '' };
 });
 </script>
 
 <template>
-  <section class="card cell span-8 headline" id="today" data-test="today">
+  <div class="td-col td-main span-8">
+  <section class="card cell headline" id="today" data-test="today">
     <p class="label">{{ weekday }} brief</p>
     <p class="greet">Good <em>{{ part }}</em>.</p>
-    <p v-if="empty" class="lede">Budgie starts empty. Say or type what is on your mind in the <b>Playground</b> or import your school calendar in the <b>Planner</b>.</p>
+    <p v-if="empty" class="lede">Budgie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Planner</b>.</p>
     <p v-else class="lede" data-test="brief">
       <template v-if="items.length">Today you have <mark class="m-violet">{{ items.length }} {{ items.length === 1 ? 'thing' : 'things' }}</mark> planned<template v-if="items.length - left.length">, {{ items.length - left.length }} done</template>. </template>
       <template v-else>Nothing is planned for today yet. </template>
@@ -53,40 +55,43 @@ const nextStep = computed(() => {
     </p>
     <p class="brief-acts">
       <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="14" />Planner</button>
-      <button type="button" class="btn small" @click="go('Playground', { anchor: '#inbox' })"><Icon name="plus" :size="14" />Add something</button>
+      <button type="button" class="btn small" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="14" />Add something</button>
     </p>
   </section>
-
-  <section class="card cell span-4 td-ring-card">
+  <section class="card cell" data-test="today-list">
+    <div class="cell-head"><p class="label">On today</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="store.planner.view = 'Schedule'; go('Planner')"><Icon name="calendar" /></button></div>
+    <ul v-if="items.length" class="tk-list"><TaskRow v-for="x in items" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
+    <p v-else class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
+  </section>
+  </div>
+  <div class="td-col td-side span-4">
+  <section class="card cell td-ring-card">
     <div class="cell-head"><p class="label">Today</p><span class="muted small">{{ items.length - left.length }} of {{ items.length }} done</span></div>
     <div class="pln-ring td-ring" :style="{ '--p': pct }" role="img" :aria-label="`${pct}% of today done`"><b>{{ pct }}%</b><span>done</span></div>
     <p v-if="habits.length" class="muted small td-habits">{{ habits.filter(h => items.some(x => x.task === h.t && x.done)).length }} of {{ habits.filter(h => items.some(x => x.task === h.t)).length }} habits today</p>
   </section>
-
-  <section class="card cell span-8" data-test="today-list">
-    <div class="cell-head"><p class="label">On today</p><button type="button" class="ibtn ghost" title="Open the calendar" aria-label="Open the calendar" @click="store.planner.view = 'Calendar'; go('Planner')"><Icon name="calendar" /></button></div>
-    <ul v-if="items.length" class="tk-list"><TaskRow v-for="x in items" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-    <p v-else class="empty-note">Nothing on today. Write or say something in the Playground.</p>
+  <section class="card cell" data-test="today-goals">
+    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
+    <ul v-if="goals.length" class="td-goals">
+      <li v-for="x in goals" :key="x.g.id" :class="{ pending: x.g.pending }" :data-goal-id="x.g.id">
+        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>
+        <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
+        <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
+      </li>
+    </ul>
+    <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
   </section>
-
-  <section class="card cell span-4" data-test="today-deadlines">
+  <section class="card cell" data-test="today-deadlines">
     <div class="cell-head"><p class="label">This week</p><span class="muted small">{{ deadlines.length }} deadlines</span></div>
     <ul v-if="deadlines.length" class="td-list">
       <li v-for="t in deadlines.slice(0, 6)" :key="t.id" :style="{ '--k': KINDS[t.kind].color }"><i /><span><b>{{ t.title }}</b><span class="muted small">{{ dayLabel(t.date) }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }}{{ t.project ? ` · #${t.project}` : '' }}</span></span></li>
     </ul>
     <p v-else class="empty-note">No assignments or exams due this week.</p>
   </section>
+  </div>
 
-  <section class="card cell span-12" data-test="today-goals">
-    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
-    <ul v-if="goals.length" class="td-goals">
-      <li v-for="x in goals" :key="x.g.id">
-        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>
-        <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
-        <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
-      </li>
-    </ul>
-    <p v-else class="empty-note">No goals yet. In the Playground, write something like “I want to run a 10K by March” and Budgie plans the milestones.</p>
-  </section>
+
+
+
 
 </template>
