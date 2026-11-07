@@ -49,6 +49,22 @@ export function route(line) {
 const splitCommas = line => { const parts = line.split(/,(?!\d{3}\b)/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => /\d/.test(x)) ? parts : [line]; };
 export const routeAll = text => splitLines(text).flatMap(splitCommas).map(route);
 
+// Speech has no line breaks. Split at sentence ends, "then", "also", "after
+// that", and at "and" when what follows starts a new thing ("and spent 9 on
+// coffee", "and remind me to..."), but not inside "call mom and dad".
+const STARTS = "(?:i |i've |i have |i need |i spent|spent|paid|bought|got |remind|remember|need to|have to|call|email|text|pay|buy|book|study|finish|submit|start|go to|meet|meeting|gym|my |add|schedule|salary|rent|save)";
+const AND_SPLIT = new RegExp(`,?\\s+and\\s+(?=${STARTS})`, 'gi');
+export function splitSpoken(text) {
+  return String(text)
+    .replace(/[.!?]+\s+/g, '\n')
+    .replace(/,?\s+\b(?:and then|then|after that|also|plus)\b\s+/gi, '\n')
+    .replace(AND_SPLIT, '\n')
+    .split('\n')
+    .map(s => s.trim().replace(/^(add|remind me to|remember to)\s+/i, '').replace(/[.,;]+$/, ''))
+    .filter(s => s.length > 1);
+}
+export const routeSpoken = text => splitSpoken(text).flatMap(splitCommas).map(route);
+
 // A short description of what each destination will receive.
 export function preview(r, d) {
   if (d === 'planner') return [KINDS[r.task.kind].label, r.task.title, r.task.date && dayLabel(r.task.date), r.task.time && timeLabel(r.task.time), r.task.repeat && 'repeats', r.task.cost && `$${r.task.cost} when done`].filter(Boolean).join(' · ');
@@ -59,7 +75,7 @@ export const canSend = (r, d) => (d === 'money' ? Boolean(r.spend) : d === 'plan
 
 // Send the lines where they were routed. Returns counts per destination.
 export async function sendAll(list) {
-  const n = { planner: 0, money: 0, plan: 0 };
+  const n = { planner: 0, money: 0, plan: 0, made: [], incomeBefore: store.plan.income };
   let income = 0;
   for (const r of list) {
     for (const d of r.dest) {
@@ -67,17 +83,33 @@ export async function sendAll(list) {
       if (d === 'planner') {
         const p = r.task;
         const done = r.dest.includes('money');
-        store.tasks.unshift(makeTask({ title: p.title, date: p.date || (done ? today() : ''), time: p.time, mins: p.mins, repeat: p.repeat, priority: p.priority, project: p.project, kind: p.kind, cost: done ? null : p.cost, costCategory: p.cost ? guessCategory(p.title, -1) : '', done: done && !p.repeat, doneAt: done ? new Date().toISOString() : null, source: 'playground' }));
+        const t = makeTask({ title: p.title, date: p.date || (done ? today() : ''), time: p.time, mins: p.mins, repeat: p.repeat, priority: p.priority, project: p.project, kind: p.kind, cost: done ? null : p.cost, costCategory: p.cost ? guessCategory(p.title, -1) : '', done: done && !p.repeat, doneAt: done ? new Date().toISOString() : null, source: 'playground' });
+        store.tasks.unshift(t);
+        n.made.push({ to: 'planner', id: t.id, label: t.title, sub: [t.date && dayLabel(t.date), t.time && timeLabel(t.time), t.repeat && 'repeats'].filter(Boolean).join(' · ') });
       } else if (d === 'money') {
-        store.drafts.unshift({ id: newId(), ...(await enrich(r.spend)) });
+        const e = { id: newId(), ...(await enrich(r.spend)) };
+        store.drafts.unshift(e);
+        n.made.push({ to: 'money', id: e.id, label: e.merchant || 'Entry', sub: `${Math.abs(e.amount)} ${e.currency} · ${e.category}` });
       } else if (d === 'plan') {
         // Income sets the plan's monthly income; everything else is a line in the plan.
         if (r.planItem.group === 'Income') income += Number(r.planItem.monthly) || 0;
-        else store.plan.items.push({ ...r.planItem, manual: true });
+        else {
+          store.plan.items.push({ ...r.planItem, manual: true });
+          n.made.push({ to: 'plan', id: r.planItem.id, label: r.planItem.label, sub: `$${Math.round(r.planItem.monthly || 0)} a month` });
+        }
       }
       n[d]++;
     }
   }
   if (income) store.plan.income = Math.round(income);
   return n;
+}
+
+// Take back everything one send created.
+export function undoSend(n) {
+  const ids = new Set(n.made.map(m => m.id));
+  store.tasks = store.tasks.filter(t => !ids.has(t.id));
+  store.drafts = store.drafts.filter(d => !ids.has(d.id));
+  store.plan.items = store.plan.items.filter(i => !ids.has(i.id));
+  store.plan.income = n.incomeBefore;
 }

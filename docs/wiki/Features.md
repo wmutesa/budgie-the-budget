@@ -4,7 +4,9 @@
 A written brief of your month, net worth with 1M, 3M and 1Y ranges, a monthly plan, cash flow, savings goals, live exchange rates, subscriptions, expense breakdown, accounts and wallets converted to your base currency.
 
 ## Search and navigation
-Pages sit in a rail on the left with live signs: today's Planner progress, entries waiting in Transactions, and whether markets are open. The search in the top bar finds tasks, spending, subscriptions, goals, accounts, calendars and pages, and turns typed text into "add to Planner" or "add spending". Press `/` to jump to it.
+**Voice from anywhere:** tap the microphone in the top bar and say one or more things ("essay due Friday at 5, then spent 9 on coffee yesterday"). Budgie splits what you said and sends each thing to the Planner, Transactions or your money plan, then shows what went where with Undo.
+
+The search in the top bar finds tasks, spending, subscriptions, goals, accounts, calendars and pages, and turns typed text into "add to Planner" or "add spending". Press `/` to jump to it.
 
 ## Planner
 One place for school, work, projects, events and daily life.

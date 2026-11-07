@@ -137,11 +137,8 @@ async function run(url) {
   await fakeNetwork(page);
   await page.goto(url, { waitUntil: 'load' });
 
-  assert.equal(await page.locator('.dock .dock-btn').count(), 5, 'the dock has the five pages');
-  assert.equal(await page.textContent('.nav-bar .nb-page'), 'Overview', 'the top bar names the page you are on');
-  await page.click('.dock-btn:has-text("Planner")');
-  assert.equal(await page.textContent('.nav-bar .nb-page'), 'Planner', 'the dock switches pages');
-  await page.click('.dock-btn:has-text("Overview")');
+  assert.equal(await page.locator('.nav-bar .nb-pages button').count(), 5, 'the top bar has the five pages');
+  assert.equal(await page.$('.dock'), null, 'there is no sidebar');
   if (process.env.SHOTS) { await page.waitForTimeout(600); await page.screenshot({ path: `${process.env.SHOTS}/overview.png` }); }
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   assert.match(await page.textContent('.lede-money'), /You hold[\s\S]*spent/, 'the brief covers your money');
@@ -460,6 +457,25 @@ async function run(url) {
   assert.match(await talk.textContent('.draft-card >> nth=0'), /Chipotle/, 'dictated words become a draft');
   assert.equal(await talk.$('.say-bar.live'), null, 'the bar leaves recording mode when done');
   await talk.close();
+
+  // Voice from anywhere: say several things, each goes where it belongs, with Undo.
+  const voice = await context.newPage();
+  await fakeNetwork(voice);
+  await voice.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = 'essay due friday at 5pm then spent 9 on coffee yesterday and remind me to call mom tomorrow';");
+  await voice.goto(url, { waitUntil: 'load' });
+  await voice.click('[data-test="voice"]');
+  await voice.waitForSelector('[data-test="voice-live"]');
+  await voice.waitForFunction(() => /coffee/.test(document.querySelector('[data-test="voice-live"]').textContent));
+  await voice.click('[data-test="voice-stop"]');
+  await voice.waitForSelector('[data-test="voice-done"]');
+  const said = await voice.textContent('[data-test="voice-done"]');
+  assert.match(said, /Added 3 things/, 'three things are heard');
+  assert.match(said, /Essay[\s\S]*Planner[\s\S]*Coffee[\s\S]*Transactions[\s\S]*Call mom[\s\S]*Planner/i, 'each goes to the right place');
+  await voice.click('[data-test="voice-undo"]');
+  await voice.click('.nb-pages button:has-text("Planner")');
+  await voice.click('[data-test="view-tasks"]');
+  assert.doesNotMatch(await voice.textContent('[data-test="planner"]'), /Call mom/, 'Undo takes it all back');
+  await voice.close();
 
   // Rwandan francs in the live rates.
   await page.click('.nb-pages button:has-text("Overview")');

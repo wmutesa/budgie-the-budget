@@ -6,6 +6,7 @@ import {
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
 import { fetchFeed } from './ical.js';
+import { modelSource, modelResponse } from './models.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -427,6 +428,12 @@ async function routes(request, env, url) {
       return json({ error: 'Changed on another device', data: row ? JSON.parse(row.data) : null, version: row?.version || 0 }, 409);
     }
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
+  }
+
+  // --- AI model files, through Budgie's own address (see models.js) ---
+  if (path.startsWith('/api/model/') && (method === 'GET' || method === 'HEAD')) {
+    const source = modelSource(path);
+    return source ? modelResponse(request, source) : fail(404, 'Not found');
   }
 
   // --- calendar import for the Planner: the link stays in the person's data; it is never logged ---

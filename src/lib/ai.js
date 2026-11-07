@@ -26,7 +26,8 @@ export const MODELS = {
   medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', id32: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', mb: 1300, good: 'writing' },
   // Runs on the processor (llama.cpp in WebAssembly), so it works in any modern
   // browser, including those without WebGPU. Slower, used when the others cannot run.
-  cpu: { url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf', name: 'Qwen 2.5 (processor)', size: 'about 490 MB', mb: 700, good: 'any browser' },
+  cpu: { url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
+    path: '/api/model/hf/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf', name: 'Qwen 2.5 (processor)', size: 'about 490 MB', mb: 700, good: 'any browser' },
 };
 const FAIL_KEY = 'budgie.aiFailed'; // when the last automatic start failed, to avoid retrying on every visit
 const STALL_MS = 90 * 1000;          // give up if a download makes no progress for this long
@@ -128,12 +129,25 @@ async function checkDevice() {
 }
 const modelId = (key, info) => (info?.f16 ? MODELS[key].id : MODELS[key].id32);
 
+// Models download through Budgie's own address (the Worker fetches them from
+// Hugging Face and GitHub), so content blockers, private relays and strict
+// networks that block those sites do not stop the AI.
+const viaBudgie = url => url.replace('https://huggingface.co/', `${location.origin}/api/model/hf/`).replace('https://raw.githubusercontent.com/', `${location.origin}/api/model/gh/`);
+function budgieAppConfig(webllm) {
+  const base = webllm.prebuiltAppConfig;
+  return { ...base, model_list: base.model_list.map(m => ({ ...m, model: viaBudgie(m.model), model_lib: viaBudgie(m.model_lib) })) };
+}
+// Network hiccups get a second try before giving up.
+const isNetwork = e => /Load failed|Failed to fetch|NetworkError|network/i.test(String(e?.message || e || ''));
+
 // Plain words for what went wrong.
 function explain(e) {
   const m = String(e?.message || e || '');
   if (/shader-f16|f16/i.test(m)) return 'This graphics chip does not support the faster model build.';
   if (/quota|storage|QuotaExceeded/i.test(m)) return 'Not enough free storage in this browser for the model. Free up space, then try again.';
-  if (/network|fetch|Failed to fetch|Load failed|NetworkError/i.test(m)) return 'The model could not download. Check your connection, then try again.';
+  if (/network|fetch|Failed to fetch|Load failed|NetworkError/i.test(m)) return /iPhone|iPad|Macintosh/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent) && !/Chrome|CriOS|Edg/.test(navigator.userAgent)
+    ? 'Safari stopped the model download. Turn off content blockers for this site, check the connection (Low Data Mode or Lockdown Mode can block it), then try again.'
+    : 'The model could not download. Check your connection, then try again.';
   if (/memory|out of memory|allocation/i.test(m)) return 'This device ran out of memory loading the model.';
   if (/stalled/i.test(m)) return 'The download stopped making progress. Try again on a steadier connection.';
   return `The AI could not start (${m.slice(0, 120) || 'unknown reason'}).`;
@@ -159,6 +173,7 @@ export function loadModel(key) {
         worker.addEventListener('error', ev => { ev.preventDefault?.(); reject(new Error(ev.message || 'the AI worker stopped')); });
       });
       const engine = webllm.CreateWebWorkerMLCEngine(worker, modelId(key, info), {
+        appConfig: budgieAppConfig(webllm),
         initProgressCallback: p => { last = Date.now(); Object.assign(ai[key], { progress: Math.round((p.progress || 0) * 100), text: p.text || '' }); },
       });
       engines[key] = await Promise.race([engine, watchdog]);
@@ -210,13 +225,20 @@ export function loadCpuModel() {
         const t = setInterval(() => { if (Date.now() - last > STALL_MS) { clearInterval(t); reject(new Error('stalled')); } }, 5000);
         loading.cpuTimer = t;
       });
-      await Promise.race([
-        w.loadModelFromUrl(MODELS.cpu.url, {
-          n_ctx: 2048,
-          progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
-        }),
-        stall,
-      ]);
+      const download = url => w.loadModelFromUrl(url, {
+        n_ctx: 2048,
+        progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
+      });
+      // Through Budgie first; if that fails on the network, wait and try once more.
+      const attempt = async () => {
+        try { return await download(`${location.origin}${MODELS.cpu.path}`); } catch (e) {
+          if (!isNetwork(e)) throw e;
+          ai.cpu.text = 'Retrying';
+          await new Promise(r => setTimeout(r, 3000));
+          return download(`${location.origin}${MODELS.cpu.path}`);
+        }
+      };
+      await Promise.race([attempt(), stall]);
       engines.cpu = w;
       Object.assign(ai.cpu, { state: 'ready', progress: 100, text: '' });
       return true;

@@ -16,6 +16,7 @@ Only the current `main` branch receives fixes.
 ## How Budgie is protected
 
 - **Accounts:** invite-only sign-in with passkeys. Sessions are `__Host-` cookies (HttpOnly, Secure, SameSite=Lax); expired sessions are removed. Only hashes of session cookies, invite links and recovery codes are stored, in Cloudflare D1. Requests that change data must come from the site itself, and each person can reach only their own data.
+- **AI model downloads:** the in-browser models download through Budgie's own address, so blockers of other sites do not stop them. The Worker serves only the exact model files Budgie uses, to signed-in people; it is not an open proxy.
 - **Rate limits:** sign-in and invite requests are limited to 120 an hour per network address; wrong recovery codes to 10 an hour.
 - **Your control:** sign out of every device at once; members can delete their account and all of its data; anyone can download a full copy of their data.
 - **Security headers** (`public/_headers`, sent by Cloudflare with every page):

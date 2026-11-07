@@ -123,7 +123,7 @@ check('calendar links: only public https addresses', () => {
   assert.equal(feedKind('https://calendar.google.com/calendar/ical/x/private-y/basic.ics'), 'google');
   assert.equal(feedKind('https://outlook.office365.com/owa/calendar/x/reachcalendar.ics'), 'outlook');
 });
-const { route } = await import('../../src/lib/router.js');
+const { route, splitSpoken, routeSpoken } = await import('../../src/lib/router.js');
 check('the Playground inbox sends each line where it belongs', () => {
   const to = t => route(t).dest.sort().join('+');
   assert.equal(to('Essay due Fri 5pm #English'), 'planner');
@@ -137,5 +137,20 @@ check('the Playground inbox sends each line where it belongs', () => {
   assert.equal(to('groceries maybe 400'), 'plan');
   assert.equal(to('save 1200 for laptop by june'), 'plan');
   assert.equal(to('rent 1500'), 'plan');
+});
+check('speech is split into separate things', () => {
+  assert.deepEqual(splitSpoken('essay due friday at 5pm then spent 9 on coffee yesterday and remind me to call mom and dad tomorrow'),
+    ['essay due friday at 5pm', 'spent 9 on coffee yesterday', 'call mom and dad tomorrow']);
+  assert.deepEqual(splitSpoken('Gym on Monday. Salary 4000 a month'), ['Gym on Monday', 'Salary 4000 a month']);
+  assert.deepEqual(routeSpoken('rent 1500 and spent 20 on lunch today').map(r => r.dest.join()), ['plan', 'money']);
+});
+const { modelSource } = await import('../../worker/models.js');
+check('model downloads: only the exact files Budgie uses', () => {
+  assert.equal(modelSource('/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin'), 'https://huggingface.co/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin');
+  assert.equal(modelSource('/api/model/hf/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf'), 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf');
+  assert.match(modelSource('/api/model/gh/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_86/base/Qwen2-0.5B-Instruct-q4f16_1_cs1k-webgpu.wasm'), /^https:\/\/raw\.githubusercontent\.com\//);
+  for (const bad of ['/api/model/hf/evil/repo/resolve/main/x.bin', '/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/../../x', '/api/model/hf/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/other.gguf', '/api/model/gh/evil/x.wasm', '/api/model/gh/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_86/x.js', '/api/model/xx/a']) {
+    assert.equal(modelSource(bad), null, bad);
+  }
 });
 console.log(`\n${n} checks passed`);

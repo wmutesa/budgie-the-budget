@@ -216,6 +216,9 @@ async function main() {
     assert.equal(cal.empty[0], 400, 'an empty link is refused');
     const calSignedOut = await fetch(`${base}/api/calendar`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://example.com/a.ics' }) });
     assert.equal(calSignedOut.status, 401, 'calendar import needs a sign-in');
+    // Model downloads: signed in only, and only Budgie's own model files.
+    assert.equal((await fetch(`${base}/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/mlc-chat-config.json`)).status, 401, 'model files need a sign-in');
+    assert.equal(await owner.page.evaluate(async () => (await fetch('/api/model/hf/someone/else/resolve/main/x.bin')).status), 404, 'other files are refused');
 
     const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
     assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');

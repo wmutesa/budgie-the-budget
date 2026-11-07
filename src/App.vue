@@ -30,7 +30,8 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import PlannerView from './components/PlannerView.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
-import SideDock from './components/SideDock.vue';
+import VoiceAdd from './components/VoiceAdd.vue';
+import Icon from './components/Icon.vue';
 import PlayInbox from './components/PlayInbox.vue';
 import { nextTick } from 'vue';
 import { nav, PAGES, go } from './lib/nav';
@@ -62,6 +63,7 @@ const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* st
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
 // The + button adds what fits the page you are on.
+const PAGE_ICONS = { Overview: 'home', Planner: 'planner', Transactions: 'wallet', Markets: 'trend', Playground: 'shapes' };
 const newLabel = computed(() => ({ Planner: '+ Task', Transactions: '+ Spending', Playground: '+ Anything' }[active.value] || '+ Subscription'));
 async function newThing() {
   // Tasks are added in the Playground's inbox, which sends them to the Planner.
@@ -101,19 +103,24 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
       <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" @skip="skipCodes" />
     </section>
   </main>
-  <div v-else class="app docked">
-    <SideDock />
+  <div v-else class="app">
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header class="cell nav-bar span-12">
         <div class="nb-brand">
-          <span class="nb-page">{{ active }}</span>
+          <span class="brand-word">BUDGIE</span>
           <span class="muted small nb-date">{{ today }}</span>
         </div>
+        <nav class="nb-pages" aria-label="Pages">
+          <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" @click="active = p">
+            <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
+          </button>
+        </nav>
         <GlobalSearch />
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
           <button class="btn primary small" data-test="new" @click="newThing">{{ newLabel }}</button>
+          <VoiceAdd />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
         </div>

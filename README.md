@@ -39,7 +39,7 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | **Markets** | A daily brief: the day's headline, what it means for you, indexes, top stories, markets to watch, a growth calculator and savings ideas for your banks |
 | **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sends each line to the Planner, Transactions, your money plan or more than one. Below it, messy money notes become a plan with scenarios to compare |
 
-Budgie starts empty: every number comes from what you add. Pages sit in a rail on the left (a bar at the bottom on phones), and one search in the top bar finds anything (tasks, spending, subscriptions, goals, pages) and turns what you type into an action. Press `/` to jump to it.
+Budgie starts empty: every number comes from what you add. The top bar has the pages, one search that finds anything (tasks, spending, subscriptions, goals, pages) and turns what you type into an action (press `/`), and a microphone: say several things at once and Budgie adds each where it belongs, with Undo.
 
 ## Run it locally
 
