@@ -107,6 +107,7 @@ async function main() {
     await owner.page.click('[data-test="sign-in"]');
     await owner.page.waitForSelector('.nb-pages');
     await owner.page.click('.nb-pages button:has-text("Planner")');
+    await owner.page.click('[data-test=\"view-tasks\"]');
     await owner.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
 
     // The owner invites someone.
@@ -166,6 +167,7 @@ async function main() {
     await laptop.page.click('[data-test="create-passkey"]');
     await laptop.page.waitForSelector('.nb-pages');
     await laptop.page.click('.nb-pages button:has-text("Planner")');
+    await laptop.page.click('[data-test=\"view-tasks\"]');
     await laptop.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
     await laptop.context.close();
 
@@ -182,6 +184,7 @@ async function main() {
     await lost.page.click('[data-test="create-passkey"]');
     await lost.page.waitForSelector('.nb-pages');
     await lost.page.click('.nb-pages button:has-text("Planner")');
+    await lost.page.click('[data-test=\"view-tasks\"]');
     await lost.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
