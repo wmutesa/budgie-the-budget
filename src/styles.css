@@ -2491,3 +2491,12 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 /* Planner: the add-calendar button stays square; the reminders button is round */
 .pln-feed-add [data-test="feed-add"] { border-radius: 0 !important; }
 [data-test="remind"] { border-radius: 50% !important; width: 32px; height: 32px; padding: 0; }
+
+/* Square, not rounded: notifications, the bell list and tips are plain cards */
+.toast, .bell-pop, .bell-item, .bell-tip, .toast-x { border-radius: 0 !important; }
+.bell-item { margin: 0; border-bottom: 1px solid #f4f4f5 !important; }
+/* Today: the Add something button is square like the rest of the brief */
+.brief-acts .btn, .brief-acts button:has(> .ico-plus) { border-radius: 0 !important; }
+/* Today goals: delete sits at the end of each goal */
+.td-goal-del { width: 24px; height: 24px; padding: 0; margin-left: 4px; vertical-align: middle; opacity: .55; }
+.td-goal-del:hover, .td-goal-del:focus-visible { opacity: 1; }

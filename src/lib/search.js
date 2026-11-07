@@ -15,10 +15,7 @@ const PLACES = [
   ['Planner', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
   ['Digests', 'Digests', 'Your twice-weekly brief of opportunities and news', /digest|brief|news|newsletter|opportunit|intern|scholarship|event|draft|email/],
   ['Digests', 'Digest profile', 'What your digest looks for', /profile|interests|keywords|sources|feeds?/, null, '#digest-profile'],
-  ['Playground', 'Playground', 'Add anything; goals, routines and projects', /playground|inbox|add|write|say/],
-  ['Playground', 'Goals', 'Life goals with milestones', /goal|milestone|dream|aim/, null, '#goals'],
-  ['Playground', 'Build my routine', 'Wake, sleep and your week, drafted by AI', /routine|habit|wake|sleep|morning/, null, '#routine'],
-  ['Playground', 'Projects', 'Colours and names for your projects', /project|category|categories|tag/, null, '#projects'],
+  ['Playground', 'Playground', 'Add anything: tasks, routines and goals', /playground|inbox|add|write|say/],
 ];
 
 const has = (hay, q) => String(hay || '').toLowerCase().includes(q);
@@ -31,7 +28,7 @@ export function actionsFor(text) {
   const bits = [task.date && dayLabel(task.date), task.time && timeLabel(task.time), task.repeat && 'repeats', task.project && `#${task.project}`].filter(Boolean).join(' · ');
   const addTask = { id: 'act-task', icon: 'plus', title: `Add “${task.title}” to Planner`, sub: [task.repeat ? 'Routine' : KINDS[task.kind].label, bits].filter(Boolean).join(' · '), run: () => { const [t] = addFromText(q); go('Planner', { task: t.id }); } };
   const g = parseGoal(q);
-  const addGoal = { id: 'act-goal', icon: 'target', title: `Set a goal: “${g.title}”`, sub: `${g.by ? `By ${dayLabel(g.by)} · ` : ''}milestones added for you`, run: async () => { const goal = makeGoal(g); await planGoal(goal); go('Playground', { anchor: '#goals' }); } };
+  const addGoal = { id: 'act-goal', icon: 'target', title: `Set a goal: “${g.title}”`, sub: `${g.by ? `By ${dayLabel(g.by)} · ` : ''}milestones added for you`, run: async () => { const goal = makeGoal(g); await planGoal(goal); go('Today'); } };
   return GOAL_WORDS.test(q) && !task.time ? [addGoal, addTask] : [addTask, addGoal];
 }
 
@@ -48,8 +45,8 @@ export function search(text, page) {
     });
   if (tasks.length) groups.push({ name: 'Planner', page: 'Planner', items: tasks });
   const goals = store.goals.filter(g => has(g.title, q) || has(g.why, q)).slice(0, 4)
-    .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Playground', { anchor: '#goals' }) }; });
-  if (goals.length) groups.push({ name: 'Goals', page: 'Playground', items: goals });
+    .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Today') }; });
+  if (goals.length) groups.push({ name: 'Goals', page: 'Today', items: goals });
   const ed = digests.current;
   const stories = ed ? [ed.lead, ...(ed.stories || [])].filter(s => s && (has(s.headline, q) || has(s.desc || s.dek, q) || has(s.tag, q))).slice(0, 4)
     .map((s, i) => ({ id: `d-${i}-${s.headline}`, icon: 'list', title: s.headline, sub: `Digest · ${s.tag || 'Lead'}${s.deadline ? ` · ${s.deadline}` : ''}`, run: () => go('Digests') })) : [];

@@ -158,28 +158,18 @@ async function run(url) {
   await page.waitForFunction(() => [...document.querySelectorAll('[data-test="inbox-made"]')].some(li => /Haircut/.test(li.textContent) && li.classList.contains('to-routine')));
   await page.locator('[data-test="inbox-made"]', { hasText: 'Haircut' }).locator('[data-test="made-task"]').click();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-test="inbox-made"]')].some(li => /Haircut/.test(li.textContent) && li.classList.contains('to-task')));
-  // Goals: milestones are planned (by rules here) and land in the Planner.
-  await page.waitForSelector('[data-test="goal"]');
-  assert.match(await page.textContent('[data-test="goals"]'), /Land a summer internship[\s\S]*0 of 6 steps[\s\S]*by/, 'the goal gets six milestones and its date');
-  await page.click('[data-test="goal"] .gl-top');
-  await page.click('[data-test="goal"] .gl-steps li >> nth=0 >> input');
-  assert.match(await page.textContent('[data-test="goal"]'), /1 of 6 steps[\s\S]*17%/, 'ticking a milestone moves the goal');
-  await page.fill('[data-test="goal-title"]', 'Run a 10K by March');
-  await page.click('[data-test="goal-add"]');
-  await page.waitForFunction(() => document.querySelectorAll('[data-test="goal"]').length === 2);
-  assert.match(await page.textContent('[data-test="projects"]'), /#English/, 'projects are listed from your tasks');
-  // Routine, built here in the Playground.
-  await page.fill('[data-test="routine-text"]', 'call friends sundays');
-  await page.click('[data-test="routine-build"]');
-  await page.waitForSelector('[data-test="routine-draft"]');
-  assert.match(await page.textContent('[data-test="routine-draft"]'), /7 AM[\s\S]*Wake up[\s\S]*Call friends[\s\S]*Sun/, 'the routine starts at wake-up and includes what you wrote');
-  await page.click('[data-test="routine-save"]');
+  // The Playground is only the inbox: no goal, routine or project boards.
+  for (const id of ['goals', 'projects', 'routine-text']) assert.equal(await page.$(`[data-test="${id}"]`), null, `no ${id} on the Playground`);
+  // A second goal, from the inbox too.
+  await page.fill('[data-test="inbox-text"]', 'I want to run a 10K by March');
+  await page.click('[data-test="inbox-send"]');
+  await page.waitForFunction(() => /Added 1 thing/.test(document.querySelector('[data-test="inbox-done"]')?.textContent || ''));
 
   // Planner: what the inbox sent is here.
   await page.click(tab('Planner'));
   await page.click('[data-test="view-tasks"]');
   assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority, with its time on the right');
-  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits and the routine repeat on their days');
+  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits repeat on their days');
   assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
   // Deleting is one click, with Undo in a notification.
   const before = await page.locator('[data-test="task"]').count();
@@ -189,7 +179,7 @@ async function run(url) {
   assert.equal(await page.locator('[data-test="task"]').count(), before, 'Undo brings it back');
   if (process.env.SHOTS) { const b = await page.locator('.pln-main').boundingBox(); await page.locator('.pln-group[data-group="Tomorrow"] [data-test="task"] >> nth=0').hover(); await page.screenshot({ path: `${process.env.SHOTS}/rows.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } }); }
   await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
-  assert.match(await page.textContent('.pln-main'), /Show 2 done/, 'a ticked task moves to the done list');
+  assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
   await idea.locator('[data-test="suggestion-add"]').click();
   assert.match(await page.textContent('.pln-group[data-group="Today"]'), /Work on Essay 2/, 'an accepted suggestion becomes a task for today');
@@ -274,7 +264,7 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
-  assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
+  assert.ok(/Land a summer internship[\s\S]*0\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
   assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
 
@@ -309,21 +299,7 @@ async function run(url) {
   assert.match(said, /Added 3 things/, 'three things are heard and added when you stop');
   assert.deepEqual(await voice.$$eval('[data-test="inbox-made"]', li => li.map(x => x.className.match(/to-(\w+)/)[1])), ['task', 'routine', 'goal'], 'each is sorted');
   await voice.click('[data-test="inbox-undo"]');
-  assert.doesNotMatch(await voice.textContent('[data-test="goals"]'), /Read 12 books/, 'Undo takes it all back');
-  // Say a goal: words appear live, and stopping plans it, with "because" as why.
-  await voice.evaluate(() => { window.__speechPhrase = 'I want to learn Spanish by June because I am moving to Madrid'; });
-  await voice.click('#goals .dict-wrap .mic-btn');
-  await voice.waitForFunction(() => /Spanish/.test(document.querySelector('[data-test="goal-title"]').value));
-  await voice.click('#goals .dict-wrap .mic-btn');
-  await voice.waitForFunction(() => /Learn Spanish/.test(document.querySelector('[data-test="goals"]').textContent));
-  assert.match(await voice.textContent('[data-test="goal"]:has-text("Learn Spanish")'), /by[\s\S]*I am moving to Madrid/, 'a spoken goal gets its date and why');
-  // Say your week: words appear live, and stopping drafts the routine.
-  await voice.evaluate(() => { window.__speechPhrase = 'gym every monday at 6pm'; });
-  await voice.click('#routine .dict-wrap .mic-btn');
-  await voice.waitForFunction(() => /gym/.test(document.querySelector('[data-test="routine-text"]').value));
-  await voice.click('#routine .dict-wrap .mic-btn');
-  await voice.waitForSelector('[data-test="routine-draft"]');
-  assert.match(await voice.textContent('[data-test="routine-draft"]'), /6 PM[\s\S]*Gym[\s\S]*Mon/, 'a spoken week becomes a routine draft');
+  assert.equal(await voice.$('[data-test="inbox-done"]'), null, 'Undo takes it all back');
   await voice.close();
 
   // First-time guide, once per person, on an empty account.
@@ -345,8 +321,8 @@ async function run(url) {
     if (/Start using/.test(label)) break;
     await guide.waitForTimeout(400);
   }
-  assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Four pages[\s\S]*Goals with milestones[\s\S]*Digests, coming soon/, 'the guide covers the four pages');
+  assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
+  assert.match(seen, /Four pages[\s\S]*Add anything[\s\S]*Digests, coming soon/, 'the guide covers the four pages');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Today'));

@@ -10,9 +10,6 @@ import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
 import DigestsView from './components/DigestsView.vue';
 import PlayInbox from './components/PlayInbox.vue';
-import GoalsBoard from './components/GoalsBoard.vue';
-import ProjectsCard from './components/ProjectsCard.vue';
-import PlanRoutine from './components/PlanRoutine.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
 import Icon from './components/Icon.vue';
 import Toasts from './components/Toasts.vue';
@@ -115,9 +112,6 @@ onUnmounted(() => clearInterval(timer));
       </template>
       <template v-else>
         <PlayInbox />
-        <GoalsBoard />
-        <ProjectsCard />
-        <PlanRoutine class="span-12" />
       </template>
     </main>
 

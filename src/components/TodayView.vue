@@ -7,6 +7,7 @@ import { DIGESTS_LIVE, digests, loadDigests } from '../lib/digest';
 import { go } from '../lib/nav';
 import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
+import { deleteGoal } from '../lib/undo';
 
 // Today: your day first (what is on, what is next, deadlines, streaks), then
 // your goals and the latest digest. Everything comes from your own planner.
@@ -80,10 +81,10 @@ const nextStep = computed(() => {
   </section>
 
   <section class="card cell" :class="DIGESTS_LIVE ? 'span-6' : 'span-12'" data-test="today-goals">
-    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Open goals" aria-label="Open goals" @click="go('Playground', { anchor: '#goals' })"><Icon name="right" /></button></div>
+    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
     <ul v-if="goals.length" class="td-goals">
       <li v-for="x in goals" :key="x.g.id">
-        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}</span></span>
+        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>
         <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
         <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
       </li>
