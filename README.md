@@ -2,7 +2,7 @@
 
 # Budgie
 
-Budgie is a personal web app for money: spending, subscriptions, budgets, savings goals, accounts and the markets, with an AI helper that runs on your own device. It is invite-only. Each person signs in with a passkey, and their data syncs to their own private account.
+Budgie is a personal assistant for your money and your time: spending, subscriptions, budgets, savings goals and the markets, plus a planner for school, work, projects and daily routines, with an AI helper that runs on your own device. It is invite-only. Each person signs in with a passkey, and their data syncs to their own private account.
 
 ## About
 
@@ -11,7 +11,7 @@ Budgie is a personal web app for money: spending, subscriptions, budgets, saving
 | | Where it lives | Who can see it |
 | --- | --- | --- |
 | The source code in this repository | GitHub | Anyone |
-| Your entries, budgets, accounts, goals, plans and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
+| Your entries, budgets, accounts, goals, plans, tasks, calendar links and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
 | Passkeys | Your device or your Apple, Google or Microsoft password manager | Only you; Budgie keeps the public half |
 | AI | Runs on your device (in the browser, or Ollama on your computer) | Nobody: no cloud AI service, no API keys |
 
@@ -34,6 +34,7 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | Page | What it is for |
 | --- | --- |
 | **Overview** | Your month in a sentence, net worth, plan, cash flow, savings goals, live exchange rates, subscriptions, upcoming payments and wallets |
+| **Planner** | Tasks, deadlines, classes, events and routines in four views (Tasks, Agenda, Week, Focus). Type or say anything and Budgie reads the date, time, repeat, project, priority and cost. Imports Canvas, Google, Apple and Outlook calendars, builds a daily routine, suggests what to prepare for, keeps streaks, and sends ticked costs to Transactions |
 | **Transactions** | Add spending by typing, speaking, scanning a receipt, or importing a PDF, CSV or Excel statement; review it; AI-drafted budgets; recent activity; your accounts |
 | **Markets** | A daily brief: the day's headline, what it means for you, indexes, top stories, markets to watch, a growth calculator and savings ideas for your banks |
 | **Playground** | Write or say messy notes and Budgie turns them into a plan, with scenarios to compare |
@@ -62,6 +63,7 @@ OLLAMA_ORIGINS="http://localhost:8787,<your Budgie address>" ollama serve
 
 ```bash
 npm run build
+npm run test:unit      # Planner rules and the calendar reader, no browser
 npm test               # browser smoke test; live services and the account server are faked
 npm run test:accounts  # the real Worker and a local database, with virtual passkeys
 ```
@@ -76,7 +78,8 @@ npm run test:accounts  # the real Worker and a local database, with virtual pass
 ## Project layout
 
 ```
-worker/index.js           account server: passkeys, invites, sessions, sync, markets
+worker/index.js           account server: passkeys, invites, sessions, sync, markets, calendar import
+worker/ical.js            calendar link checks and the iCal reader
 migrations/               database tables
 src/
   App.vue                 navigation and the pages

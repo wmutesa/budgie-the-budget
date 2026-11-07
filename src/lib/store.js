@@ -41,6 +41,14 @@ function fromSaved(saved = {}) {
     goals: Array.isArray(saved.goals) ? saved.goals : [],
     // One net-worth reading per day, for the chart: { date, total }.
     netHistory: Array.isArray(saved.netHistory) ? saved.netHistory.slice(-400) : [],
+    // Planner: tasks, classes, assignments, events and routines (see tasks.js).
+    tasks: Array.isArray(saved.tasks) ? saved.tasks.filter(t => t && t.id && t.title) : [],
+    // Calendar links to import from: { id, name, url, kind, lastSync, count, error }. Private to the account.
+    feeds: Array.isArray(saved.feeds) ? saved.feeds.slice(0, 12) : [],
+    // What the routine was built from: { wake, sleep, text, builtAt }.
+    routine: saved.routine && typeof saved.routine === 'object' ? saved.routine : { wake: '07:00', sleep: '23:00', text: '' },
+    // Planner settings: { view, remind }.
+    planner: saved.planner && typeof saved.planner === 'object' ? saved.planner : { view: 'Tasks', remind: false },
   };
 }
 const SAVED_FIELDS = Object.keys(fromSaved());

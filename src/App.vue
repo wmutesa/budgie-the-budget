@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import HeadlineCell from './components/HeadlineCell.vue';
 import GoalCell from './components/GoalCell.vue';
 import NetWorthCell from './components/NetWorthCell.vue';
@@ -28,14 +28,19 @@ import MarketsView from './components/MarketsView.vue';
 import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
+import PlannerView from './components/PlannerView.vue';
+import { nav, PAGES } from './lib/nav';
+import { refreshFeeds } from './lib/calendar';
+import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { loadRates, ratesLabel, rates } from './lib/rates';
 import { store } from './lib/store';
 
-// Four pages: Overview (dashboard), Transactions (capture, review, budgets, accounts), Markets (news and savings ideas), Playground (build a plan).
-const tabs = ['Overview', 'Transactions', 'Markets', 'Playground'];
-const active = ref('Overview');
+// Five pages: Overview (dashboard), Planner (tasks, routines, calendars), Transactions (capture, review, budgets, accounts),
+// Markets (news and savings ideas), Playground (build a plan).
+const tabs = PAGES;
+const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
 const searching = ref(false);
 const seed = ref('');
 const openSearch = (q = '') => { seed.value = q; searching.value = true; };
@@ -43,6 +48,8 @@ const openSearch = (q = '') => { seed.value = q; searching.value = true; };
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
 watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immediate: true });
+// Calendars refresh and reminders run once your data has loaded.
+watch(() => account.sync, s => { if (account.status === 'signed-in' && s === 'saved') { refreshFeeds(); startReminders(); } });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;
 }, { immediate: true });
@@ -56,7 +63,7 @@ let timer = null;
 onMounted(() => {
   startAccount();
   loadRates(store.base);
-  timer = setInterval(() => loadRates(store.base, { force: true }), 30 * 60 * 1000);
+  timer = setInterval(() => { loadRates(store.base, { force: true }); if (account.status === 'signed-in') refreshFeeds(); }, 30 * 60 * 1000);
   document.addEventListener('visibilitychange', onVisible);
 });
 // Coming back to the tab refreshes rates if they are older than an hour.
@@ -122,6 +129,9 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
         <BudgetsView class="span-4" id="budgets" />
         <TransactionsView class="span-8" id="ledger" :limit="40" fill />
         <RecurringCell class="span-12" id="recurring" />
+      </template>
+      <template v-else-if="active === 'Planner'">
+        <PlannerView />
       </template>
       <template v-else-if="active === 'Playground'">
         <PlaygroundView />

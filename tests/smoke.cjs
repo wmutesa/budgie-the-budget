@@ -97,6 +97,12 @@ async function fakeApi(page, account = fakeAccount) {
       watch: [{ symbol: 'VTI', name: 'US stock market', about: 'x', price: 310, currency: 'USD', day: 0.5, month: 1.9, year: 14.2, spark: [1, 2] }, { symbol: 'BND', name: 'Bonds', about: 'x', price: 72, currency: 'USD', day: 0.1, month: 0.4, year: 3.1, spark: [1, 2] }],
       news: [{ title: 'Stocks rise as the Fed holds rates', link: 'https://finance.yahoo.com/news/a.html', source: 'Reuters', date: new Date().toUTCString() }],
     } });
+    if (p === '/api/calendar') {
+      const { url } = JSON.parse(req.postData());
+      if (!/^https:\/\//.test(url)) return route.fulfill({ status: 400, json: { error: 'Use the https or webcal link of the calendar.' } });
+      const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+      return route.fulfill({ json: { kind: 'canvas', name: 'Fall courses', events: [{ uid: 'a1', title: 'Lab report [CHEM 110 Fall 2026]', start: { date: inDays(3) }, end: null, location: '', url: 'https://school.instructure.com/courses/1', notes: '', repeat: null }] } });
+    }
     if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
     if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
     if (p === '/api/people') return route.fulfill({ json: { people: [{ id: 'u1', name: 'Willy', role: 'owner', last_seen: Date.now() }], invites: [] } });
@@ -169,7 +175,7 @@ async function run(url) {
   await page.reload({ waitUntil: 'load' });
   assert.match(await page.textContent('#subscriptions'), /Netflix/, 'subscriptions survive a reload');
 
-  await page.click('.nb-pages button:nth-child(2)');
+  await page.click('.nb-pages button:has-text("Transactions")');
   assert.match(await page.textContent('body'), /Monthly budgets/, 'transactions page shows budgets');
   await page.waitForFunction(() => /Drafted from your spending|Made by AI/.test(document.querySelector('[data-test="budgets-by"]')?.textContent || ''));
   const budgetText = await page.textContent('#budgets');
@@ -246,8 +252,8 @@ async function run(url) {
   assert.match(require('node:fs').readFileSync(await csvFile.path(), 'utf8'), /^Date,Merchant,Amount,Currency,Category,Account,Source\n[\s\S]*Planet Fitness/, 'the CSV has a header and the entries');
 
   // Markets: news and savings ideas use the whole page.
-  await page.click('.nb-pages button:nth-child(3)');
-  assert.match(await page.textContent('.nb-pages button:nth-child(3)'), /Markets/, 'the third page is called Markets');
+  await page.click('.nb-pages button:has-text("Markets")');
+  assert.match(await page.textContent('.nb-pages button:has-text("Markets")'), /Markets/, 'the third page is called Markets');
   assert.equal(await page.$('#activity'), null, 'All activity is gone from this page');
   assert.equal(await page.$('#reports'), null, 'Year in numbers is gone from this page');
   assert.equal(await page.$('.insight'), null, 'the old "What Budgie thinks" card is gone');
@@ -270,7 +276,7 @@ async function run(url) {
   assert.match(await page.textContent('#opportunities'), /Bank of America/, 'Bank of America opportunities appear');
 
   // Playground: messy notes become an organised plan, then budgets.
-  await page.click('.nb-pages button:nth-child(4)');
+  await page.click('.nb-pages button:has-text("Playground")');
   await page.fill('[data-test="scratch"]', 'salary 4000\nrent 1500, groceries maybe 450\nnetflix 15.49, github 4\nsave 1200 for laptop by june');
   await page.click('[data-test="organize"]');
   assert.match(await page.textContent('.lane[data-group="Needs"]'), /Rent/, 'rent lands in needs');
@@ -284,12 +290,73 @@ async function run(url) {
   await page.click('[data-test="load-scenario"]');
   assert.equal(await page.inputValue('[data-test="plan-income"]'), '4000', 'opening a saved scenario brings its plan back');
   await page.click('[data-test="apply-plan"]');
-  await page.click('.nb-pages button:nth-child(2)');
+  await page.click('.nb-pages button:has-text("Transactions")');
   assert.match(await page.textContent('#budgets'), /\$1,500/, 'the plan sets the housing budget');
-  await page.click('.nb-pages button:nth-child(1)');
+  await page.click('.nb-pages button:has-text("Overview")');
+
+  // Planner: type anything, and Budgie works out when, how often and how important.
+  await page.click('.nb-pages button:has-text("Planner")');
+  await page.waitForSelector('[data-test="planner"]');
+  assert.match(await page.textContent('[data-test="planner-summary"]'), /Nothing planned for today yet/, 'an empty planner says so');
+  await page.fill('[data-test="plan-add"]', 'Essay 2 due tomorrow 5pm #English');
+  assert.match(await page.textContent('[data-test="plan-preview"]'), /Assignment[\s\S]*Tomorrow[\s\S]*5 PM[\s\S]*#English[\s\S]*Essay 2/, 'the preview shows what Budgie understood');
+  await page.press('[data-test="plan-add"]', 'Enter');
+  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /Essay 2[\s\S]*5 PM[\s\S]*Assignment[\s\S]*#English[\s\S]*High/, 'a deadline tomorrow lands in Tomorrow, marked high priority');
+  await page.fill('[data-test="plan-add"]', 'Gym MWF 6pm');
+  await page.click('[data-test="plan-add-btn"]');
+  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Gym[\s\S]*6 PM[\s\S]*Mon Wed Fri/, 'a habit repeats on its days');
+  await page.fill('[data-test="plan-add"]', 'haircut today $25');
+  await page.press('[data-test="plan-add"]', 'Enter');
+  await page.click('.pln-group[data-group="Today"] [data-test="task-check"]');
+  assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
+  // Suggestions: a deadline tomorrow with no plan gets a work session.
+  const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
+  await idea.locator('button:has-text("Add")').click();
+  assert.match(await page.textContent('.pln-group[data-group="Today"]'), /Work on Essay 2/, 'an accepted suggestion becomes a task for today');
+  // Routine built from wake and sleep times and a few words.
+  await page.fill('[data-test="routine-text"]', 'gym 3x a week at 6pm, call friends sundays');
+  await page.click('[data-test="routine-build"]');
+  await page.waitForSelector('[data-test="routine-draft"]');
+  assert.match(await page.textContent('[data-test="routine-draft"]'), /7 AM[\s\S]*Wake up[\s\S]*Shower[\s\S]*Call friends[\s\S]*Sun/, 'the routine starts at wake-up and includes what you wrote');
+  await page.click('[data-test="routine-save"]');
+  assert.match(await page.textContent('.pln-group[data-group="Routines and classes"]'), /Wake up[\s\S]*Sleep/, 'the routine is saved to the planner');
+  // Calendars: a Canvas link brings assignments in, with the course as the project.
+  await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
+  await page.click('[data-test="feed-add"]');
+  await page.waitForSelector('.pln-feeds li');
+  assert.match(await page.textContent('[data-test="calendars"]'), /Canvas[\s\S]*Fall courses[\s\S]*1 event/, 'the calendar is listed with its name');
+  assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*From calendar/, 'Canvas items become assignments with the course');
+  await page.click('.pln-filter .chip-btn:has-text("#English")');
+  assert.doesNotMatch(await page.textContent('.pln-main'), /Lab report/, 'filtering by project hides the rest');
+  await page.click('.pln-filter .chip-btn:has-text("Everything")');
+  // The other views.
+  await page.click('[data-test="view-agenda"]');
+  assert.match(await page.textContent('[data-test="agenda-day"] >> nth=0'), /Today[\s\S]*Haircut/, 'the agenda starts with today');
+  await page.click('[data-test="view-week"]');
+  assert.equal(await page.locator('[data-test="week"] .pln-wday').count(), 7, 'the week has seven days');
+  await page.click('[data-test="view-focus"]');
+  assert.match(await page.textContent('[data-test="focus"]'), /done today/, 'focus shows progress for today');
+  assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
+  await page.click('.pln-top li:has-text("Essay 2") button:has-text("Focus 25 min")');
+  assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  await page.click('[data-test="view-tasks"]');
+  // SHOTS=<folder> saves screenshots of the Planner for a visual check.
+  if (process.env.SHOTS) {
+    await page.click('.pln-group[data-group="Tomorrow"] .tk-main');
+    for (const v of ['tasks', 'agenda', 'week', 'focus']) { await page.click(`[data-test="view-${v}"]`); await page.screenshot({ path: `${process.env.SHOTS}/planner-${v}.png`, fullPage: true }); }
+    await page.click('[data-test="view-tasks"]');
+  }
+  // Money follows: the haircut with a cost waits in Transactions, and the bell knows about today.
+  await page.click('.nb-pages button:has-text("Transactions")');
+  await page.waitForSelector('#review');
+  assert.match(await page.textContent('#review'), /Haircut[\s\S]*From Planner/, 'a ticked task with a cost becomes an entry to review');
+  await page.click('[data-test="discard-all"], #review button:has-text("Discard all")');
+  await page.click('[data-test="bell"]');
+  assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
+  await page.click('[data-test="bell"]');
 
   // Sentences with relative dates become clean drafts.
-  await page.click('.nb-pages button:nth-child(2)');
+  await page.click('.nb-pages button:has-text("Transactions")');
   await page.fill('[data-test="quick-note"]', 'spent 12.50 on lunch at chipotle last friday');
   await page.press('[data-test="quick-note"]', 'Enter');
   await page.waitForSelector('#review');
@@ -303,7 +370,7 @@ async function run(url) {
   await fakeNetwork(talk);
   await talk.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = '12.50 for lunch at Chipotle yesterday';");
   await talk.goto(url, { waitUntil: 'load' });
-  await talk.click('.nb-pages button:nth-child(2)');
+  await talk.click('.nb-pages button:has-text("Transactions")');
   await talk.click('.say-bar .mic-btn');
   await talk.waitForSelector('.say-bar.live');
   await talk.waitForFunction(() => document.querySelector('[data-test="quick-note"]').value.includes('Chipotle'));
@@ -314,7 +381,7 @@ async function run(url) {
   await talk.close();
 
   // Rwandan francs in the live rates.
-  await page.click('.nb-pages button:nth-child(1)');
+  await page.click('.nb-pages button:has-text("Overview")');
   assert.match(await page.textContent('.fx'), /RWF/, 'Rwandan franc rate appears');
 
   // A long subscription list stays compact.
@@ -352,11 +419,11 @@ async function run(url) {
   assert.ok(steps >= 8, `the guide walks through the app (${steps} steps)`);
   // A new account starts empty: no sample entries, and each card says what to add.
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
-  await guide.click('.nb-pages button:nth-child(1)');
+  await guide.click('.nb-pages button:has-text("Overview")');
   const body = await guide.textContent('body');
   assert.doesNotMatch(body, /Trader Joe|sample data|Sample balances|Investment portfolio/i, 'a new account has no sample data');
   assert.ok((await guide.locator('.empty-note').count()) >= 4, 'empty cards explain what to add');
-  await guide.click('.nb-pages button:nth-child(2)');
+  await guide.click('.nb-pages button:has-text("Transactions")');
   await guide.click('[data-test="add-account"]');
   await guide.fill('.acc-form input[aria-label="Account name"]', 'Bank of Kigali');
   await guide.fill('.acc-form input[aria-label="Balance today"]', '250000');
@@ -364,7 +431,7 @@ async function run(url) {
   await guide.click('.pick-pop .pick-opt:has-text("RWF")');
   await guide.click('.acc-form button[type="submit"]');
   assert.match(await guide.textContent('[data-test="accounts"]'), /Bank of Kigali[\s\S]*RWF/, 'you can add your own account');
-  await guide.click('.nb-pages button:nth-child(1)');
+  await guide.click('.nb-pages button:has-text("Overview")');
   await guide.click('[data-test="add-goal"]');
   await guide.fill('.goal-form input[aria-label="Goal name"]', 'Emergency fund');
   await guide.fill('.goal-form input[aria-label="Target"]', '5000');
@@ -413,6 +480,11 @@ async function run(url) {
   await mobile.goto(url, { waitUntil: 'load' });
   const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(overflow <= 0, `no horizontal scroll on a phone (overflow ${overflow}px)`);
+  await mobile.click('.nb-pages button:has-text("Planner")');
+  await mobile.click('[data-test="view-week"]');
+  if (process.env.SHOTS) await mobile.screenshot({ path: `${process.env.SHOTS}/planner-phone.png`, fullPage: true });
+  const planOverflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  assert.ok(planOverflow <= 0, `the Planner fits a phone (overflow ${planOverflow}px)`);
 
   await browser.close();
   assert.deepEqual(errors, [], 'no page errors');

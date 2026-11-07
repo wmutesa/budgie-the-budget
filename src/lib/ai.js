@@ -37,6 +37,7 @@ const ROUTES = {
   budget: ['ollama', 'medium', 'small', 'cpu'],
   news: ['ollama', 'medium', 'small', 'cpu'],
   account: ['ollama', 'small', 'medium', 'cpu'],
+  plan: ['ollama', 'medium', 'small', 'cpu'],
 };
 
 const engineState = () => ({ state: 'idle', progress: 0, text: '', error: '', detail: '' }); // idle | loading | ready | error | skipped | waiting
@@ -48,7 +49,7 @@ export const ai = reactive({
   cpu: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { receipt: '', advice: '', budget: '', news: '', account: '' }, // which model last did each task
+  used: { receipt: '', advice: '', budget: '', news: '', account: '', plan: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -379,4 +380,38 @@ export async function aiAdvise(facts) {
     { role: 'user', content: facts.join('\n') },
   ], { temperature: 0.2, max_tokens: 160 });
   return reply ? reply.trim() : null;
+}
+
+// ---------- Planner ----------
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+// Adjust a rules-built routine to what the person wrote. Returns the new list or null.
+export async function aiRefineRoutine(items, { wake, sleep, text }) {
+  const reply = await route('plan', [
+    { role: 'system', content: 'You plan a realistic daily routine. Adjust the draft to fit what the person wrote: change times, add missing habits they mention, remove clashes. Keep meals, sleep and their commitments. Reply with JSON only: {"routine": [{"title": string, "time": "HH:MM" 24-hour, "minutes": number, "days": ["mon".."sun"] or "daily"}]}' },
+    { role: 'user', content: `Wake ${wake}, sleep ${sleep}. About my week: ${String(text || 'nothing more').slice(0, 600)}\nDraft: ${JSON.stringify(items.map(i => ({ title: i.title, time: i.time, minutes: i.mins, days: i.repeat?.every === 'week' ? i.repeat.days.map(d => DAYS[d]) : 'daily' })))}` },
+  ], { json: true, temperature: 0.2, max_tokens: 700 });
+  const list = firstJSON(reply)?.routine;
+  if (!Array.isArray(list) || list.length < 3) return null;
+  const clean = list.slice(0, 24).map(x => {
+    const title = String(x.title || '').replace(/[<>]/g, '').trim().slice(0, 60);
+    const time = HHMM.test(x.time) ? x.time : '';
+    const days = Array.isArray(x.days) ? [...new Set(x.days.map(d => DAYS.indexOf(String(d).slice(0, 3).toLowerCase())).filter(d => d >= 0))].sort() : [];
+    const mins = Number(x.minutes) > 0 && Number(x.minutes) <= 600 ? Math.round(Number(x.minutes)) : null;
+    const known = items.find(i => i.title.toLowerCase() === title.toLowerCase());
+    return title && { title, time, mins, kind: known?.kind || 'routine', repeat: days.length && days.length < 7 ? { every: 'week', days } : { every: 'day' } };
+  }).filter(Boolean);
+  return clean.length >= 3 ? clean.sort((a, b) => (a.time || '99').localeCompare(b.time || '99')) : null;
+}
+
+// Up to three task ideas the person has not listed. Returns [{ title, why }] or null.
+export async function aiSuggestTasks(facts) {
+  const reply = await route('plan', [
+    { role: 'system', content: 'You help a student and young professional plan their life. Suggest up to 3 useful tasks they have not listed: preparation for what is coming, healthy habits, people to keep in touch with, or small money chores. Each must be specific and doable in one sitting. Use only the facts given. Reply with JSON only: {"tasks": [{"title": string under 60 characters, "why": one short sentence}]}' },
+    { role: 'user', content: facts.join('\n') },
+  ], { json: true, temperature: 0.4, max_tokens: 300 });
+  const list = firstJSON(reply)?.tasks;
+  if (!Array.isArray(list)) return null;
+  return list.slice(0, 3).map(x => ({ title: String(x.title || '').replace(/[<>]/g, '').trim().slice(0, 60), why: String(x.why || '').replace(/[<>]/g, '').trim().slice(0, 160) })).filter(x => x.title);
 }

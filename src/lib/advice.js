@@ -3,6 +3,8 @@ import { computed } from 'vue';
 import { store, monthly, daysUntil, thisMonth } from './store';
 import { convert } from './rates';
 import { budgetRows, monthTotals, spentIn } from './ledger';
+import { today, addDays, occurrences, dayLabel } from './tasks';
+import { go } from './nav';
 
 const usd = n => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 const round50 = n => Math.ceil(n / 50) * 50;
@@ -85,6 +87,15 @@ export const cards = computed(() => {
   if (goal && surplus.value > 0) {
     out.push({ id: `save-${month}`, tone: 'good', title: 'Money left to put to work', body: `Income is ahead of projected spending by about ${usd(surplus.value)}. Moving half of that to ${goal.name.toLowerCase()} gets you to ${usd(goal.target)} sooner.` });
   }
+
+  // Planner: what is due today, what is late, and deadlines tomorrow.
+  const d = today();
+  const left = occurrences(d, d).filter(x => !x.done && x.task.kind !== 'routine');
+  if (left.length) out.unshift({ id: `plan-today-${d}`, tone: 'info', title: `${left.length} thing${left.length === 1 ? '' : 's'} on today`, body: left.slice(0, 4).map(x => x.task.title).join(', ') + (left.length > 4 ? ` and ${left.length - 4} more.` : '.'), action: { label: 'Open Planner', run: () => go('Planner') } });
+  const late = store.tasks.filter(t => !t.repeat && !t.done && t.date && t.date < d);
+  if (late.length) out.unshift({ id: `plan-late-${d}`, tone: 'warn', title: `${late.length} overdue task${late.length === 1 ? '' : 's'}`, body: `${late.slice(0, 3).map(t => t.title).join(', ')}. Do them, move them or let them go.`, action: { label: 'Open Planner', run: () => go('Planner') } });
+  const tomorrow = store.tasks.filter(t => !t.repeat && !t.done && t.date === addDays(d, 1) && ['assignment', 'exam'].includes(t.kind));
+  tomorrow.forEach(t => out.unshift({ id: `plan-due-${t.id}`, tone: 'warn', title: `${t.title} is due ${dayLabel(t.date).toLowerCase()}`, body: t.project ? `For ${t.project}.` : 'Leave time for it today.', action: { label: 'Open Planner', run: () => go('Planner') } }));
 
   return out.filter(c => !store.dismissed.includes(c.id));
 });

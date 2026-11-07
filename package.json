@@ -11,6 +11,7 @@
     "check": "vite build",
     "test": "node tests/smoke.cjs",
     "test:accounts": "node tests/accounts.cjs",
+    "test:unit": "node tests/unit/run.mjs",
     "dev:api": "wrangler dev --local --port 8787"
   },
   "devDependencies": {

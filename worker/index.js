@@ -5,6 +5,7 @@ import {
   generateRegistrationOptions, verifyRegistrationResponse,
   generateAuthenticationOptions, verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { fetchFeed } from './ical.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -15,6 +16,7 @@ const RECOVERY_CODES = 8;
 const RECOVERY_LINK_MS = 15 * 60 * 1000;
 const MAX_FAILED_RECOVERIES = 10; // per network address per hour
 const OPEN_PER_HOUR = 120; // sign-in and invite requests per network address per hour
+const CALENDAR_PER_HOUR = 60; // calendar imports per person per hour
 
 // ---------- small helpers ----------
 const now = () => Date.now();
@@ -425,6 +427,21 @@ async function routes(request, env, url) {
       return json({ error: 'Changed on another device', data: row ? JSON.parse(row.data) : null, version: row?.version || 0 }, 409);
     }
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
+  }
+
+  // --- calendar import for the Planner: the link stays in the person's data; it is never logged ---
+  if (path === '/api/calendar' && method === 'POST') {
+    const key = `cal:${user.id}`;
+    if (await tooManyAttempts(env, key, CALENDAR_PER_HOUR)) return fail(429, 'Too many calendar updates. Try again in an hour.');
+    await countFailure(env, key);
+    const { url: link } = await body(request);
+    try {
+      return json(await fetchFeed(link));
+    } catch (e) {
+      // Our own messages are plain words; network failures get a general one.
+      if (e.name === 'TimeoutError' || e instanceof TypeError) return fail(502, 'The calendar could not be reached. Check the link and try again.');
+      return fail(e.status || 400, String(e.message || 'The calendar could not be read.'));
+    }
   }
 
   // --- markets and news ---

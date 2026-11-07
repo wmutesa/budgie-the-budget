@@ -89,7 +89,7 @@ async function main() {
     assert.equal(new URL(owner.page.url()).hash, '', 'the invite token is removed from the address bar');
 
     // Spending added on one device is saved to the account.
-    await owner.page.click('.nb-pages button:nth-child(2)');
+    await owner.page.click('.nb-pages button:has-text("Transactions")');
     await owner.page.fill('[data-test="quick-note"]', 'coffee 4.50 at Blue Bottle today');
     await owner.page.press('[data-test="quick-note"]', 'Enter');
     await owner.page.waitForSelector('[data-test="accept-all"]');
@@ -107,7 +107,7 @@ async function main() {
     assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'the session ends on sign-out');
     await owner.page.click('[data-test="sign-in"]');
     await owner.page.waitForSelector('.nb-pages');
-    await owner.page.click('.nb-pages button:nth-child(2)');
+    await owner.page.click('.nb-pages button:has-text("Transactions")');
     await owner.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
 
     // The owner invites someone.
@@ -159,7 +159,7 @@ async function main() {
     await laptop.page.waitForSelector('text=Add this device, Willy');
     await laptop.page.click('[data-test="create-passkey"]');
     await laptop.page.waitForSelector('.nb-pages');
-    await laptop.page.click('.nb-pages button:nth-child(2)');
+    await laptop.page.click('.nb-pages button:has-text("Transactions")');
     await laptop.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
     await laptop.context.close();
 
@@ -175,7 +175,7 @@ async function main() {
     await lost.page.waitForSelector('text=Recovery code accepted. 7 codes left');
     await lost.page.click('[data-test="create-passkey"]');
     await lost.page.waitForSelector('.nb-pages');
-    await lost.page.click('.nb-pages button:nth-child(2)');
+    await lost.page.click('.nb-pages button:has-text("Transactions")');
     await lost.page.waitForFunction(() => document.querySelector('#ledger')?.textContent.includes('Blue Bottle'));
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
@@ -205,6 +205,18 @@ async function main() {
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
 
     // The owner cannot delete their own account; a member can delete theirs.
+    // Calendar imports: only public https links, and only when signed in.
+    const cal = await owner.page.evaluate(async () => {
+      const send = url => fetch('/api/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }).then(async r => [r.status, (await r.json()).error]);
+      return { http: await send('http://example.com/a.ics'), local: await send('https://localhost/a.ics'), ip: await send('https://169.254.169.254/latest'), empty: await send('') };
+    });
+    assert.deepEqual(cal.http, [400, 'Use the https or webcal link of the calendar.'], 'plain http calendar links are refused');
+    assert.equal(cal.local[0], 400, 'local addresses are refused');
+    assert.equal(cal.ip[0], 400, 'IP addresses are refused');
+    assert.equal(cal.empty[0], 400, 'an empty link is refused');
+    const calSignedOut = await fetch(`${base}/api/calendar`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://example.com/a.ics' }) });
+    assert.equal(calSignedOut.status, 401, 'calendar import needs a sign-in');
+
     const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
     assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');
     await owner.page.click('[data-test="account"]').catch(() => {});

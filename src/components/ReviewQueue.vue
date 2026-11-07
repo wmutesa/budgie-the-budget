@@ -28,7 +28,7 @@ const pick = (d, brand) => {
   Object.assign(d, { merchant: brand.name, domain: brand.domain, logo: brand.logo, description: brand.description });
   editing.value = null;
 };
-const sourceLabel = { receipt: 'Receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'Excel', quick: 'Note' };
+const sourceLabel = { receipt: 'Receipt scan', pdf: 'PDF', csv: 'CSV', excel: 'Excel', quick: 'Note', planner: 'From Planner' };
 </script>
 
 <template>
