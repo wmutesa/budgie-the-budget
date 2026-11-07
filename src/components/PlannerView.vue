@@ -133,9 +133,17 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     </section>
 
 
-    <div v-if="projects.length && view !== 'Schedule'" class="pln-filter" role="group" aria-label="Filter by project">
+    <div v-if="(projects.length || view === 'Tasks') && view !== 'Schedule'" class="pln-filter" role="group" aria-label="Filter by project">
       <button type="button" class="chip-btn" :class="{ on: !project }" @click="project = ''">Everything</button>
       <button v-for="p in projects" :key="p" type="button" class="chip-btn" :class="{ on: project === p }" @click="project = project === p ? '' : p">#{{ p }}</button>
+      <div v-if="view === 'Tasks'" class="pln-cols-bar">
+        <span class="muted small">Group by</span>
+        <div class="seg" role="group" aria-label="Group by">
+          <button type="button" :class="{ on: groupBy === 'when' }" :aria-pressed="groupBy === 'when'" data-test="group-when" @click="groupBy = 'when'">When</button>
+          <button type="button" :class="{ on: groupBy === 'category' }" :aria-pressed="groupBy === 'category'" data-test="group-category" @click="groupBy = 'category'">Category</button>
+        </div>
+      </div>
+      
     </div>
 
     <div v-if="focus.task && view !== 'Focus'" class="pln-focusbar" role="status">
@@ -151,13 +159,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
       <div class="pln-main">
         <!-- Tasks: columns, by when or by category; each column stays short -->
         <template v-if="view === 'Tasks'">
-          <div class="pln-cols-bar">
-            <span class="muted small">Group by</span>
-            <div class="seg" role="group" aria-label="Group by">
-              <button type="button" :class="{ on: groupBy === 'when' }" :aria-pressed="groupBy === 'when'" data-test="group-when" @click="groupBy = 'when'">When</button>
-              <button type="button" :class="{ on: groupBy === 'category' }" :aria-pressed="groupBy === 'category'" data-test="group-category" @click="groupBy = 'category'">Category</button>
-            </div>
-          </div>
           <div v-if="groups.length" class="pln-cols">
             <section v-for="g in groups" :key="g.name" class="pln-group pln-col" :class="{ late: g.name === 'Overdue' }" :style="g.color ? { '--c': g.color } : {}" :data-group="g.name">
               <h2 class="pln-gh"><i v-if="g.color" class="pln-col-dot" />{{ g.name }} <span class="muted">{{ g.list.length }}</span>

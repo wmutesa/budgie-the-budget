@@ -2855,3 +2855,5 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 
 /* Focus: tick, stop and play are perfect circles */
 .pln-top .ibtn, .pln-timer .ibtn, .pln-now .ibtn, .pln-focusbar .ibtn { width: 36px !important; height: 36px !important; min-width: 36px; padding: 0 !important; border-radius: 50% !important; display: inline-grid !important; place-items: center; }
+.pln-filter .pln-cols-bar { margin-left: auto; }
+.pln-filter { align-items: center; }
