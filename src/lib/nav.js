@@ -1,6 +1,10 @@
-// Which page is open, so any part of the app can send you somewhere.
+// Which page is open, so any part of the app can send you somewhere: a page,
+// a part of a page (#goals), or one Planner item to open.
 import { reactive } from 'vue';
 
 export const PAGES = ['Overview', 'Planner', 'Transactions', 'Markets', 'Playground'];
-export const nav = reactive({ page: 'Overview' });
-export const go = page => { if (PAGES.includes(page)) nav.page = page; };
+export const nav = reactive({ page: 'Overview', anchor: '', task: '' });
+export const go = (page, { anchor = '', task = '' } = {}) => {
+  if (!PAGES.includes(page)) return;
+  Object.assign(nav, { page, anchor, task });
+};

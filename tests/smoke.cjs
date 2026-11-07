@@ -236,7 +236,7 @@ async function run(url) {
   await page.waitForTimeout(200);
   assert.equal(await page.textContent('[data-test="bell-tip"]'), await items.first().locator('.bell-body').textContent(), 'each notification has a tooltip with the full message');
   assert.equal(await page.$('[data-test="bell-count"]'), null, 'opening the bell marks them as seen');
-  await items.first().locator('button:has-text("Dismiss")').click();
+  await items.first().locator('button[title="Dismiss"]').click();
   assert.equal(await items.count(), before - 1, 'a dismissed notification goes away');
   await page.keyboard.press('Escape');
   assert.equal(await page.$('[data-test="bell-pop"]'), null, 'Escape closes the dropdown');
@@ -311,7 +311,7 @@ async function run(url) {
   assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
   // Suggestions: a deadline tomorrow with no plan gets a work session.
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
-  await idea.locator('button:has-text("Add")').click();
+  await idea.locator('[data-test="suggestion-add"]').click();
   assert.match(await page.textContent('.pln-group[data-group="Today"]'), /Work on Essay 2/, 'an accepted suggestion becomes a task for today');
   // Routine built from wake and sleep times and a few words.
   await page.fill('[data-test="routine-text"]', 'gym 3x a week at 6pm, call friends sundays');
@@ -323,29 +323,93 @@ async function run(url) {
   // Calendars: a Canvas link brings assignments in, with the course as the project.
   await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
   await page.click('[data-test="feed-add"]');
-  await page.waitForSelector('.pln-feeds li');
+  await page.waitForFunction(() => /Imported/.test(document.querySelector('[data-test="calendars"]').textContent));
   assert.match(await page.textContent('[data-test="calendars"]'), /Canvas[\s\S]*Fall courses[\s\S]*1 event/, 'the calendar is listed with its name');
-  assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*From calendar/, 'Canvas items become assignments with the course');
+  assert.match(await page.textContent('.pln-group[data-group="This week"]'), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
   await page.click('.pln-filter .chip-btn:has-text("#English")');
   assert.doesNotMatch(await page.textContent('.pln-main'), /Lab report/, 'filtering by project hides the rest');
   await page.click('.pln-filter .chip-btn:has-text("Everything")');
   // The other views.
   await page.click('[data-test="view-agenda"]');
   assert.match(await page.textContent('[data-test="agenda-day"] >> nth=0'), /Today[\s\S]*Haircut/, 'the agenda starts with today');
-  await page.click('[data-test="view-week"]');
-  assert.equal(await page.locator('[data-test="week"] .pln-wday').count(), 7, 'the week has seven days');
+  // AI breakdown (rules here, since no model runs in the test): steps appear on the task.
+  await page.click('[data-test="view-tasks"]');
+  await page.click('.pln-group[data-group="Tomorrow"] [data-test="row-breakdown"]');
+  assert.match(await page.textContent('.pln-group[data-group="Tomorrow"]'), /0\/6/, 'the assignment is broken into six steps');
+  assert.match(await page.inputValue('.pln-group[data-group="Tomorrow"] .tk-sub-in >> nth=0'), /Read the brief for Essay 2/, 'steps are specific to the task');
+  // Calendar: a time grid like a calendar app.
+  await page.click('[data-test="view-calendar"]');
+  await page.click('[data-test="cal-week"]');
+  assert.equal(await page.locator('.cal-dh').count(), 7, 'the week has seven days');
+  assert.ok(await page.locator('[data-test="cal-item"]', { hasText: 'Essay 2' }).count() + await page.locator('.cal-item', { hasText: 'Essay 2' }).count() >= 0);
+  // Click an empty slot on today's column, type, and it lands there.
+  const col = page.locator('.cal-col.today');
+  await col.scrollIntoViewIfNeeded();
+  await page.evaluate(() => { document.querySelector('[data-test="cal-grid"]').scrollTop = 48 * 13; });
+  const box = await col.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, (await page.locator('[data-test="cal-grid"]').boundingBox()).y + 10);
+  await page.waitForSelector('[data-test="cal-pop"]');
+  const slot = (await page.textContent('[data-test="cal-pop"] .label')).match(/Today · (\d+(?::30)? [AP]M)/);
+  assert.ok(slot, 'the time under the click is offered');
+  await page.fill('[data-test="cal-new"]', 'Study group #Chem');
+  await page.press('[data-test="cal-new"]', 'Enter');
+  const made = page.locator('.cal-col.today [data-test="cal-item"]', { hasText: 'Study group' });
+  assert.match(await made.textContent(), new RegExp(`${slot[1]} – `), 'the new item starts at the clicked slot');
+  // Click it: a card with actions.
+  await made.click();
+  await page.click('[data-test="cal-breakdown"]');
+  await page.waitForFunction(() => document.querySelectorAll('[data-test="cal-pop"] .tk-subs li').length >= 3);
+  await page.click('[data-test="cal-edit"]');
+  await page.fill('[data-test="cal-pop"] [data-test="task-edit"] input >> nth=0', 'Chem study group');
+  await page.click('[data-test="cal-done"]');
+  await page.keyboard.press('Escape');
+  await page.click('.cal-title');
+  assert.match(await page.locator('.cal-col.today .cal-item.done').first().textContent(), /Chem study group/, 'editing and ticking from the card work');
+  await page.click('[data-test="cal-month"]');
+  assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
+  await page.click('[data-test="cal-day"]');
+  assert.equal(await page.locator('.cal-dh').count(), 1, 'the day view has one column');
+  if (process.env.SHOTS) {
+    await page.click('[data-test="cal-week"]');
+    await page.locator('.cal-col.today [data-test="cal-item"]').first().click();
+    await page.screenshot({ path: `${process.env.SHOTS}/cal-week.png` });
+    await page.keyboard.press('Escape');
+    await page.click('[data-test="cal-month"]');
+    await page.screenshot({ path: `${process.env.SHOTS}/cal-month.png` });
+  }
   await page.click('[data-test="view-focus"]');
   assert.match(await page.textContent('[data-test="focus"]'), /done today/, 'focus shows progress for today');
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
-  await page.click('.pln-top li:has-text("Essay 2") button:has-text("Focus 25 min")');
+  await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   await page.click('[data-test="view-tasks"]');
   // SHOTS=<folder> saves screenshots of the Planner for a visual check.
   if (process.env.SHOTS) {
     await page.click('.pln-group[data-group="Tomorrow"] .tk-main');
-    for (const v of ['tasks', 'agenda', 'week', 'focus']) { await page.click(`[data-test="view-${v}"]`); await page.screenshot({ path: `${process.env.SHOTS}/planner-${v}.png`, fullPage: true }); }
+    for (const v of ['tasks', 'agenda', 'calendar', 'focus']) { await page.click(`[data-test="view-${v}"]`); await page.screenshot({ path: `${process.env.SHOTS}/planner-${v}.png`, fullPage: true }); }
     await page.click('[data-test="view-tasks"]');
   }
+  // Search everything: tasks are found and opened; typed text becomes an action that fits the page.
+  assert.equal((await page.textContent('[data-test="new"]')).trim(), '+ Task', 'the + button adds a task on the Planner');
+  await page.click('.nb-pages button:has-text("Overview")');
+  await page.fill('[data-test="search"]', 'essay');
+  await page.waitForSelector('[data-test="search-pop"]');
+  assert.match(await page.textContent('[data-test="search-pop"]'), /Planner[\s\S]*Essay 2[\s\S]*Assignment/, 'tasks show up in search');
+  await page.click('[data-test="search-result"]:has-text("Work on Essay 2")');
+  await page.waitForSelector('[data-test="planner"] [data-test="task-edit"]');
+  assert.equal(await page.inputValue('[data-test="task-edit"] input >> nth=0'), 'Work on Essay 2', 'choosing a task opens it in the Planner');
+  await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
+  assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to Planner[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-Planner action');
+  await page.press('[data-test="search"]', 'Enter');
+  await page.waitForFunction(() => /Dentist/.test(document.querySelector('.pln-group[data-group="Tomorrow"]')?.textContent || ''), null, { timeout: 5000 });
+  await page.click('.nb-pages button:has-text("Transactions")');
+  await page.fill('[data-test="search"]', 'spent 9 on coffee');
+  assert.equal(await page.getAttribute('[data-test="search-pop"] .gs-item >> nth=0', 'data-test'), 'act-spend', 'on Transactions, money comes first');
+  await page.fill('[data-test="search"]', 'budgets');
+  assert.match(await page.textContent('[data-test="search-pop"]'), /Go to[\s\S]*Budgets/, 'pages and parts of pages are found');
+  await page.fill('[data-test="search"]', '');
+  await page.click('.nb-pages button:has-text("Planner")');
+
   // Money follows: the haircut with a cost waits in Transactions, and the bell knows about today.
   await page.click('.nb-pages button:has-text("Transactions")');
   await page.waitForSelector('#review');
@@ -481,7 +545,7 @@ async function run(url) {
   const overflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(overflow <= 0, `no horizontal scroll on a phone (overflow ${overflow}px)`);
   await mobile.click('.nb-pages button:has-text("Planner")');
-  await mobile.click('[data-test="view-week"]');
+  await mobile.click('[data-test="view-calendar"]');
   if (process.env.SHOTS) await mobile.screenshot({ path: `${process.env.SHOTS}/planner-phone.png`, fullPage: true });
   const planOverflow = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   assert.ok(planOverflow <= 0, `the Planner fits a phone (overflow ${planOverflow}px)`);

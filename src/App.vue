@@ -29,6 +29,8 @@ import GuideTour from './components/GuideTour.vue';
 import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import PlannerView from './components/PlannerView.vue';
+import GlobalSearch from './components/GlobalSearch.vue';
+import { nextTick } from 'vue';
 import { nav, PAGES } from './lib/nav';
 import { refreshFeeds } from './lib/calendar';
 import { startReminders } from './lib/reminders';
@@ -57,6 +59,20 @@ watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCo
 const skipCodes = async () => { try { await dropRecoveryCodes(); } catch { /* still hidden; they can be remade later */ } account.recoveryCodes = null; };
 const endTour = () => { touring.value = false; store.guide = { done: true, at: new Date().toISOString() }; };
 const fxShort = { loading: 'FX loading', live: 'FX live', cached: 'FX updated', stale: 'FX offline', error: 'FX unavailable' };
+// The + button adds what fits the page you are on.
+const newLabel = computed(() => ({ Planner: '+ Task', Transactions: '+ Spending' }[active.value] || '+ Subscription'));
+function newThing() {
+  if (active.value === 'Planner') return document.querySelector('[data-test="plan-add"]')?.focus();
+  if (active.value === 'Transactions') { const el = document.querySelector('[data-test="quick-note"]'); el?.scrollIntoView({ block: 'center' }); return el?.focus(); }
+  openSearch('');
+}
+// Jump to a part of a page when something asks for it (search, notices).
+watch(() => [nav.page, nav.anchor], async ([, anchor]) => {
+  if (!anchor) return;
+  await nextTick(); await nextTick();
+  document.querySelector(anchor)?.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  nav.anchor = '';
+});
 const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 
 let timer = null;
@@ -95,13 +111,10 @@ onUnmounted(() => { clearInterval(timer); document.removeEventListener('visibili
             <sup>0{{ i + 1 }}</sup>{{ t }}
           </button>
         </nav>
-        <label class="nb-search">
-          <span aria-hidden="true">⌕</span>
-          <input v-model="store.query" type="search" placeholder="Search transactions" aria-label="Search transactions" @keydown.enter="active = 'Transactions'" />
-        </label>
+        <GlobalSearch />
         <div class="nb-actions">
           <span class="ai-pill" :class="rates.status" :title="ratesLabel()">{{ fxShort[rates.status] || 'FX' }}</span>
-          <button class="btn primary small" @click="openSearch('')">+ Subscription</button>
+          <button class="btn primary small" data-test="new" @click="newThing">{{ newLabel }}</button>
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
         </div>

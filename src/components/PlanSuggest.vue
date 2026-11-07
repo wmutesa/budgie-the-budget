@@ -4,6 +4,7 @@ import { store } from '../lib/store';
 import { suggestions, plannerFacts } from '../lib/suggest';
 import { makeTask, today } from '../lib/tasks';
 import { ai, aiSuggestTasks } from '../lib/ai';
+import Icon from './Icon.vue';
 
 // Ideas Budgie spots from your planner, money and goals. One tap to add.
 const extra = ref([]);
@@ -27,15 +28,15 @@ const acceptAI = x => { store.tasks.unshift(makeTask({ title: x.title, notes: x.
 
 <template>
   <section class="pln-card" id="suggestions" data-test="suggestions">
-    <div class="pln-card-head"><h3>Suggested for you</h3><button v-if="ai.enabled" type="button" class="notice-link" :disabled="asking" data-test="ask-ai" @click="askAI">{{ asking ? 'Thinking…' : 'More ideas from AI' }}</button></div>
+    <div class="pln-card-head"><h3>Suggested for you</h3><button v-if="ai.enabled" type="button" class="ibtn ai" :disabled="asking" title="Ask the on-device AI for more ideas" data-test="ask-ai" @click="askAI"><Icon name="sparkle" :size="14" />{{ asking ? 'Thinking…' : 'More ideas' }}</button></div>
     <ul v-if="suggestions.length || extra.length" class="pln-ideas">
       <li v-for="s in suggestions" :key="s.id" :class="s.tone" data-test="suggestion">
         <div><b>{{ s.title }}</b><span class="muted small">{{ s.why }}</span></div>
-        <div class="tk-acts"><button type="button" class="btn primary small" @click="accept(s)">{{ s.run ? 'Do it' : 'Add' }}</button><button type="button" class="notice-link" @click="dismiss(s)">Not now</button></div>
+        <div class="pln-idea-acts"><button type="button" class="ibtn primary" :title="s.run ? 'Do it' : 'Add to planner'" :aria-label="s.run ? `Do it: ${s.title}` : `Add: ${s.title}`" data-test="suggestion-add" @click="accept(s)"><Icon :name="s.run ? 'check' : 'plus'" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${s.title}`" @click="dismiss(s)"><Icon name="x" /></button></div>
       </li>
       <li v-for="x in extra" :key="x.id" class="ai">
         <div><b><span class="pln-ai-tag">AI</span> {{ x.title }}</b><span class="muted small">{{ x.why }}</span></div>
-        <div class="tk-acts"><button type="button" class="btn primary small" @click="acceptAI(x)">Add</button><button type="button" class="notice-link" @click="extra = extra.filter(y => y !== x)">Not now</button></div>
+        <div class="pln-idea-acts"><button type="button" class="ibtn primary" title="Add to planner" :aria-label="`Add: ${x.title}`" @click="acceptAI(x)"><Icon name="plus" /></button><button type="button" class="ibtn ghost" title="Not now" :aria-label="`Not now: ${x.title}`" @click="extra = extra.filter(y => y !== x)"><Icon name="x" /></button></div>
       </li>
     </ul>
     <p v-else class="empty-note">No ideas right now. Add deadlines, a routine or a calendar, and Budgie will spot what to prepare for.</p>

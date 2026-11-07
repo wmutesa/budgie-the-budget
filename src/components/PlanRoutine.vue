@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { buildRoutine, saveRoutine, timeLabel, DAY_SHORT } from '../lib/tasks';
 import { ai, aiRefineRoutine, labelFor } from '../lib/ai';
+import Icon from './Icon.vue';
 
 // A daily routine built for you: wake and sleep times plus a few words about
 // your week. Rules draft it instantly; the on-device AI then adjusts it.
@@ -41,13 +42,13 @@ function save() {
         <textarea v-model="r.text" rows="2" maxlength="600" placeholder="Classes MWF 10-12, gym 3x a week at 6pm, call friends Sundays, work Sat 9-5" data-test="routine-text" />
       </label>
     </div>
-    <button type="button" class="btn primary small" :disabled="busy" data-test="routine-build" @click="build">{{ busy ? 'Building…' : has ? 'Rebuild my routine' : 'Build my routine' }}</button>
+    <button type="button" class="ibtn ai wide-btn" :disabled="busy" data-test="routine-build" @click="build"><Icon name="sparkle" :size="14" />{{ busy ? 'Building…' : has ? 'Rebuild my routine' : 'Build my routine' }}</button>
     <div v-if="draft" class="pln-draft" data-test="routine-draft">
       <p class="muted small">Drafted by {{ by }}. Untick anything you do not want, then save.</p>
       <ul>
         <li v-for="(i, n) in draft" :key="n"><label><input v-model="i.keep" type="checkbox" /><b>{{ i.time ? timeLabel(i.time) : 'Any time' }}</b> {{ i.title }} <span class="muted small">{{ days(i.repeat) }}</span></label></li>
       </ul>
-      <div class="tk-acts"><button type="button" class="btn small" @click="draft = null">Cancel</button><button type="button" class="btn primary small" data-test="routine-save" @click="save">Save to planner</button></div>
+      <div class="tk-acts"><button type="button" class="ibtn ghost" title="Cancel" aria-label="Cancel" @click="draft = null"><Icon name="x" /></button><button type="button" class="ibtn primary" data-test="routine-save" @click="save"><Icon name="check" />Save to planner</button></div>
     </div>
   </section>
 </template>

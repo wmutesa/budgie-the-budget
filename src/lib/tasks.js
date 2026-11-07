@@ -237,6 +237,7 @@ export function addFromText(text, extra = {}) {
 // Does this task happen on this day?
 export function occursOn(t, iso) {
   if (!t.repeat) return t.date === iso;
+  if (t.skipDates?.includes(iso)) return false;
   const start = t.date || (t.createdAt || '').slice(0, 10);
   if (start && iso < start) return false;
   if (t.repeat.until && iso > t.repeat.until) return false;
@@ -304,6 +305,33 @@ function logCost(t, iso) {
     category: t.costCategory || guessCategory(t.title, -1), source: 'planner', confidence: 0.9, domain: '', logo: null, fromTask: key,
   });
 }
+// Skip one day of a repeating item ("not today").
+export function skipDay(t, iso) { t.skipDates = [...new Set([...(t.skipDates || []), iso])].sort().slice(-200); }
+export function duplicateTask(t) {
+  const copy = makeTask({ ...JSON.parse(JSON.stringify(t)), id: newId(), done: false, doneAt: null, doneDates: [], skipDates: [], source: 'you', uid: undefined, feedId: undefined, createdAt: new Date().toISOString() });
+  store.tasks.unshift(copy);
+  return copy;
+}
+
+// ---------- breaking a task into steps ----------
+// Steps from rules, by kind; the on-device AI writes better ones when ready (see breakdown.js).
+export function ruleSteps(t) {
+  const name = t.title.replace(/^(work on|finish|submit|do|prepare for|study for|review for)\s+/i, '');
+  const by = {
+    assignment: [`Read the brief for ${name} and note what is asked`, 'Gather sources and notes', 'Write an outline', 'Write the first draft', 'Revise and check against the brief', 'Submit and save a copy'],
+    exam: ['List every topic that will be tested', 'Make a one-page summary per topic', 'Do practice questions', 'Review what you got wrong', 'Quick final review the day before'],
+    class: ['Do the reading or prep', 'Pack what you need', 'Review notes afterwards'],
+    event: ['Confirm the time and place', 'Prepare what to bring or say', 'Plan how to get there'],
+    bill: ['Check the amount and due date', 'Pay it', 'Save the receipt'],
+    routine: ['Get ready', 'Do it', 'Tick it off'],
+  }[t.kind];
+  if (by) return by;
+  if (/clean|tidy/i.test(t.title)) return ['Clear surfaces', 'Put things away', 'Wipe and vacuum', 'Take out the trash'];
+  if (/apply|application|job/i.test(t.title)) return ['Read the posting and note requirements', 'Tailor your CV', 'Write the cover letter', 'Submit and note the date'];
+  if (/move|trip|travel|pack/i.test(t.title)) return ['Make a list of what is needed', 'Book or confirm what is missing', 'Pack', 'Double-check documents'];
+  return [`Decide what "done" means for ${name}`, 'Do the first 15 minutes', 'Finish the main part', 'Check it and wrap up'];
+}
+
 export const removeTask = t => { store.tasks = store.tasks.filter(x => x.id !== t.id); };
 export function moveTo(t, iso) { t.date = iso; }
 

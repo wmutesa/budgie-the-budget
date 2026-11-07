@@ -9,14 +9,24 @@ import MicButton from './MicButton.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import PlanRoutine from './PlanRoutine.vue';
 import PlanCalendars from './PlanCalendars.vue';
+import PlanCalendar from './PlanCalendar.vue';
+import Icon from './Icon.vue';
+import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
+import { nav } from '../lib/nav';
+let showDoneFirst = false;
 
 // Planner: school, work, projects, routines and events in one place.
 // Type or say anything; Budgie works out the date, time, repeat and priority.
-const VIEWS = ['Tasks', 'Agenda', 'Week', 'Focus'];
-const view = computed({ get: () => (VIEWS.includes(store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
+const VIEWS = [['Tasks', 'list'], ['Agenda', 'agenda'], ['Calendar', 'calendar'], ['Focus', 'target']];
+const view = computed({ get: () => (store.planner.view === 'Week' ? 'Calendar' : VIEWS.some(([v]) => v === store.planner.view) ? store.planner.view : 'Tasks'), set: v => { store.planner.view = v; } });
 const now = ref(today());
 const clock = ref(new Date());
 let tick = null;
+// Something asked to open one item (search): show it in the task list.
+if (nav.task) {
+  const t = store.tasks.find(x => x.id === nav.task);
+  if (t) { store.planner.view = 'Tasks'; if (t.done && !t.repeat) showDoneFirst = true; }
+}
 onMounted(() => {
   refreshFeeds();
   tick = setInterval(() => { clock.value = new Date(); now.value = today(); }, 30000);
@@ -51,7 +61,7 @@ const projects = computed(() => [...new Set(store.tasks.map(t => t.project).filt
 const inFilter = t => !project.value || t.project === project.value;
 
 // ---------- Tasks view ----------
-const showDone = ref(false);
+const showDone = ref(showDoneFirst);
 const groups = computed(() => {
   const d = now.value;
   const one = store.tasks.filter(t => !t.repeat && !t.done && inFilter(t));
@@ -81,22 +91,6 @@ const agenda = computed(() => {
   return days;
 });
 
-// ---------- Week ----------
-const weekOffset = ref(0);
-const weekStart = computed(() => { const d = fromIso(now.value); const back = (d.getDay() + 6) % 7; return addDays(now.value, -back + weekOffset.value * 7); });
-const week = computed(() => {
-  const items = occurrences(weekStart.value, addDays(weekStart.value, 6)).filter(x => inFilter(x.task));
-  return Array.from({ length: 7 }, (_, i) => {
-    const date = addDays(weekStart.value, i);
-    const d = fromIso(date);
-    return { date, name: d.toLocaleDateString('en-US', { weekday: 'short' }), num: d.getDate(), list: items.filter(x => x.date === date) };
-  });
-});
-const weekTitle = computed(() => {
-  const a = fromIso(weekStart.value); const b = fromIso(addDays(weekStart.value, 6));
-  return `${a.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${b.toLocaleDateString('en-US', { month: a.getMonth() === b.getMonth() ? undefined : 'short', day: 'numeric' })}`;
-});
-
 // ---------- Focus ----------
 const todayItems = computed(() => occurrences(now.value, now.value));
 const progress = computed(() => { const all = todayItems.value.length; const done = todayItems.value.filter(x => x.done).length; return { all, done, pct: all ? Math.round((done / all) * 100) : 0 }; });
@@ -110,22 +104,6 @@ const nowItem = computed(() => {
 });
 const top3 = computed(() => openTasks(now.value).filter(t => t.kind !== 'routine' && !(t.repeat && t.kind === 'class')).filter(t => !t.date || t.date <= addDays(now.value, 3) || t.priority === 'high').slice(0, 3));
 const routineToday = computed(() => todayItems.value.filter(x => x.task.kind === 'routine'));
-// A simple focus timer.
-const timer = ref({ task: null, left: 25 * 60, running: false });
-let countdown = null;
-function startFocus(t) {
-  timer.value = { task: t, left: 25 * 60, running: true };
-  clearInterval(countdown);
-  countdown = setInterval(() => {
-    if (!timer.value.running) return;
-    timer.value.left -= 1;
-    if (timer.value.left <= 0) { timer.value.running = false; clearInterval(countdown); try { new Notification('Focus session done', { body: timer.value.task?.title || '' }); } catch { /* notifications off */ } }
-  }, 1000);
-}
-const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-onUnmounted(() => clearInterval(countdown));
-const finishFocus = () => { if (timer.value.task && !isDone(timer.value.task)) toggleDone(timer.value.task); timer.value = { task: null, left: 25 * 60, running: false }; clearInterval(countdown); };
-
 // ---------- reminders on this device ----------
 const canNotify = typeof Notification !== 'undefined';
 async function toggleRemind() {
@@ -148,9 +126,9 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
       </div>
       <div class="pln-head-right">
         <div class="seg pln-views" role="tablist" aria-label="Planner views">
-          <button v-for="v in VIEWS" :key="v" type="button" role="tab" :aria-selected="view === v" :class="{ on: view === v }" :data-test="`view-${v.toLowerCase()}`" @click="view = v">{{ v }}</button>
+          <button v-for="[v, ic] in VIEWS" :key="v" type="button" role="tab" :aria-selected="view === v" :class="{ on: view === v }" :title="v" :data-test="`view-${v.toLowerCase()}`" @click="view = v"><Icon :name="ic" :size="15" /><span class="pln-vlabel">{{ v }}</span></button>
         </div>
-        <button v-if="canNotify" type="button" class="notice-link" :aria-pressed="store.planner.remind" data-test="remind" @click="toggleRemind">{{ store.planner.remind ? 'Reminders on' : 'Turn on reminders' }}</button>
+        <button v-if="canNotify" type="button" class="ibtn" :class="{ on: store.planner.remind }" :aria-pressed="store.planner.remind" :title="store.planner.remind ? 'Reminders on: tap to turn off' : 'Remind me 10 minutes before timed items'" :aria-label="store.planner.remind ? 'Turn reminders off' : 'Turn reminders on'" data-test="remind" @click="toggleRemind"><Icon :name="store.planner.remind ? 'bell' : 'bell-off'" /></button>
       </div>
     </section>
 
@@ -159,7 +137,7 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         <span class="pln-plus" aria-hidden="true">+</span>
         <textarea v-model="entry" rows="1" class="pln-input" placeholder="Add anything, like “Essay due Fri 5pm” or “Gym MWF 6pm”" aria-label="Add to planner" data-test="plan-add" @keydown.enter.exact.prevent="add" />
         <MicButton v-if="canDictate" :listening="dict.listening.value" label="Say it" @toggle="toggleDictate" />
-        <button type="button" class="btn primary small" :disabled="!entry.trim()" data-test="plan-add-btn" @click="add">Add</button>
+        <button type="button" class="ibtn primary" :disabled="!entry.trim()" title="Add (Enter)" aria-label="Add" data-test="plan-add-btn" @click="add"><Icon name="plus" /></button>
       </div>
       <p v-if="preview" class="pln-chips" aria-live="polite" data-test="plan-preview">
         <span class="pln-chip k" :style="{ '--k': KINDS[preview.kind].color }">{{ KINDS[preview.kind].label }}</span>
@@ -173,6 +151,12 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     <div v-if="projects.length" class="pln-filter" role="group" aria-label="Filter by project">
       <button type="button" class="chip-btn" :class="{ on: !project }" @click="project = ''">Everything</button>
       <button v-for="p in projects" :key="p" type="button" class="chip-btn" :class="{ on: project === p }" @click="project = project === p ? '' : p">#{{ p }}</button>
+    </div>
+
+    <div v-if="focus.task && view !== 'Focus'" class="pln-focusbar" role="status">
+      <Icon name="target" /><b>{{ focus.task.title }}</b><span class="pln-clock small">{{ mmss(focus.left) }}</span>
+      <button type="button" class="ibtn ghost" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
+      <button type="button" class="ibtn ghost" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
     </div>
 
     <div class="pln-body">
@@ -202,21 +186,9 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
           </div>
         </template>
 
-        <!-- Week: seven columns -->
-        <template v-else-if="view === 'Week'">
-          <div class="pln-week-head">
-            <h2 class="pln-gh">{{ weekTitle }}</h2>
-            <div class="seg"><button type="button" aria-label="Previous week" @click="weekOffset--">‹</button><button type="button" :class="{ on: weekOffset === 0 }" @click="weekOffset = 0">This week</button><button type="button" aria-label="Next week" @click="weekOffset++">›</button></div>
-          </div>
-          <div class="pln-week" data-test="week">
-            <div v-for="d in week" :key="d.date" class="pln-wday" :class="{ today: d.date === now }">
-              <p class="pln-wd"><span>{{ d.name }}</span><b>{{ d.num }}</b></p>
-              <button v-for="x in d.list" :key="x.key" type="button" class="pln-wi" :class="{ done: x.done }" :style="{ '--k': KINDS[x.task.kind]?.color }" :title="x.task.title" @click="toggleDone(x.task, x.date)">
-                <span v-if="x.task.time" class="muted">{{ timeLabel(x.task.time) }}</span>{{ x.task.title }}
-              </button>
-            </div>
-          </div>
-          <p class="muted small">Tap an item to tick it off.</p>
+        <!-- Calendar: day, week and month, like a calendar app -->
+        <template v-else-if="view === 'Calendar'">
+          <PlanCalendar :filter="inFilter" @focus="view = 'Focus'" />
         </template>
 
         <!-- Focus: what matters now -->
@@ -228,23 +200,24 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
             <div v-if="nowItem" class="pln-now">
               <p class="label">{{ nowItem.label }}</p>
               <h2>{{ nowItem.item.task.title }}</h2>
-              <button type="button" class="btn small" @click="toggleDone(nowItem.item.task, nowItem.item.date)">Mark done</button>
+              <button type="button" class="ibtn primary" title="Mark done" aria-label="Mark done" @click="toggleDone(nowItem.item.task, nowItem.item.date)"><Icon name="check" /></button>
             </div>
             <div v-else class="pln-now"><p class="label">Now</p><h2>Free time</h2><p class="muted small">Nothing else is scheduled today.</p></div>
           </div>
-          <div v-if="timer.task" class="pln-timer" data-test="timer">
-            <span class="label">Focusing on</span><b>{{ timer.task.title }}</b>
-            <span class="pln-clock">{{ mmss(timer.left) }}</span>
-            <button type="button" class="btn small" @click="timer.running = !timer.running">{{ timer.running ? 'Pause' : 'Resume' }}</button>
-            <button type="button" class="btn primary small" @click="finishFocus">Done</button>
+          <div v-if="focus.task" class="pln-timer" data-test="timer">
+            <span class="label">Focusing on</span><b>{{ focus.task.title }}</b>
+            <span class="pln-clock">{{ mmss(focus.left) }}</span>
+            <button type="button" class="ibtn" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
+            <button type="button" class="ibtn primary" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
+            <button type="button" class="ibtn" title="Stop" aria-label="Stop" @click="stopFocus"><Icon name="x" /></button>
           </div>
           <div class="pln-group">
             <h2 class="pln-gh">Top three</h2>
             <ol v-if="top3.length" class="pln-top">
               <li v-for="t in top3" :key="t.id">
                 <span class="pln-top-t"><b>{{ t.title }}</b><span class="muted small">{{ t.date ? dayLabel(t.date, now) : 'Any time' }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }} · {{ KINDS[t.kind].label }}</span></span>
-                <button type="button" class="btn small" @click="startFocus(t)">Focus 25 min</button>
-                <button type="button" class="btn primary small" @click="toggleDone(t)">Done</button>
+                <button type="button" class="ibtn" title="Focus for 25 minutes" :aria-label="`Focus on ${t.title}`" data-test="top-focus" @click="startFocus(t)"><Icon name="play" /></button>
+                <button type="button" class="ibtn primary" title="Mark done" :aria-label="`Done: ${t.title}`" @click="toggleDone(t)"><Icon name="check" /></button>
               </li>
             </ol>
             <p v-else class="muted small">Nothing urgent. Enjoy it, or pick something from Later.</p>

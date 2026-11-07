@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { cards } from '../lib/advice';
 import { store } from '../lib/store';
+import Icon from './Icon.vue';
 
 // Budgie's suggestions behind a bell in the top bar: a count of new ones, a
 // dropdown with every notification, and a tooltip with the full message.
@@ -52,7 +53,7 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
             <span class="bell-body">{{ c.body }}</span>
             <div class="bell-acts">
               <button v-if="c.action" class="btn primary small" type="button" @click="run(c)">{{ c.action.label }}</button>
-              <button class="notice-link" type="button" @click="dismiss(c)">Dismiss</button>
+              <button class="ibtn ghost" type="button" title="Dismiss" :aria-label="`Dismiss: ${c.title}`" @click="dismiss(c)"><Icon name="x" :size="14" /></button>
             </div>
           </div>
         </li>

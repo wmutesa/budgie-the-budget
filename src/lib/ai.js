@@ -405,6 +405,18 @@ export async function aiRefineRoutine(items, { wake, sleep, text }) {
   return clean.length >= 3 ? clean.sort((a, b) => (a.time || '99').localeCompare(b.time || '99')) : null;
 }
 
+// Break a task into 3 to 7 concrete steps. Returns [string] or null.
+export async function aiBreakdown(task) {
+  const reply = await route('plan', [
+    { role: 'system', content: 'Break the task into 3 to 7 concrete, ordered steps a student or young professional can tick off. Each step starts with a verb and is under 60 characters. Reply with JSON only: {"steps": [string]}' },
+    { role: 'user', content: `Task: ${task.title}. Kind: ${task.kind}.${task.date ? ` Due ${task.date}.` : ''}${task.notes ? ` Notes: ${String(task.notes).slice(0, 300)}` : ''}` },
+  ], { json: true, temperature: 0.2, max_tokens: 260 });
+  const list = firstJSON(reply)?.steps;
+  if (!Array.isArray(list)) return null;
+  const clean = list.map(s => String(s || '').replace(/[<>]/g, '').replace(/^\s*\d+[.)]\s*/, '').trim().slice(0, 80)).filter(Boolean).slice(0, 7);
+  return clean.length >= 2 ? clean : null;
+}
+
 // Up to three task ideas the person has not listed. Returns [{ title, why }] or null.
 export async function aiSuggestTasks(facts) {
   const reply = await route('plan', [

@@ -1,0 +1,72 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { store, newId } from '../lib/store';
+import { KINDS, DAY_SHORT, removeTask, today } from '../lib/tasks';
+import { breakDown } from '../lib/breakdown';
+import { CATEGORIES } from '../lib/categorize';
+import Icon from './Icon.vue';
+
+// Every detail of one Planner item. Changes save as you type.
+const props = defineProps({ task: { type: Object, required: true } });
+const emit = defineEmits(['close']);
+const t = props.task;
+const projects = computed(() => [...new Set(store.tasks.map(x => x.project).filter(Boolean))].sort());
+const repeatEvery = computed({
+  get: () => t.repeat?.every || '',
+  set: v => { t.repeat = v ? { every: v, days: v === 'week' ? (t.repeat?.days?.length ? t.repeat.days : [new Date(`${t.date || today()}T12:00`).getDay()]) : [] } : null; if (v && !t.date) t.date = today(); },
+});
+const toggleDay = d => { const s = new Set(t.repeat.days || []); s.has(d) ? s.delete(d) : s.add(d); t.repeat.days = [...s].sort(); };
+const newSub = ref('');
+const addSub = () => { const v = newSub.value.trim(); if (!v) return; (t.subtasks ||= []).push({ id: newId(), title: v, done: false }); newSub.value = ''; };
+const setKind = v => { t.kind = v; t.kindSet = true; };
+const remove = () => { if (confirm(`Delete "${t.title}"?`)) { removeTask(t); emit('close'); } };
+const splitting = ref(false);
+const splitBy = ref('');
+async function split() { splitting.value = true; splitBy.value = await breakDown(t); splitting.value = false; }
+</script>
+
+<template>
+  <div class="tk-edit" data-test="task-edit">
+    <label class="tk-f wide"><span>Title</span><input v-model="t.title" maxlength="160" /></label>
+    <label class="tk-f"><span>Date</span><input v-model="t.date" type="date" /></label>
+    <label class="tk-f"><span>Time</span><input v-model="t.time" type="time" /></label>
+    <label class="tk-f"><span>Minutes</span><input v-model.number="t.mins" type="number" min="0" step="5" /></label>
+    <label class="tk-f"><span>Kind</span>
+      <select :value="t.kind" @change="setKind($event.target.value)"><option v-for="(k, id) in KINDS" :key="id" :value="id">{{ k.label }}</option></select>
+    </label>
+    <div class="tk-f"><span>Priority</span>
+      <div class="seg"><button v-for="p in ['high', 'medium', 'low']" :key="p" type="button" :class="{ on: t.priority === p }" @click="t.priority = p">{{ p[0].toUpperCase() + p.slice(1) }}</button></div>
+    </div>
+    <label class="tk-f"><span>Repeats</span>
+      <select v-model="repeatEvery" data-test="task-repeat">
+        <option value="">Does not repeat</option><option value="day">Every day</option><option value="weekdays">Weekdays</option><option value="week">Some days each week</option><option value="month">Every month</option>
+      </select>
+    </label>
+    <div v-if="t.repeat?.every === 'week'" class="tk-f"><span>On</span>
+      <div class="tk-days"><button v-for="(d, i) in DAY_SHORT" :key="d" type="button" :class="{ on: t.repeat.days?.includes(i) }" :aria-pressed="t.repeat.days?.includes(i)" :aria-label="d" @click="toggleDay(i)">{{ d[0] }}</button></div>
+    </div>
+    <label class="tk-f"><span>Project</span><input v-model="t.project" list="tk-projects" maxlength="40" placeholder="e.g. English 101" /></label>
+    <datalist id="tk-projects"><option v-for="p in projects" :key="p" :value="p" /></datalist>
+    <label class="tk-f"><span>Costs ($)</span><input v-model.number="t.cost" type="number" min="0" step="0.01" placeholder="—" data-test="task-cost" /></label>
+    <label v-if="t.cost" class="tk-f"><span>Category</span>
+      <select v-model="t.costCategory"><option value="">Guess for me</option><option v-for="c in CATEGORIES.filter(c => c !== 'Income')" :key="c" :value="c">{{ c }}</option></select>
+    </label>
+    <label class="tk-f wide"><span>Notes</span><textarea v-model="t.notes" rows="2" maxlength="1000" /></label>
+    <div class="tk-f wide">
+      <span class="tk-steps-head">Steps
+        <button type="button" class="ibtn ai" :disabled="splitting" title="Break it into steps with AI" data-test="breakdown" @click="split"><Icon name="sparkle" :size="14" />{{ splitting ? 'Thinking…' : 'Break down' }}</button>
+        <small v-if="splitBy" class="muted">by {{ splitBy }}</small>
+      </span>
+      <ul class="tk-subs">
+        <li v-for="s in t.subtasks" :key="s.id"><label><input v-model="s.done" type="checkbox" /> <input v-model="s.title" class="tk-sub-in" maxlength="120" /></label><button type="button" class="ibtn ghost" :aria-label="`Remove ${s.title}`" title="Remove step" @click="t.subtasks = t.subtasks.filter(x => x !== s)"><Icon name="x" :size="14" /></button></li>
+      </ul>
+      <input v-model="newSub" placeholder="Add a step, then press Enter" maxlength="120" @keydown.enter.prevent="addSub" />
+    </div>
+    <p v-if="t.cost" class="muted small wide">When you tick this, ${{ t.cost }} goes to Transactions to review.</p>
+    <div class="tk-acts wide">
+      <a v-if="t.link" class="ibtn ghost" :href="t.link" target="_blank" rel="noopener noreferrer" title="Open in calendar" aria-label="Open in calendar"><Icon name="external" /></a>
+      <button type="button" class="ibtn danger" title="Delete" aria-label="Delete" @click="remove"><Icon name="trash" /></button>
+      <button type="button" class="ibtn" title="Close" aria-label="Close" @click="emit('close')"><Icon name="check" /></button>
+    </div>
+  </div>
+</template>
