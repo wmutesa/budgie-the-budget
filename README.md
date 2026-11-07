@@ -40,7 +40,7 @@ See [SECURITY.md](SECURITY.md) for details and how to report a problem privately
 | **Digests** | Short newspapers to read, kept up to date on their own (Mondays and Thursdays, and catching up when you open them): opportunities that fit, deadlines, outreach drafts to copy, a watch box and one thing to do this week. "My brief" follows your goals, projects and studies; add more digests with just a name. With your free Gemini key (in your profile), each edition is researched with Google Search as it is written. Deadlines go to your Planner |
 | **Playground** | One inbox for everything: write or say anything, one thing per line, and Budgie sorts tasks, routines and goals. Life goals get milestones on your calendar; build a daily routine; name and colour projects |
 
-Anywhere in the app: the microphone in the top bar takes several things at once and adds each where it belongs, with Undo; the search finds anything and turns what you type into an action (press `/`).
+In the Playground, say several things at once and Budgie adds each where it belongs, with chips to switch and Undo; the search in the top bar finds anything and turns what you type into an action (press `/`).
 
 Budgie starts empty: everything comes from what you add. It costs nothing to run: digests use free sources and rules (plus Gemini's free tier if you add your own key), and the AI runs on your device.
 

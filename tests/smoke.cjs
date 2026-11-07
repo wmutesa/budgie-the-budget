@@ -303,22 +303,23 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
   await page.click('[data-test="bell"]');
 
-  // Voice from anywhere: several things at once, each where it belongs, with Undo.
+  // Voice in the Playground: several things at once, added and sorted when you stop, with Undo.
   const voice = await context.newPage();
   await fakeNetwork(voice);
   await voice.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = 'essay due friday at 5pm then gym every monday at 6 and I want to read 12 books this year';");
   await voice.goto(url, { waitUntil: 'load' });
-  await voice.click('[data-test="voice"]');
-  await voice.waitForSelector('[data-test="voice-live"]');
-  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="voice-live"]').textContent));
-  if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png`, clip: { x: 1000, y: 0, width: 440, height: 70 } });
-  await voice.click('[data-test="voice-stop"]');
-  await voice.waitForSelector('[data-test="voice-done"]');
-  const said = await voice.textContent('[data-test="voice-done"]');
-  assert.match(said, /Added 3 things/, 'three things are heard');
-  assert.match(said, /Essay[\s\S]*Task[\s\S]*Gym[\s\S]*Routine[\s\S]*Read 12 books[\s\S]*Goal/i, 'each is sorted');
-  await voice.click('[data-test="voice-undo"]');
+  assert.equal(await voice.$('[data-test="voice"]'), null, 'there is no microphone in the top bar');
   await voice.click(tab('Playground'));
+  await voice.click('.inbox-pad .mic-btn');
+  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="inbox-text"]').value));
+  assert.equal(await voice.getAttribute('.inbox-pad .mic-btn', 'aria-pressed'), 'true', 'the button shows it is recording');
+  if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
+  await voice.click('.inbox-pad .mic-btn');
+  await voice.waitForSelector('[data-test="inbox-done"]');
+  const said = await voice.textContent('[data-test="inbox-done"]');
+  assert.match(said, /Added 3 things/, 'three things are heard and added when you stop');
+  assert.deepEqual(await voice.$$eval('[data-test="inbox-made"]', li => li.map(x => x.className.match(/to-(\w+)/)[1])), ['task', 'routine', 'goal'], 'each is sorted');
+  await voice.click('[data-test="inbox-undo"]');
   assert.doesNotMatch(await voice.textContent('[data-test="goals"]'), /Read 12 books/, 'Undo takes it all back');
   await voice.close();
 

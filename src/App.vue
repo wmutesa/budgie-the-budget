@@ -14,7 +14,6 @@ import GoalsBoard from './components/GoalsBoard.vue';
 import ProjectsCard from './components/ProjectsCard.vue';
 import PlanRoutine from './components/PlanRoutine.vue';
 import GlobalSearch from './components/GlobalSearch.vue';
-import VoiceAdd from './components/VoiceAdd.vue';
 import Icon from './components/Icon.vue';
 import { nav, PAGES, go } from './lib/nav';
 import { refreshFeeds } from './lib/calendar';
@@ -90,7 +89,6 @@ onUnmounted(() => clearInterval(timer));
         </nav>
         <GlobalSearch />
         <div class="nb-actions">
-          <VoiceAdd />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
         </div>

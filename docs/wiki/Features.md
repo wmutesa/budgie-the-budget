@@ -27,5 +27,5 @@ Short newspapers to read, kept up to date on their own: a new edition every Mond
 - **Projects:** every #project from your tasks, with a colour and a one-click rename.
 
 ## Voice and search
-- **Voice from anywhere:** tap the microphone in the top bar and say one or more things ("essay due Friday at 5, then gym every Monday at 6, and I want to read 12 books this year"). Budgie splits what you said and adds each one where it belongs, then shows what went where, with chips to switch any item and Undo.
+- **Voice:** tap the microphone in the Playground inbox and say one or more things ("essay due Friday at 5, then gym every Monday at 6, and I want to read 12 books this year"). When you stop, Budgie splits what you said, adds each one as a task, routine or goal, and lets you switch any of them or undo.
 - **Search:** finds tasks, goals, digest stories, calendars and pages, and turns typed text into "add to Planner" or "set a goal". Press `/` to jump to it.

@@ -65,7 +65,7 @@ watch(() => ai.ready, async ready => {
   <section class="card cell span-8" data-test="today-list">
     <div class="cell-head"><p class="label">On today</p><button type="button" class="ibtn ghost" title="Open the calendar" aria-label="Open the calendar" @click="store.planner.view = 'Calendar'; go('Planner')"><Icon name="calendar" /></button></div>
     <ul v-if="items.length" class="tk-list"><TaskRow v-for="x in items" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-    <p v-else class="empty-note">Nothing on today. Add something in the Playground or by voice with the microphone at the top.</p>
+    <p v-else class="empty-note">Nothing on today. Write or say something in the Playground.</p>
   </section>
 
   <section class="card cell span-4" data-test="today-deadlines">
