@@ -3132,3 +3132,18 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .brief-acts { gap: 10px !important; margin-top: 18px !important; }
 .brief-acts .btn { height: 34px !important; padding: 0 13px !important; font-size: 13px !important; gap: 7px !important; }
 .brief-acts .btn .ico { width: 14px; height: 14px; }
+/* Focus timer: a light lilac card with the time large, a draining bar, and a
+   green "time is up" state */
+.pln-timer { background: #faf8ff !important; color: #18181b !important; border: 1px solid #ede9fe; border-radius: 16px; padding: 14px 16px !important; gap: 10px 12px !important; }
+.pln-timer .label { color: #6d28d9 !important; }
+.pln-timer b { color: #18181b !important; flex: 1; min-width: 120px; }
+.pln-timer .pln-clock { font: 700 26px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #4c1d95; letter-spacing: -.02em; }
+.pln-timer .ibtn:not(.primary) { background: #fff !important; border-color: #ddd6fe !important; color: #4c1d95 !important; }
+.pln-timer .ibtn:not(.primary):hover, .pln-timer .ibtn.on { background: #ede9fe !important; }
+.pln-timer-bar { flex-basis: 100%; order: 9; height: 5px; border-radius: 999px; background: #ede9fe; overflow: hidden; }
+.pln-timer-bar i { display: block; height: 100%; border-radius: 999px; background: #a78bfa; transition: width 1s linear; }
+.pln-timer-note { flex-basis: 100%; order: 10; margin: 0; }
+.pln-timer.ended { background: #f0fdf4 !important; border-color: #bbf7d0; }
+.pln-timer.ended .label, .pln-timer.ended .pln-clock { color: #15803d !important; }
+.pln-timer.ended .pln-timer-bar i { background: #86efac; }
+@media (prefers-reduced-motion: reduce) { .pln-timer-bar i { transition: none; } }

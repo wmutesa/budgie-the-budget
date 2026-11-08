@@ -7,7 +7,7 @@ import TaskRow from './TaskRow.vue';
 import PlanSchedule from './PlanSchedule.vue';
 import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
-import { focus, finishFocus, mmss } from '../lib/focus';
+import { focus, finishFocus, toggleFocus, mmss } from '../lib/focus';
 import { nav, go } from '../lib/nav';
 import { catKey, catColor } from '../lib/cats';
 let showDoneFirst = false;
@@ -107,8 +107,8 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
     </div>
 
     <div v-if="focus.task" class="pln-focusbar" role="status">
-      <Icon name="target" /><b>{{ focus.task.title }}</b><span class="pln-clock small">{{ mmss(focus.left) }}</span>
-      <button type="button" class="ibtn ghost" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
+      <Icon name="target" /><b>{{ focus.task.title }}</b><span class="pln-clock small">{{ focus.ended ? 'Time is up' : mmss(focus.left) }}</span>
+      <button type="button" class="ibtn ghost" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="toggleFocus"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
       <button type="button" class="ibtn ghost" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
     </div>
 

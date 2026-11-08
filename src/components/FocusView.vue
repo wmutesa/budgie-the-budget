@@ -4,7 +4,7 @@ import { openTasks, occurrences, summary, today, addDays, dayLabel, timeLabel, t
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import Icon from './Icon.vue';
-import { focus, startFocus, finishFocus, stopFocus, mmss } from '../lib/focus';
+import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss } from '../lib/focus';
 
 // Focus: what matters now. Its own page, with Budgie's suggestions as the
 // right side bar, top to bottom.
@@ -52,12 +52,17 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
           </div>
           <div v-else class="pln-now"><p class="label">Now</p><h2>Free time</h2><p class="muted small">Nothing else is scheduled today.</p></div>
         </div>
-        <div v-if="focus.task" class="pln-timer" data-test="timer">
-          <span class="label">Focusing on</span><b>{{ focus.task.title }}</b>
-          <span class="pln-clock">{{ mmss(focus.left) }}</span>
-          <button type="button" class="ibtn" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" @click="focus.running = !focus.running"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
+        <div v-if="focus.task" class="pln-timer" :class="{ ended: focus.ended }" data-test="timer" :role="focus.ended ? 'alert' : undefined">
+          <span class="label">{{ focus.ended ? 'Time is up' : focus.running ? 'Focusing on' : 'Paused' }}</span><b>{{ focus.task.title }}</b>
+          <span class="pln-clock">{{ focus.ended ? 'Break time' : mmss(focus.left) }}</span>
+          <span class="pln-timer-bar" aria-hidden="true"><i :style="{ width: `${(focus.left / Math.max(1, focus.total)) * 100}%` }" /></span>
+          <button v-if="!focus.ended" type="button" class="ibtn" :title="focus.running ? 'Pause' : 'Resume'" :aria-label="focus.running ? 'Pause' : 'Resume'" data-test="timer-toggle" @click="toggleFocus"><Icon :name="focus.running ? 'pause' : 'play'" /></button>
+          <button v-else type="button" class="ibtn" title="Another 25 minutes" aria-label="Another 25 minutes" @click="startFocus(focus.task)"><Icon name="refresh" /></button>
+          <button type="button" class="ibtn" title="Five more minutes" aria-label="Five more minutes" data-test="timer-more" @click="extendFocus(5)"><Icon name="plus" /></button>
+          <button v-if="canMini" type="button" class="ibtn" :class="{ on: focus.mini }" title="Keep the timer on top of other windows" aria-label="Keep the timer on top of other windows" data-test="timer-float" @click="openMini"><Icon name="external" /></button>
           <button type="button" class="ibtn primary" title="Mark done" aria-label="Mark done" @click="finishFocus"><Icon name="check" /></button>
           <button type="button" class="ibtn" title="Stop" aria-label="Stop" @click="stopFocus"><Icon name="x" /></button>
+          <p class="muted small pln-timer-note">{{ focus.ended ? 'A chime played and a notification was sent. Take five, then go again or mark it done.' : 'The countdown shows in this tab\'s title and icon, so you can see it from any tab.' }}</p>
         </div>
         <div class="pln-group">
           <h2 class="pln-gh">Top three</h2>

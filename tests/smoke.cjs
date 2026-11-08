@@ -263,6 +263,13 @@ async function run(url) {
   assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
   await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  // The tab shows the countdown, its icon becomes a ring, and pause and +5 work.
+  assert.match(await page.title(), /^⏱ 2[45]:\d\d · .*Essay 2/, `the tab title counts down (${await page.title()})`);
+  assert.match(await page.getAttribute('link[rel="icon"]', 'href'), /^data:image\/png/, 'the tab icon shows the time left');
+  await page.click('[data-test="timer-toggle"]');
+  assert.match(await page.title(), /^⏸ /, 'a paused session shows in the title');
+  await page.click('[data-test="timer-more"]');
+  assert.match(await page.textContent('[data-test="timer"] .pln-clock'), /^(29|30):\d\d$/, 'five more minutes are added');
   // Suggested for you stays below the top bar while the page scrolls, and scrolls inside itself.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(200);
