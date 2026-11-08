@@ -89,7 +89,7 @@ async function main() {
     assert.equal(new URL(owner.page.url()).hash, '', 'the invite token is removed from the address bar');
 
     // A task added on one device is saved to the account.
-    await owner.page.click('[data-test="capture"]');
+    await owner.page.locator('body').press('n'); // opens Add for typing
     await owner.page.fill('[data-test="capture-text"]', 'Call Blue Bottle about the internship tomorrow');
     await owner.page.click('[data-test="capture-sort"]');
     await owner.page.click('[data-test="review-keep"]');
@@ -106,9 +106,10 @@ async function main() {
     assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'the session ends on sign-out');
     await owner.page.click('[data-test="sign-in"]');
     await owner.page.waitForSelector('.nb-pages');
-    await owner.page.click('.nb-pages button:has-text("Planner")');
-    await owner.page.click('[data-test=\"view-tasks\"]');
-    await owner.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
+    // The account's data comes back to this device, and the Schedule opens.
+    await owner.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Blue Bottle')));
+    await owner.page.click('.nb-pages button:has-text("Schedule")');
+    await owner.page.waitForSelector('[data-test="schedule"]');
 
     // The owner invites someone.
     await owner.page.click('[data-test="account"]');
@@ -166,9 +167,10 @@ async function main() {
     await laptop.page.waitForSelector('text=Add this device, Willy');
     await laptop.page.click('[data-test="create-passkey"]');
     await laptop.page.waitForSelector('.nb-pages');
-    await laptop.page.click('.nb-pages button:has-text("Planner")');
-    await laptop.page.click('[data-test=\"view-tasks\"]');
-    await laptop.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
+    // The account's data comes back to this device, and the Schedule opens.
+    await laptop.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Blue Bottle')));
+    await laptop.page.click('.nb-pages button:has-text("Schedule")');
+    await laptop.page.waitForSelector('[data-test="schedule"]');
     await laptop.context.close();
 
     // Lost every device: a recovery code leads to a new passkey.
@@ -183,9 +185,10 @@ async function main() {
     await lost.page.waitForSelector('text=Recovery code accepted. 7 codes left');
     await lost.page.click('[data-test="create-passkey"]');
     await lost.page.waitForSelector('.nb-pages');
-    await lost.page.click('.nb-pages button:has-text("Planner")');
-    await lost.page.click('[data-test=\"view-tasks\"]');
-    await lost.page.waitForFunction(() => document.querySelector('[data-test="planner"]')?.textContent.includes('Blue Bottle'));
+    // The account's data comes back to this device, and the Schedule opens.
+    await lost.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Blue Bottle')));
+    await lost.page.click('.nb-pages button:has-text("Schedule")');
+    await lost.page.waitForSelector('[data-test="schedule"]');
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
     await lost.page.click('[data-test="account"]');
