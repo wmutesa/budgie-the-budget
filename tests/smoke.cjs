@@ -277,7 +277,7 @@ async function run(url) {
   if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
   await page.click('[data-test="tp-h-4"]');
   await page.click('[data-test="tp-m-30"]');
-  await page.click('[data-test="time-pop"] .tp-ampm button:has-text("PM")');
+  await page.click('[data-test="tp-pm"]');
   await page.click('[data-test="tp-done"]');
   assert.match(await when.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
   await when.locator('[data-test="date-field"]').click();
