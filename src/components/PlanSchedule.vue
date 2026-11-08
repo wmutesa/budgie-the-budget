@@ -2,7 +2,7 @@
 import { liftOnHover, dropLift } from '../lib/lift';
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
-import { occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
+import { occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, KINDS, toggleDone, isDone, parseTask, makeTask, timeLabel } from '../lib/tasks';
 import { catKey, catLabel, catColor } from '../lib/cats';
 import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
@@ -267,6 +267,39 @@ function outside(e) {
 }
 onMounted(() => document.addEventListener('mousedown', outside));
 onUnmounted(() => document.removeEventListener('mousedown', outside));
+
+// Click an empty spot on the day calendar to add something there, at that
+// time and in that column's category.
+const fresh = ref(null);
+const freshText = ref('');
+const freshEl = ref(null);
+function newHere(e, col) {
+  if (over.value) { over.value = null; return; }
+  const r = e.currentTarget.getBoundingClientRect();
+  const mins = Math.floor((((e.clientY - r.top) / HOUR.value) * 60 + startH.value * 60) / 30) * 30;
+  const w = Math.min(320, window.innerWidth - 24);
+  const left = Math.max(12, Math.min(e.clientX - 24, window.innerWidth - w - 12));
+  const top = Math.max(12, Math.min(e.clientY + 10, window.innerHeight - 140));
+  fresh.value = { date: day.value, time: fromMins(Math.min(23 * 60 + 30, Math.max(0, mins))), col, style: { left: `${left}px`, top: `${top}px`, width: `${w}px` } };
+  freshText.value = '';
+  nextTick(() => freshEl.value?.querySelector('input')?.focus());
+}
+const KIND_OF_LABEL = Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [v.label, k]));
+function addFresh() {
+  const text = freshText.value.trim();
+  if (!text || !fresh.value) return;
+  const p = parseTask(text);
+  const at = fresh.value;
+  const project = p.project || (at.col.key.startsWith('#') ? at.col.key.slice(1) : '');
+  const kind = p.kind !== 'task' ? p.kind : KIND_OF_LABEL[at.col.key] || 'task';
+  const t = makeTask({ title: p.title, kind: kind === 'routine' && !p.repeat ? 'task' : kind, priority: p.priority, project, repeat: p.repeat, mins: p.mins || 60, date: p.date && p.date !== today() ? p.date : at.date, time: p.time || at.time });
+  store.tasks.unshift(t);
+  fresh.value = null;
+}
+const escFresh = e => { if (e.key === 'Escape' && fresh.value) fresh.value = null; };
+const outFresh = e => { if (fresh.value && freshEl.value && !freshEl.value.contains(e.target)) fresh.value = null; };
+onMounted(() => { document.addEventListener('keydown', escFresh); document.addEventListener('mousedown', outFresh); });
+onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.removeEventListener('mousedown', outFresh); });
 </script>
 
 <template>
@@ -311,7 +344,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
           <h4 v-if="range === 'day'"><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.all }}</span></h4>
           <h4 v-else><button type="button" class="sch-fold" :aria-expanded="!folded(c)" data-test="sch-fold" @click="flip(c)"><i />{{ c.label }}<span class="sch-fold-bar"><b :style="{ width: `${c.all ? Math.round((c.done / c.all) * 100) : 0}%` }" /></span><span class="muted">{{ c.done }}/{{ c.all }}</span><Icon name="right" :size="13" class="sch-fold-ic" /></button></h4>
           <ul v-if="!folded(c)">
-            <li v-for="x in c.list" :key="x.key" class="sch-row" :data-key="x.key" :class="{ flash: flashKey === x.key, done: x.summary ? x.timesDone === x.times : x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
+            <li v-for="x in c.list" :key="x.key" class="sch-row" :data-key="x.key" :style="{ '--glow': catColor(x.task) }" :class="{ flash: flashKey === x.key, done: x.summary ? x.timesDone === x.times : x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
               <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
               <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
@@ -345,7 +378,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
           <div class="sch-axis">
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
-          <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
+          <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col" title="Click an empty spot, or double-click anywhere, to add something at that time" @click.self="newHere($event, col)" @dblclick="newHere($event, col)">
             <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :data-lane="x.lane" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
               <span class="sch-box-time">{{ hhmm(x.s) }} – {{ hhmm(x.e) }}<Icon name="more" :size="14" class="sch-box-more" /></span>
               <b class="sch-box-title">{{ x.task.title }}</b>
@@ -356,6 +389,15 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
       </section>
     </div>
 
+    <Teleport to="body">
+      <div v-if="fresh" ref="freshEl" class="sch-new" :style="{ ...fresh.style, '--c': fresh.col.color }" role="dialog" aria-label="Add here" data-test="sch-new">
+        <p class="label"><i />{{ fresh.col.key.startsWith('*') ? '' : `${fresh.col.label} · ` }}{{ timeLabel(fresh.time) }}</p>
+        <form @submit.prevent="addFresh">
+          <input v-model="freshText" placeholder="What is it? e.g. “Study group 2h”" aria-label="New item" data-test="sch-new-input" />
+          <button class="btn primary small" :disabled="!freshText.trim()">Add</button>
+        </form>
+      </div>
+    </Teleport>
     <Teleport to="body">
       <div v-if="over" ref="overEl" class="sch-over" :class="{ beside: !over.onCalendar }" :style="over.style" role="dialog" :aria-label="`Edit ${over.x.task.title}`" data-test="sch-over" @keydown.esc="closeOver">
         <div class="sch-over-head" :style="{ '--c': catColor(over.x.task) }">

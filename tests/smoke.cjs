@@ -366,6 +366,28 @@ async function run(url) {
     assert.equal(await big.evaluate(e => e.classList.contains('lifted')), false, 'only one is forward at a time');
     await page.mouse.move(0, 0);
   }
+  // Click an empty spot on the day calendar to add something at that time.
+  {
+    const col = page.locator('[data-test="sch-col"]').first();
+    const c = await col.boundingBox();
+    const spot = await col.evaluate(el => { const r = el.getBoundingClientRect(); const boxes = [...el.querySelectorAll('[data-lane]')].map(b => b.getBoundingClientRect()); for (let y = r.top + 8; y < r.bottom - 8; y += 12) if (!boxes.some(b => y >= b.top - 4 && y <= b.bottom + 4)) return y; return null; });
+    if (spot != null) {
+      await page.mouse.click(c.x + c.width / 2, spot);
+      await page.waitForSelector('[data-test="sch-new"]');
+      await page.fill('[data-test="sch-new-input"]', 'Spot study session');
+      await page.press('[data-test="sch-new-input"]', 'Enter');
+      await page.waitForSelector('[data-test="sch-box"]:has-text("Spot study session")');
+      assert.equal(await page.$('[data-test="sch-new"]'), null, 'the little card closes once added');
+    }
+    // Two things can happen at once: a double-click on an item adds another at that time.
+    const onItem = page.locator('[data-test="sch-box"]', { hasText: 'Overlap big' });
+    const ob = await onItem.boundingBox();
+    await page.mouse.dblclick(ob.x + 8, ob.y + ob.height - 8);
+    await page.waitForSelector('[data-test="sch-new"]');
+    await page.fill('[data-test="sch-new-input"]', 'Same time call');
+    await page.press('[data-test="sch-new-input"]', 'Enter');
+    await page.waitForSelector('[data-test="sch-box"]:has-text("Same time call")');
+  }
   const box = page.locator('[data-test="sch-box"]').first();
   const boxTitle = (await box.locator('.sch-box-title').textContent()).trim();
   await box.click({ position: { x: 12, y: 10 } });
