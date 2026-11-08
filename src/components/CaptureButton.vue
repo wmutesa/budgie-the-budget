@@ -154,7 +154,7 @@ const onKey = e => {
   if (!capture.open && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('input, textarea, select, [contenteditable]')) { e.preventDefault(); openSheet({ voice: false }); }
 };
 onMounted(() => window.addEventListener('keydown', onKey));
-onUnmounted(() => { diag('unmounted', { open: capture.open, listening: listening.value }); flush(); window.removeEventListener('keydown', onKey); });
+onUnmounted(() => { diag('unmounted', { open: capture.open, listening: listening.value }); stopAll(); capture.open = false; flush(); window.removeEventListener('keydown', onKey); });
 // Who opens and closes the card, as it happens.
 watch(() => capture.open, v => diag(v ? 'card-open' : 'card-closed', { listening: listening.value, from: from() }), { flush: 'sync' });
 watch(listening, v => diag(v ? 'listening-on' : 'listening-off', { open: capture.open }), { flush: 'sync' });

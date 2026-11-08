@@ -23,6 +23,7 @@ import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { focus, mmss } from './lib/focus';
+import { capture } from './lib/capture';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
@@ -35,6 +36,18 @@ const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', People: 'user', Voi
 // The owner can switch to the Admin view (from the avatar menu); everyone else sees their planner.
 const adminView = computed(() => nav.mode === 'admin' && account.user?.role === 'owner');
 const tabs = computed(() => (adminView.value ? ADMIN_PAGES : PAGES));
+// The line between the views: each view opens only its own pages. Settings is shared (a reduced
+// version in the Admin view); Privacy belongs to the user view. Anything else lands on the view's first page.
+const ADMIN_OK = [...ADMIN_PAGES, 'Settings'];
+const USER_OK = [...PAGES, 'Settings', 'Privacy'];
+watch([() => nav.page, adminView, () => account.status], () => {
+  if (account.status !== 'signed-in') return;
+  if (adminView.value && !ADMIN_OK.includes(nav.page)) nav.page = ADMIN_PAGES[0];
+  else if (!adminView.value && !USER_OK.includes(nav.page)) nav.page = 'Overview';
+}, { immediate: true });
+// Switching to the Admin view puts the planner away: the Add card closes (stopping any
+// recording), and Lock In keeps counting quietly until you are back.
+watch(adminView, on => { if (!on) return; capture.open = false; if (focus.task) focus.min = true; });
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -103,19 +116,22 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
       <header ref="navBar" class="cell nav-bar span-12">
         <div class="nb-brand">
           <span class="brand-word">BUDGIE</span>
-          <span class="muted small nb-date">{{ today }}</span>
+          <span v-if="adminView" class="nb-admin" data-test="admin-badge">Admin</span>
+          <span v-else class="muted small nb-date">{{ today }}</span>
         </div>
         <nav class="nb-pages" aria-label="Pages">
           <button v-for="p in tabs" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase().replace(/\s+/g, '-')}`" @click="active = p">
             <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
           </button>
         </nav>
-        <GlobalSearch />
+        <GlobalSearch v-if="!adminView" />
+        <span v-else class="nb-admin-note muted small">Counts and states only · no planner, no recording</span>
         <div class="nb-actions">
           <!-- Lock In, minimised: a pill with the time left, like a status icon in a menu bar -->
-          <button v-if="focus.task" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Locked in on ${focus.task.title}`" :aria-label="focus.ended ? 'Lock In ended: open it' : `Locked in, ${mmss(focus.left)} left: open Lock In`" data-test="nb-focus" @click="focus.min = false"><Icon name="timer" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
-          <CaptureButton v-if="account.status === 'signed-in'" />
-          <NoticeBell />
+          <button v-if="focus.task && !adminView" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Locked in on ${focus.task.title}`" :aria-label="focus.ended ? 'Lock In ended: open it' : `Locked in, ${mmss(focus.left)} left: open Lock In`" data-test="nb-focus" @click="focus.min = false"><Icon name="timer" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
+          <!-- The planner's tools live in the user view only: no Add, no recording, no notices in the Admin view -->
+          <CaptureButton v-if="account.status === 'signed-in' && !adminView" />
+          <NoticeBell v-if="!adminView" />
           <AccountMenu @tour="touring = true" />
         </div>
       </header>
@@ -138,8 +154,8 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
     </main>
 
     <Toasts />
-    <LockIn v-if="account.status === 'signed-in'" />
-    <CaptureReview v-if="account.status === 'signed-in'" />
-    <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
+ <LockIn v-if="account.status === 'signed-in' && !adminView" />
+    <CaptureReview v-if="account.status === 'signed-in' && !adminView" />
+    <GuideTour v-if="touring && !adminView" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>
 </template>

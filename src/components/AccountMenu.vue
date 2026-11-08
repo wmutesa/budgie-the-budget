@@ -39,8 +39,10 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
         <button type="button" :class="{ on: nav.mode === 'admin' }" :aria-pressed="nav.mode === 'admin'" data-test="view-admin" @click="open = false; setMode('admin')"><Icon name="shield" :size="14" />Admin view</button>
       </div>
       <button type="button" role="menuitem" data-test="menu-settings" @click="to('Settings')"><Icon name="gear" :size="16" />Settings</button>
-      <button type="button" role="menuitem" data-test="menu-privacy" @click="to('Privacy')"><Icon name="shield" :size="16" />Privacy</button>
-      <button type="button" role="menuitem" data-test="replay-guide" @click="tour"><Icon name="play" :size="16" />Take the tour</button>
+      <template v-if="nav.mode !== 'admin' || !isOwner">
+        <button type="button" role="menuitem" data-test="menu-privacy" @click="to('Privacy')"><Icon name="shield" :size="16" />Privacy</button>
+        <button type="button" role="menuitem" data-test="replay-guide" @click="tour"><Icon name="play" :size="16" />Take the tour</button>
+      </template>
       <button type="button" role="menuitem" class="am-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="16" />Sign out</button>
     </div>
   </span>

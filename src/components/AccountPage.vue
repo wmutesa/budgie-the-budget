@@ -39,7 +39,10 @@ const PRIVACY = [
   ['sessions', 'Sessions', 'logout', 'Everywhere you are signed in, and the big red button for all of them.'],
   ['delete', 'Delete account', 'trash', 'The nuclear option. We will miss you, quietly.'],
 ];
-const tabs = computed(() => (props.kind === 'privacy' ? PRIVACY : SETTINGS.value));
+// In the Admin view, Settings shows only what is about running Budgie: people and devices.
+const adminView = computed(() => nav.mode === 'admin' && isOwner.value);
+const tabs = computed(() => (props.kind === 'privacy' ? PRIVACY : adminView.value ? SETTINGS.value.filter(t => ['people', 'security'].includes(t[0])) : SETTINGS.value));
+watch(tabs, t => { if (!t.some(x => x[0] === tab.value)) tab.value = t[0][0]; });
 const tab = ref(nav.anchor === '#calendars' ? 'calendars' : tabs.value[0][0]);
 watch(() => props.kind, () => { tab.value = tabs.value[0][0]; });
 watch(() => nav.anchor, a => { if (a === '#calendars' && props.kind === 'settings') tab.value = 'calendars'; });
