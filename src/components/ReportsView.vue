@@ -203,20 +203,6 @@ const verdict = computed(() => {
   const sure = Math.round(Math.min(95, 40 + Math.min(1, cur.value.occ.length / 120) * 35 + Math.min(1, s.active / 20) * 20));
   return { label, why, sure };
 });
-// What is helping, and what is holding you back.
-const drivers = computed(() => {
-  const s = stats.value; const out = [];
-  if (strongest.value) out.push({ up: true, text: `${strongest.value.label} follow-through, ${strongest.value.rate}%` });
-  if (s.r != null && s.r >= 0.2) out.push({ up: true, text: 'Focus sessions lift your output' });
-  if (s.slopeWeek >= 0.5) out.push({ up: true, text: `Rising: +${s.slopeWeek} a day each week` });
-  if (cur.value.onTime != null && cur.value.onTime >= 75) out.push({ up: true, text: `Deadlines met, ${cur.value.onTime}%` });
-  if (streaks.value[0]) out.push({ up: true, text: `${streaks.value[0].n}-day streak on ${streaks.value[0].t.title}` });
-  if (slipping.value && slipping.value.rate < 60 && slipping.value !== strongest.value) out.push({ up: false, text: `${slipping.value.label} slipping, ${slipping.value.rate}%` });
-  if (s.consistency < 60) out.push({ up: false, text: `Only ${s.consistency}% of days have something done` });
-  if (s.slopeWeek <= -0.5) out.push({ up: false, text: `Falling: ${s.slopeWeek} a day each week` });
-  if (cur.value.onTime != null && cur.value.onTime < 75) out.push({ up: false, text: `Late on ${100 - cur.value.onTime}% of dated tasks` });
-  return out.slice(0, 6);
-});
 
 // ---------- download ----------
 function download() {
@@ -356,13 +342,6 @@ function download() {
             <div><dt>Longest</dt><dd>{{ longest ? hours(longest.mins) : '–' }}</dd></div>
             <div><dt>Focus and output</dt><dd>{{ stats.r == null ? '–' : `${strength(stats.r)} (r ${stats.r})` }}</dd></div>
           </dl>
-        </section>
-        <section class="rep-sec">
-          <h3><Icon name="steps" :size="14" />KEY DRIVERS</h3>
-          <ul class="rep-drivers">
-            <li v-for="(d, i) in drivers" :key="i" :class="{ down: !d.up }"><b>{{ d.up ? '+' : '−' }}</b>{{ d.text }}</li>
-            <li v-if="!drivers.length" class="muted">Not enough data yet.</li>
-          </ul>
         </section>
       </aside>
     </div>

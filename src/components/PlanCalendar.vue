@@ -21,7 +21,7 @@ import Icon from './Icon.vue';
 // Schedule's own day time line.
 // `fill`: the height to grow to (the Schedule's activity list), 0 for its own size.
 const props = defineProps({ filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false }, fill: { type: Number, default: 0 }, listHidden: { type: Boolean, default: false } });
-const emit = defineEmits(['focus', 'day', 'range', 'list']);
+const emit = defineEmits(['focus', 'day', 'range', 'list', 'pick']);
 const MODES = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
 const mode = computed({ get: () => (['day', 'week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'week'), set: v => { store.planner.cal = v; } });
 const anchor = ref(today());
@@ -173,9 +173,11 @@ async function aiIdeas() {
 }
 function addIdea(x) { store.tasks.unshift(makeTask({ title: x.title, notes: x.why, date: pop.value.date, time: pop.value.time, mins: pop.value.time ? 60 : null, source: 'ai' })); pop.value = null; }
 
-// Click an item: its card with actions.
+// Click an item: inside the Schedule, show it in the activity list (with its
+// steps); on its own, its card with actions.
 function openItem(e, x) {
   if (dragging.value) return;
+  if (props.embedded) { emit('pick', x); return; }
   pop.value = { kind: 'item', item: x, editing: false };
   place(e);
 }

@@ -4,8 +4,7 @@ import { openTasks, occurrences, summary, today, addDays, dayLabel, timeLabel, t
 import TaskRow from './TaskRow.vue';
 import PlanSuggest from './PlanSuggest.vue';
 import Icon from './Icon.vue';
-import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss, ALLOW, focusAllow } from '../lib/focus';
-import { store } from '../lib/store';
+import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss } from '../lib/focus';
 
 // Focus: what matters now. Its own page, with Budgie's suggestions as the
 // right side bar, top to bottom.
@@ -66,17 +65,6 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
           <p v-if="focus.held.length && !focus.ended" class="small pln-timer-note fcs-held" data-test="focus-held">{{ focus.held.length }} {{ focus.held.length === 1 ? 'reminder is' : 'reminders are' }} waiting until you finish.</p>
           <p class="muted small pln-timer-note">{{ focus.ended ? 'A chime played and a notification was sent. Take five, then go again or mark it done.' : 'The countdown shows in this tab\'s title and icon, so you can see it from any tab.' }}</p>
         </div>
-        <!-- What gets through while you focus -->
-        <section class="fcs-allow" data-test="focus-allow">
-          <h2 class="pln-gh">While you focus</h2>
-          <div class="fcs-allow-opts" role="radiogroup" aria-label="What gets through while you focus">
-            <label v-for="[id, label, sub] in ALLOW" :key="id" class="fcs-opt" :class="{ on: focusAllow() === id }">
-              <input type="radio" name="focus-allow" :value="id" :checked="focusAllow() === id" :data-test="`allow-${id}`" @change="store.planner.focusAllow = id" />
-              <span><b>{{ label }}</b><span class="muted small">{{ sub }}</span></span>
-            </label>
-          </div>
-          <p class="muted small">Held reminders are listed when the session ends, and the bell's count stays quiet until then. Your computer's own notifications from other apps are set in its Focus or Do Not Disturb settings; a web page cannot change those.</p>
-        </section>
         <div class="pln-group">
           <h2 class="pln-gh">Top three</h2>
           <ol v-if="top3.length" class="pln-top">
