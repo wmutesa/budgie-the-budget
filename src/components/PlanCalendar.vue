@@ -1,4 +1,5 @@
 <script setup>
+import { liftOnHover, dropLift } from '../lib/lift';
 import { ref, computed, nextTick, onMounted, onUnmounted, onUpdated, watch } from 'vue';
 import { store } from '../lib/store';
 import {
@@ -277,13 +278,13 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           </div>
         </div>
       </div>
-      <div ref="grid" class="cal-grid" :style="{ '--cols': days.length, '--hour': `${HOUR}px` }" data-test="cal-grid">
+      <div ref="grid" class="cal-grid" @mousemove="liftOnHover" @mouseleave="dropLift" :style="{ '--cols': days.length, '--hour': `${HOUR}px` }" data-test="cal-grid">
         <div class="cal-hours">
           <span v-for="h in hours" :key="h" :style="{ height: `${HOUR}px` }">{{ hourLabel(h) }}</span>
         </div>
         <div v-for="d in days" :key="d" class="cal-col" :class="{ today: d === today() }" :style="{ height: `${hours.length * HOUR}px` }" :data-date="d" @click.self="newAt($event, d, true)" @dragover.prevent @drop="dropOn($event, d, true)">
           <div v-if="d === today() && nowTop >= 0 && nowTop <= hours.length * HOUR" class="cal-now" :style="{ top: `${nowTop}px` }" aria-hidden="true" />
-          <button v-for="x in timed(d)" :key="x.key" type="button" :data-task-id="x.task.id" :data-date="x.date" class="cal-item box" :class="{ done: x.done, short: x.e - x.s < 40, stacked: x.lane > 0 }" :title="`${x.task.title} · ${timeLabel(x.task.time)}`" :style="boxStyle(x)" draggable="true" data-test="cal-item" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
+          <button v-for="x in timed(d)" :key="x.key" type="button" :data-task-id="x.task.id" :data-date="x.date" class="cal-item box" :data-lane="x.lane" :class="{ done: x.done, short: x.e - x.s < 40, stacked: x.lane > 0 }" :title="`${x.task.title} · ${timeLabel(x.task.time)}`" :style="boxStyle(x)" draggable="true" data-test="cal-item" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
             <span class="cal-box-time">{{ timeLabel(x.task.time) }}<template v-if="x.task.mins"> – {{ timeLabel(fromMins(x.s + x.task.mins)) }}</template></span><b>{{ x.task.title }}</b>
           </button>
         </div>

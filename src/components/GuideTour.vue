@@ -13,7 +13,7 @@ const steps = [
     body: 'Budgie plans your days, and keeps your goals moving. This quick tour shows where everything is. It takes about a minute.',
     note: 'Budgie starts empty: everything comes from what you add. The quickest start is to tap Add and say a few things out loud.' },
   { page: 'Overview', target: '.nb-pages', title: 'Four pages',
-    body: 'Overview is your day at a glance. Schedule shows your day, week and month, with your activity beside it. Focus shows what matters now, with a timer. Reports shows what got done and where your time went.' },
+    body: 'Overview is your day at a glance. Schedule shows your day, week and month, with your activity beside it. Focus shows what matters now, with a timer. Progress shows what got done and where your time went.' },
   { page: 'Overview', target: '#today', title: 'Your day in a sentence',
     body: 'Budgie writes what is on today, what is next, deadlines this week and your streaks. It updates as you tick things off.' },
   { page: 'Overview', target: '[data-test="capture"]', title: 'Add anything',

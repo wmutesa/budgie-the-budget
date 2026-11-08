@@ -1850,7 +1850,7 @@ body:has(.overlay) .notice { display: none; }
 .cal-item.box b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-item.box span { color: #52525b; font-size: 10.5px; }
 .cal-item.box.short { grid-auto-flow: column; justify-content: start; gap: 6px; padding-top: 1px; }
-.cal-item.box:hover { background: color-mix(in srgb, var(--k) 24%, #fff); z-index: 4; }
+.cal-item.box:hover { background: color-mix(in srgb, var(--k) 24%, #fff); }
 .cal-item.done { opacity: .5; }
 .cal-item.done b { text-decoration: line-through; }
 .cal-item.chip { display: flex; align-items: center; gap: 5px; padding: 2px 6px; border-radius: 4px; background: color-mix(in srgb, var(--k) 16%, #fff); color: #18181b; font-size: 11px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -3193,7 +3193,7 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .rep-base { stroke: #d4d4d8; stroke-width: 1.5; }
 /* Week cards cascade when they overlap: a white ring sets each apart; hover or focus brings one to the front */
 .cal-item.box.stacked { box-shadow: 0 0 0 1.5px #fff, 0 2px 6px -3px rgba(24, 24, 27, .25) !important; }
-.cal-item.box:hover, .cal-item.box:focus-visible { z-index: 30 !important; }
+.cal-item.box:focus-visible { z-index: 30 !important; }
 .cal-item.box b { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; display: block; }
 .cal-item.box:not(.short) b { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: normal; }
 /* Done calendar cards stay solid (no see-through stacking); their words are greyed and struck */
@@ -3268,7 +3268,7 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .bell-link { border-radius: 6px !important; }
 /* Day: overlapping things cascade; a white ring sets each apart; hover brings one to the front */
 .sch-box.stacked { box-shadow: 0 0 0 1.5px #fff, 0 3px 10px -4px rgba(24, 24, 27, .25) !important; }
-.sch-box:hover, .sch-box:focus-visible { z-index: 30 !important; }
+.sch-box:focus-visible { z-index: 30 !important; }
 .sch-box.done { opacity: 1 !important; background: #fafafa !important; border-color: #ececf0 !important; }
 .sch-box.done .sch-box-title, .sch-box.done .sch-box-time { color: #a1a1aa !important; }
 .sch-box.done .sch-box-title { text-decoration: line-through; }
@@ -3290,3 +3290,24 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 @media (prefers-reduced-motion: reduce) { .cap-live .cap-rec { animation: none; } }
 /* The notifications card is square, like the rest of Budgie's cards. */
 .bell-pop, .bell-item, .bell-main, .bell-new, .bell-link, .bell-tip { border-radius: 0 !important; }
+
+/* Overview: lavender only, in light tints. Every kind shares it; red is
+   kept for hover on delete, not at rest. */
+.td-col { --k: #c4b5fd !important; }
+.td-col .tk { --k: #c4b5fd !important; border-left-color: #e9e3fe !important; }
+.td-col .tk-kind { color: #8b7fd1 !important; font-weight: 500; }
+.td-col .td-list li > i { background: #d8cffd !important; }
+.td-col .pln-ring { background: radial-gradient(#fff 62%, transparent 63%), conic-gradient(#c4b5fd calc(var(--p) * 1%), #f4f4f5 0); }
+.td-col .td-bar { background: #f8f8f9; }
+.td-col .td-bar i { background: #ddd6fe !important; }
+.td-col .td-goal-del { color: #a1a1aa !important; }
+.td-col .td-goal-del:hover, .td-col .td-goal-del:focus-visible { color: #e11d48 !important; }
+.td-col .m-violet, .td-col .m-green, .td-col .m-pink, .td-col .m-blue, .td-col .m-amber { --hl: #ede9fe; }
+.td-col .tk-due.late, .td-col .tk.overdue .tk-due { color: #8b7fd1 !important; }
+/* The focus card is plain white: no gradient. */
+.pln-focus { background: #fff !important; }
+.td-col .pln-ideas > li { border-left-color: #e9e3fe !important; }
+
+/* Overlapping items: only the one that owns the spot under the cursor comes
+   forward (see lib/lift.js); plain hover no longer raises a box over the rest. */
+.sch-box.lifted, .cal-item.box.lifted { z-index: 30 !important; }

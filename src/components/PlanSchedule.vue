@@ -1,4 +1,5 @@
 <script setup>
+import { liftOnHover, dropLift } from '../lib/lift';
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
@@ -340,12 +341,12 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
             <button v-for="x in anyFor(col.key)" :key="x.key" type="button" class="sch-chip" :class="{ done: x.done }" :style="{ '--c': catColor(x.task) }" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-chip" @click="pick(x)">{{ x.task.title }}</button>
           </div>
         </div>
-        <div ref="grid" class="sch-grid" :style="{ '--n': columns.length, '--h': `${HOUR}px` }">
+        <div ref="grid" class="sch-grid" @mousemove="liftOnHover" @mouseleave="dropLift" :style="{ '--n': columns.length, '--h': `${HOUR}px` }">
           <div class="sch-axis">
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :data-lane="x.lane" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
               <span class="sch-box-time">{{ hhmm(x.s) }} – {{ hhmm(x.e) }}<Icon name="more" :size="14" class="sch-box-more" /></span>
               <b class="sch-box-title">{{ x.task.title }}</b>
             </button>

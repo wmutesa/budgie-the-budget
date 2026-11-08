@@ -145,7 +145,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Focus', 'Reports'], 'the four pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Focus', 'Progress'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -201,6 +201,13 @@ async function run(url) {
   assert.match(await page.textContent('.cr-count'), /of 1/, 'only the new thing is reviewed');
   await page.click('[data-test="review-keep"]');
   await page.click('[data-test="toast"]:has-text("2 changes") .toast-act');
+
+  // Two things at the same time, to check overlapping items on the calendar.
+  await page.click('[data-test="capture"]');
+  await page.fill('[data-test="capture-text"]', 'Overlap big today at 2pm 120 min\nOverlap small today at 2:30pm 30 min');
+  await page.click('[data-test="capture-sort"]');
+  await page.click('[data-test="review-keep"]');
+  await page.click('[data-test="review-keep"]');
 
   // Schedule: what Add sent is here. No Tasks or Agenda views any more.
   await page.click(tab('Schedule'));
@@ -331,6 +338,20 @@ async function run(url) {
   if (await page.locator('[data-test="sch-box"]').count() > boxes) assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
   // The calendar shows no steps; clicking a box shows its row in the activity list, highlighted.
   assert.equal(await page.$('.sch-box-subs, .sch-box-note'), null, 'calendar boxes do not list steps or notes');
+  // Overlapping items: the one owning the spot under the cursor comes forward, and a lifted big one never hides the small one.
+  {
+    const big = page.locator('[data-test="sch-box"]', { hasText: 'Overlap big' });
+    const small = page.locator('[data-test="sch-box"]', { hasText: 'Overlap small' });
+    await big.scrollIntoViewIfNeeded();
+    const B = await big.boundingBox(), S = await small.boundingBox();
+    assert.ok(S.x > B.x && S.y > B.y, 'the later one sits on top, shifted right');
+    await page.mouse.move(B.x + 4, B.y + 6);
+    assert.ok(await big.evaluate(e => e.classList.contains('lifted')), 'hovering the big one\'s own strip brings it forward');
+    await page.mouse.move(S.x + S.width / 2, S.y + S.height / 2);
+    assert.ok(await small.evaluate(e => e.classList.contains('lifted')), 'moving onto the small one brings it forward, even under the lifted big one');
+    assert.equal(await big.evaluate(e => e.classList.contains('lifted')), false, 'only one is forward at a time');
+    await page.mouse.move(0, 0);
+  }
   const box = page.locator('[data-test="sch-box"]').first();
   const boxTitle = (await box.locator('.sch-box-title').textContent()).trim();
   await box.click({ position: { x: 12, y: 10 } });
@@ -579,7 +600,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Schedule', 'Focus', 'Reports']) {
+  for (const p of ['Overview', 'Schedule', 'Focus', 'Progress']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

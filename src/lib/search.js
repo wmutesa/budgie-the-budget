@@ -9,7 +9,7 @@ import { go } from './nav';
 const PLACES = [
   ['Overview', 'Overview', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Schedule', 'Schedule', 'Your day, week and month, with your activity', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule|calendar|week|month|day view|timeline/],
-  ['Reports', 'Reports', 'Focus hours, what got done, by category', /report|analytic|stats|insight|progress|hours/],
+  ['Progress', 'Progress', 'Focus hours, what got done, by category', /report|analytic|stats|insight|progress|hours/],
   ['Focus', 'Focus', 'Top three, a focus timer and suggestions', /focus|timer|pomodoro|top three|suggest/],
   ['Schedule', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
 ];

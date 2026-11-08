@@ -63,7 +63,7 @@ const SCREENS = [
   }],
   ['day-pick', async p => { await p.keyboard.press('Escape'); await p.click('[data-test="sch-today"]'); }],
   ['focus', async p => { await p.click('[data-test="nav-focus"]'); }],
-  ['reports', async p => { await p.click('[data-test="nav-reports"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
+  ['reports', async p => { await p.click('[data-test="nav-progress"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
   ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
   ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.click('[data-test="capture"]'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
   ['review', async p => { await p.click('[data-test="capture-sort"]'); await p.waitForSelector('.cr-hole'); }],
