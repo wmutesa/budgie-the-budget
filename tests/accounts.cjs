@@ -215,7 +215,7 @@ async function main() {
     assert.equal(await owner.page.$('[data-test="capture-sheet"]'), null, 'the N shortcut does not open Add in the Admin view');
     await owner.page.evaluate(() => { const b = [...document.querySelectorAll('.nb-pages button')]; return b.length; });
     await owner.page.click('[data-test="account"]');
-    assert.equal(await owner.page.$('[data-test="menu-privacy"]'), null, 'Privacy belongs to the user view');
+    assert.equal(await owner.page.$('[data-test="menu-privacy"]'), null, 'there is no separate Privacy page');
     await owner.page.click('[data-test="menu-settings"]');
     assert.deepEqual(await owner.page.$$eval('[data-test="settings-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Devices & security', 'People'], 'Settings in the Admin view: people and devices only');
     await owner.page.click('[data-test="nav-people"]');
@@ -256,7 +256,7 @@ async function main() {
     assert.equal(cal.empty[0], 400, 'an empty link is refused');
     const calSignedOut = await fetch(`${base}/api/calendar`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ url: 'https://example.com/a.ics' }) });
     assert.equal(calSignedOut.status, 401, 'calendar import needs a sign-in');
-    // Model downloads: signed in only, and only Budgie's own model files.
+    // Model downloads: signed in only, and only Taskie's own model files.
     assert.equal((await fetch(`${base}/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/mlc-chat-config.json`)).status, 401, 'model files need a sign-in');
     assert.equal(await owner.page.evaluate(async () => (await fetch('/api/model/hf/someone/else/resolve/main/x.bin')).status), 404, 'other files are refused');
 
@@ -282,7 +282,7 @@ async function main() {
     await sam.page.waitForSelector('[data-test="acct-tab-profile"]');
     assert.equal(await sam.page.$('[data-test="acct-tab-people"]'), null, 'members do not see People');
     await sam.page.click('[data-test="account"]');
-    await sam.page.click('[data-test="menu-privacy"]');
+    await sam.page.click('[data-test="menu-settings"]');
     await sam.page.click('[data-test="acct-tab-delete"]');
     sam.page.removeAllListeners('dialog');
     sam.page.once('dialog', d => d.accept('DELETE'));

@@ -4,7 +4,7 @@ import { adminSummary, invitePerson } from '../lib/account';
 import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
-// The owner's Admin view: how Budgie is doing for everyone, as counts and
+// The owner's Admin view: how Taskie is doing for everyone, as counts and
 // states only. Nobody's tasks or words are shown here. Logs are kept 30 days.
 const props = defineProps({ section: { type: String, default: 'People' } });
 const data = ref(null);
@@ -35,7 +35,7 @@ const usageRows = computed(() => [
   ['Live words (Whisper)', (u.value['live-final-whisper'] || 0) + (u.value['live-partial-whisper'] || 0), (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0)],
   ['Live words (Gemini, own key)', (u.value['live-final-gemini'] || 0) + (u.value['live-partial-gemini'] || 0), 0],
   ['Live words that failed', u.value['live-failed'] || 0, 0],
-  ['Breakdowns (Budgie AI)', u.value['split-budgie'] || 0, u.value['split-budgie-failed'] || 0],
+  ['Breakdowns (Taskie AI)', u.value['split-budgie'] || 0, u.value['split-budgie-failed'] || 0],
 ]);
 // The models behind recording and sorting, with this week's use, misses and speed.
 const avg = (msKey, keys) => { const n = keys.reduce((a, k) => a + (u.value[k] || 0), 0); return n ? Math.round((u.value[msKey] || 0) / n) : null; };
@@ -44,7 +44,7 @@ const models = computed(() => [
   { name: 'Gemini Flash (own key)', job: 'Writes down and sorts, for people with their own key', where: 'Google', calls: (u.value['live-final-gemini'] || 0) + (u.value['live-partial-gemini'] || 0), misses: 0, ms: avg('ms-gemini-live', ['live-final-gemini', 'live-partial-gemini']), state: 'Optional' },
   { name: 'Llama 3.3 70B', job: 'Splits what was said into tasks, routines, events and goals', where: 'Cloudflare Workers AI', calls: (u.value['split-budgie'] || 0) + (u.value['split-budgie-failed'] || 0), misses: u.value['split-budgie-failed'] || 0, ms: avg('ms-split-budgie', ['split-budgie']), state: 'In use · teacher for training' },
   { name: 'Qwen 2.5 (0.5B and 1.5B)', job: 'On-device splitting when the server is unreachable', where: "The person's browser", calls: null, misses: null, ms: null, state: 'Fallback · to be fine-tuned daily from Nov 9' },
-  { name: 'Budgie rules', job: 'Title Case, nonsense filter, run-on splitting, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
+  { name: 'Taskie rules', job: 'Title Case, nonsense filter, run-on splitting, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
 ]);
 // Calendars across everyone: how many people added each one, and whether it is working.
 const calHealth = computed(() => {
@@ -78,7 +78,7 @@ function csv() {
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 const DESC = {
-  People: 'Who uses Budgie, how recently, and how much.',
+  People: 'Who uses Taskie, how recently, and how much.',
   Models: 'The models that write down and sort what people say: how much they were used, how often they missed, and how fast they were.',
   Voice: 'Recording health by device and browser: what was heard, what was not, and why.',
   Errors: 'What broke in the app, and which version each device is running.',
@@ -165,7 +165,7 @@ const DESC = {
           <dl class="adm-kv">
             <div><dt>First run</dt><dd>Mon Nov 9, then a new model every day</dd></div>
             <div><dt>Corrections learned (training signal)</dt><dd>{{ learnedTotal }}</dd></div>
-            <div><dt>Opted in to help Budgie hear better</dt><dd>Not built yet</dd></div>
+            <div><dt>Opted in to help Taskie hear better</dt><dd>Not built yet</dd></div>
             <div><dt>Plan and scores</dt><dd><a href="https://github.com/wmutesa/budgie-the-budget/issues/4" target="_blank" rel="noopener noreferrer">Issue #4</a></dd></div>
           </dl>
         </section>

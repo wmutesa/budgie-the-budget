@@ -23,7 +23,7 @@ export const focus = reactive({ task: null, total: 25 * 60, left: 25 * 60, runni
 // 'all': everything; 'starting': only events and classes about to start; 'none': nothing.
 export const ALLOW = [
   ['starting', 'Only what is starting', 'Events and classes about to begin still reach you; task reminders wait.'],
-  ['none', 'Nothing', 'Every Budgie reminder waits until the session ends.'],
+  ['none', 'Nothing', 'Every Taskie reminder waits until the session ends.'],
   ['all', 'Everything', 'Reminders arrive as usual.'],
 ];
 export const focusAllow = () => (ALLOW.some(([k]) => k === store.planner?.focusAllow) ? store.planner.focusAllow : 'starting');
@@ -162,13 +162,13 @@ function flashTitle() {
   flasher = setInterval(() => {
     if (typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus()) { clearInterval(flasher); flasher = null; setTitle(); return; }
     on = !on;
-    document.title = on ? '✓ Time is up' : `${focus.task?.title || 'Lock In'} · Budgie`;
+    document.title = on ? '✓ Time is up' : `${focus.task?.title || 'Lock In'} · Taskie`;
   }, 1000);
 }
 function stopAlarm() { clearInterval(flasher); flasher = null; try { note?.close(); } catch { /* gone */ } note = null; }
 
 // ---------- the tab: title and icon ----------
-const BASE_TITLE = typeof document !== 'undefined' ? document.title : 'Budgie';
+const BASE_TITLE = typeof document !== 'undefined' ? document.title : 'Taskie';
 let icons = null;
 function setTitle() {
   if (typeof document === 'undefined' || flasher) return;
@@ -215,7 +215,7 @@ export async function openMini() {
   } catch { return; }
   focus.mini = true;
   const d = mini.document;
-  d.title = 'Budgie focus';
+  d.title = 'Taskie focus';
   d.head.innerHTML = `<style>
     body { margin: 0; font: 13px/1.3 system-ui, -apple-system, sans-serif; background: #faf8ff; color: #18181b; display: grid; gap: 6px; padding: 12px 14px; }
     .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

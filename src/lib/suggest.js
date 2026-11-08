@@ -1,4 +1,4 @@
-// Task ideas Budgie offers in the Planner, from rules over your own data:
+// Task ideas Taskie offers in the Planner, from rules over your own data:
 // deadlines without a plan, exams to review for, goals without a next step,
 // gaps in your routine and the weekly review. Free and instant; the on-device AI can
 // add more ideas on request (see ai.js).
@@ -47,7 +47,7 @@ export const suggestions = computed(() => {
     const open = linked.filter(t => !t.repeat && !t.done);
     if (!linked.length) add({
       id: `goal-plan-${g.id}`, tone: 'good', title: `Break “${g.title}” into milestones`,
-      why: 'A goal with steps on the calendar is far more likely to happen. Budgie spreads them out up to your date.',
+      why: 'A goal with steps on the calendar is far more likely to happen. Taskie spreads them out up to your date.',
       goal: g,
     });
     else if (!open.some(t => t.date && dayDiff(now, t.date) <= 7)) add({
@@ -73,7 +73,7 @@ export const suggestions = computed(() => {
   }
   if (store.tasks.length >= 5 && !has(/weekly review|plan (the|my|next) week/i)) add({
     id: 'idea-weekly-review', tone: 'info', title: 'Plan your week every Sunday',
-    why: 'Fifteen minutes to look back, clear what is late and plan the week ahead. Budgie fills in the numbers.',
+    why: 'Fifteen minutes to look back, clear what is late and plan the week ahead. Taskie fills in the numbers.',
     task: { title: 'Weekly review', time: '19:00', mins: 15, kind: 'routine', repeat: { every: 'week', days: [0] }, date: now },
   });
 

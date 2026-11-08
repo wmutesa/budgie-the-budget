@@ -7,6 +7,8 @@ import PasskeyNote from './PasskeyNote.vue';
 
 // The first screen for anyone not signed in: sign in with a passkey, or
 // create one from an invite link.
+// embedded: shown inside the home page's hero rather than on its own page.
+defineProps({ embedded: { type: Boolean, default: false } });
 const busy = ref(false);
 const error = ref('');
 const supported = canUsePasskeys();
@@ -15,7 +17,7 @@ const pasting = ref(false);
 const pasted = ref('');
 const useInvite = () => run(async () => {
   const token = inviteToken(pasted.value);
-  if (!token) throw new Error('That does not look like a Budgie invite link. Copy the whole link, including everything after the # sign.');
+  if (!token) throw new Error('That does not look like a Taskie invite link. Copy the whole link, including everything after the # sign.');
   await openInvite(token);
   pasted.value = '';
   pasting.value = false;
@@ -31,21 +33,13 @@ async function run(fn) {
 </script>
 
 <template>
-  <main class="signin">
-    <SignInBackdrop />
+  <main :class="embedded ? 'signin-in' : 'signin'">
+    <SignInBackdrop v-if="!embedded" />
 
     <section class="si-card">
-      <!-- A small pixel budgie perched on the card. -->
-      <svg class="si-bird" :class="{ busy }" viewBox="0 0 10 10" width="60" height="60" shape-rendering="crispEdges" aria-hidden="true">
-        <g fill="#fde047"><rect x="3" y="1" width="3" height="1" /><rect x="2" y="2" width="5" height="1" /><rect x="2" y="3" width="4" height="1" /></g>
-        <rect class="si-eye" x="5" y="2" width="1" height="1" fill="#18181b" />
-        <rect x="6" y="3" width="1" height="1" fill="#fb923c" />
-        <g fill="#86efac"><rect x="2" y="4" width="4" height="1" /><rect x="1" y="5" width="5" height="2" /><rect x="2" y="7" width="3" height="1" /></g>
-        <g fill="#22c55e"><rect x="2" y="5" width="2" height="1" /><rect x="3" y="6" width="2" height="1" /></g>
-        <g fill="#93c5fd"><rect x="0" y="7" width="2" height="1" /><rect x="0" y="8" width="1" height="1" /></g>
-        <g fill="#18181b"><rect x="3" y="8" width="1" height="1" /><rect x="5" y="8" width="1" height="1" /></g>
-      </svg>
-      <p class="brand-word">BUDGIE</p>
+      <!-- Taskie's mark: a tick on violet, with a little sun. -->
+      <svg class="si-mark" viewBox="0 0 64 64" width="44" height="44" aria-hidden="true"><defs><linearGradient id="si-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa" /><stop offset="1" stop-color="#6d28d9" /></linearGradient></defs><rect width="64" height="64" rx="15" fill="url(#si-g)" /><path d="M17 33.5 27.5 44 47.5 21" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" /><circle cx="49" cy="46" r="4.5" fill="#fde68a" /></svg>
+      <p class="brand-word">TASKIE</p>
 
       <template v-if="account.invite?.token">
         <h1>{{ account.invite.addsDevice ? `Add this device, ${account.invite.name}` : `Welcome, ${account.invite.name}` }}</h1>
@@ -53,14 +47,14 @@ async function run(fn) {
         <p class="si-lead">
           {{ account.invite.addsDevice
             ? 'Create a passkey on this device so you can sign in here too.'
-            : 'You have been invited to Budgie. Create a passkey to set up your account. It uses your fingerprint, face or device PIN, so there is no password to remember.' }}
+            : 'You have been invited to Taskie. Create a passkey to set up your account. It uses your fingerprint, face or device PIN, so there is no password to remember.' }}
         </p>
         <button class="btn primary si-btn" data-test="create-passkey" :disabled="busy || !supported" @click="run(registerWithInvite)"><Icon name="sparkle" :size="14" />{{ busy ? 'Waiting for your passkey…' : 'Create a passkey' }}</button>
       </template>
 
       <template v-else>
         <h1>Sign in</h1>
-        <p class="si-lead">Use the passkey you created when you joined. Budgie is invite-only, so ask the owner for an invite link if you do not have one.</p>
+        <p class="si-lead">Use the passkey you created when you joined. Taskie is invite-only, so ask the owner for an invite link if you do not have one.</p>
         <p v-if="account.invite?.error" class="si-error" role="alert">{{ account.invite.error }}</p>
         <button class="btn primary si-btn" data-test="sign-in" :disabled="busy || !supported" @click="run(signIn)"><Icon name="sparkle" :size="14" />{{ busy ? 'Waiting for your passkey…' : 'Sign in with a passkey' }}</button>
         <p class="si-tip">On someone else's computer? In the passkey prompt, choose <b>Use a phone or tablet</b> and scan the code with your phone.</p>

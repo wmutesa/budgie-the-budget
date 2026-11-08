@@ -5,7 +5,7 @@ import { nav } from '../lib/nav';
 import { search, actionsFor, HINTS } from '../lib/search';
 import Icon from './Icon.vue';
 
-// The search in the top bar: finds anything in Budgie and turns what you
+// The search in the top bar: finds anything in Taskie and turns what you
 // type into an action. Press / to jump here; arrows and Enter to choose.
 const q = ref('');
 const open = ref(false);
@@ -39,7 +39,7 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
 <template>
   <div ref="root" class="nb-search gs">
     <Icon name="search" :size="15" class="gs-ico" />
-    <input ref="input" v-model="q" type="search" :placeholder="HINTS[nav.page] || 'Search Budgie'" :aria-label="HINTS[nav.page] || 'Search Budgie'" role="combobox" :aria-expanded="open" aria-controls="gs-list" autocomplete="off" data-test="search" @keydown="onKey" @focus="open = Boolean(q.trim())" />
+    <input ref="input" v-model="q" type="search" :placeholder="HINTS[nav.page] || 'Search Taskie'" :aria-label="HINTS[nav.page] || 'Search Taskie'" role="combobox" :aria-expanded="open" aria-controls="gs-list" autocomplete="off" data-test="search" @keydown="onKey" @focus="open = Boolean(q.trim())" />
     <kbd class="gs-kbd" aria-hidden="true">/</kbd>
     <div v-if="open && flat.length" id="gs-list" class="gs-pop" role="listbox" data-test="search-pop">
       <template v-if="actions.length">

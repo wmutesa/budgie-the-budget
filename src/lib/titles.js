@@ -77,7 +77,7 @@ export function spokenMarks(raw) {
 const CHATTER = [
   'ok', 'okay', 'k', 'alright', 'all right', 'right', 'yes', 'yeah', 'yep', 'yup', 'no', 'nope', 'nah', 'sure', 'cool', 'great', 'nice', 'good', 'fine', 'perfect', 'awesome', 'got it',
   'um', 'uh', 'umm', 'uhh', 'hmm', 'mm', 'mhm', 'uh huh', 'ah', 'oh', 'eh', 'er', 'so', 'well', 'like', 'and', 'but', 'also', 'then', 'anyway', 'anyways', 'whatever', 'basically',
-  'hi', 'hello', 'hey', 'hey budgie', 'hi budgie', 'hello budgie', 'good morning', 'good afternoon', 'good evening', 'good night', 'bye', 'goodbye', 'bye bye', 'see you', 'see ya',
+  'hi', 'hello', 'hey', 'hey budgie', 'hi budgie', 'hello budgie', 'hey taskie', 'hi taskie', 'hello taskie', 'good morning', 'good afternoon', 'good evening', 'good night', 'bye', 'goodbye', 'bye bye', 'see you', 'see ya',
   'thanks', 'thank you', 'thank you so much', 'thanks a lot', 'cheers', 'please', 'sorry', 'excuse me', 'oops', 'my bad',
   'test', 'testing', 'testing testing', 'test test', 'one two three', 'testing one two three', 'mic check', 'can you hear me', 'is this working', 'is it working', 'is this on', 'hello hello',
   "that's it", 'that is it', "that's all", 'that is all', "that's everything", 'that is everything', 'done', "i'm done", 'i am done', 'all done', 'nothing else', "that's about it", 'the end', 'end', 'stop', 'stop recording', 'over',
@@ -139,7 +139,7 @@ export function newWords(before, heard) {
   return next;
 }
 
-// Corrections you made to what Budgie heard become rules for next time
+// Corrections you made to what Taskie heard become rules for next time
 // (that is how it learns your accent and your names): [{ heard, word }].
 export function applyVocab(text, vocab = []) {
   let s = String(text ?? '');

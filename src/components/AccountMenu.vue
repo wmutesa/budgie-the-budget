@@ -5,7 +5,7 @@ import { avatar } from '../lib/profile';
 import { account, signOut } from '../lib/account';
 import { go, nav, setMode } from '../lib/nav';
 
-// The avatar in the top right (the one round thing in Budgie) and its menu:
+// The avatar in the top right (the one round thing in Taskie) and its menu:
 // Settings, Privacy, the tour, and Sign out.
 const emit = defineEmits(['tour']);
 const open = ref(false);
@@ -40,7 +40,6 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
       </div>
       <button type="button" role="menuitem" data-test="menu-settings" @click="to('Settings')"><Icon name="gear" :size="16" />Settings</button>
       <template v-if="nav.mode !== 'admin' || !isOwner">
-        <button type="button" role="menuitem" data-test="menu-privacy" @click="to('Privacy')"><Icon name="shield" :size="16" />Privacy</button>
         <button type="button" role="menuitem" data-test="replay-guide" @click="tour"><Icon name="play" :size="16" />Take the tour</button>
       </template>
       <button type="button" role="menuitem" class="am-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="16" />Sign out</button>

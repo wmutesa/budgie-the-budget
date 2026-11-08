@@ -10,7 +10,7 @@ const saved = ref(false);
 const copied = ref(false);
 
 const text = () => [
-  `Budgie recovery codes${props.name ? ` for ${props.name}` : ''}`,
+  `Taskie recovery codes${props.name ? ` for ${props.name}` : ''}`,
   `Made ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
   '',
   ...props.codes,
@@ -43,7 +43,7 @@ function download() {
     </div>
     <template v-if="confirm">
       <label class="rc-check"><input v-model="saved" type="checkbox" data-test="codes-saved" /> I have saved these codes somewhere safe</label>
-      <button class="btn primary si-btn" type="button" data-test="codes-done" :disabled="!saved" @click="emit('done')"><Icon name="check" :size="14" />Continue to Budgie</button>
+      <button class="btn primary si-btn" type="button" data-test="codes-done" :disabled="!saved" @click="emit('done')"><Icon name="check" :size="14" />Continue to Taskie</button>
       <div class="rc-skip">
         <button class="si-link" type="button" data-test="codes-skip" @click="emit('skip')">Skip, my passkey syncs (iCloud or Google)</button>
         <p>Choose this if your passkey is saved to iCloud Keychain or Google Password Manager, or you will add a second device. These codes are then cancelled, and you can make new ones any time from the account menu.</p>

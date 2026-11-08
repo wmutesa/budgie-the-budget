@@ -11,14 +11,14 @@ import Icon from './Icon.vue';
 import { spokenMarks, newWords, applyVocab, learnCorrections } from '../lib/titles';
 import { diag, from, flush } from '../lib/diag';
 
-// The one way to add anything. Tap Add and talk: Budgie listens to the
+// The one way to add anything. Tap Add and talk: Taskie listens to the
 // microphone itself and your words appear in the card as you speak (written
-// down by Budgie's server at each pause), and you can edit them while it
-// listens. Only Stop, on the card, ends it: Budgie then breaks what you said
+// down by Taskie's server at each pause), and you can edit them while it
+// listens. Only Stop, on the card, ends it: Taskie then breaks what you said
 // into separate things and puts each one in place. Typed text is added line by line.
 const micNote = ref('');
-// Everything Budgie wrote down this time, before your edits: comparing it with what you
-// keep teaches Budgie your names and your accent.
+// Everything Taskie wrote down this time, before your edits: comparing it with what you
+// keep teaches Taskie your names and your accent.
 let heardRaw = '';
 function learnFromEdits() {
   const pairs = learnCorrections(heardRaw.trim(), capture.text);
@@ -52,7 +52,7 @@ const hasKey = computed(() => !!store.digest?.geminiKey);
 // With a Gemini key the whole recording also goes to Gemini on Stop: it reads it in full.
 const geminiAudio = computed(() => canCapture && hasKey.value && store.planner?.geminiAudio !== false);
 
-// Budgie's own listening (every modern browser).
+// Taskie's own listening (every modern browser).
 const recLive = ref(false);
 let liveFailed = false;
 const live = createLive({
@@ -66,8 +66,8 @@ const live = createLive({
     if (code === 'mic' || code === 'unsupported') { recLive.value = false; micNote.value = `${m} You can type instead.`; return; }
     liveFailed = true;
     micNote.value = hasKey.value
-      ? `${m} Keep talking: Budgie is still recording, and Gemini writes it all down when you tap Stop.`
-      : `${m} Keep talking: Budgie is still recording and tries each phrase again. You can also type.`;
+      ? `${m} Keep talking: Taskie is still recording, and Gemini writes it all down when you tap Stop.`
+      : `${m} Keep talking: Taskie is still recording and tries each phrase again. You can also type.`;
   },
 });
 // Older browsers without audio capture: their own dictation, if they have it.
@@ -178,7 +178,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
         <header class="cap-head">
           <div>
             <h2>{{ capture.sorting ? (hasKey ? 'Sorting it out with Gemini…' : 'Sorting it out…') : listening ? 'Listening. Go on…' : 'Add anything' }}</h2>
-            <p class="muted small">{{ listening ? 'Say everything on your mind. Your words appear here as you speak, and you can fix any of them. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
+            <p class="muted small">{{ listening ? 'Say everything on your mind. Your words appear here as you speak, and you can fix any of them. Tap Stop when you are done: Taskie splits it into tasks, routines, events and goals.' : 'Say or type several things. Taskie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
           <button v-if="!listening" type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
         </header>
@@ -190,7 +190,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
         </div>
 
         <p v-if="micNote" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ micNote }}</p>
-        <ul v-if="rows.length" class="cap-rows" aria-label="How Budgie will sort it">
+        <ul v-if="rows.length" class="cap-rows" aria-label="How Taskie will sort it">
           <li v-for="r in rows" :key="r.id" :class="`to-${r.dest}`"><Icon :name="DESTS[r.dest].icon" :size="13" /><b>{{ DESTS[r.dest].label }}</b><span>{{ r.task.title }}</span></li>
         </ul>
         <div v-else class="cap-examples">

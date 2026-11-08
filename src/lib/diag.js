@@ -1,5 +1,5 @@
 // Diagnostics for the Add card: a short trail of what happened (opened,
-// microphone asked, started, levels, closed and from where), sent to Budgie's
+// microphone asked, started, levels, closed and from where), sent to Taskie's
 // server so a problem on one device can be traced. It never holds the words
 // you said: only counts, lengths, states and error names.
 const events = [];

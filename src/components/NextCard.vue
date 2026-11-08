@@ -11,7 +11,7 @@ import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
 // What's next: one list for everything coming up. Today's things in time
-// order, this week's deadlines, and Budgie's ideas, each with one action.
+// order, this week's deadlines, and Taskie's ideas, each with one action.
 const props = defineProps({ upNext: { type: Array, default: () => [] }, deadlines: { type: Array, default: () => [] } });
 const SHOW = 6;
 const all = ref(false);

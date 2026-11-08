@@ -211,7 +211,7 @@ await check('calendar links: Google links that are not feeds get the right advic
   assert.equal(linkAdvice('https://school.instructure.com/feeds/calendars/user_x.ics'), '', 'other services are tried first');
 });
 const { modelSource } = await import('../../worker/models.js');
-await check('model downloads: only the exact files Budgie uses', () => {
+await check('model downloads: only the exact files Taskie uses', () => {
   assert.equal(modelSource('/api/model/hf/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin'), 'https://huggingface.co/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC/resolve/main/params_shard_0.bin');
   assert.equal(modelSource('/api/model/hf/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf'), 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf');
   assert.match(modelSource('/api/model/gh/mlc-ai/binary-mlc-llm-libs/main/web-llm-models/v0_2_86/base/Qwen2-0.5B-Instruct-q4f16_1_cs1k-webgpu.wasm'), /^https:\/\/raw\.githubusercontent\.com\//);
@@ -337,7 +337,7 @@ await check('Gemini is given your categories and a checklist of what was said', 
   } finally { globalThis.fetch = realFetch; }
 });
 const { localLine, withKind, saidIn } = await import('../../src/lib/itemline.js');
-await check('the on-device model\'s items: clear titles, its kinds kept, exact dates worked out by Budgie', () => {
+await check('the on-device model\'s items: clear titles, its kinds kept, exact dates worked out by Taskie', () => {
   const said = 'for chemistry I have lab report 3 due friday at 5 pm and a quiz on the 18th, also need to call mom tomorrow, gym every monday and wednesday and I want to run a 10K by March';
   const items = [
     { title: 'Lab Report 3', kind: 'assignment', when: 'Friday', time: '5 pm', course: 'Chemistry' },
@@ -354,7 +354,7 @@ await check('the on-device model\'s items: clear titles, its kinds kept, exact d
   assert.deepEqual(rows.map(r => r.dest), ['task', 'task', 'task', 'routine', 'goal']);
   assert.deepEqual(rows.slice(0, 4).map(r => r.task.title), ['Lab Report 3', 'Quiz', 'Call Mom', 'Gym']);
   assert.deepEqual(rows.slice(0, 2).map(r => [r.task.kind, r.task.project]), [['assignment', 'Chemistry'], ['exam', 'Chemistry']]);
-  assert.equal(new Date(`${rows[0].task.date}T12:00`).getDay(), 5, 'Friday is worked out by Budgie');
+  assert.equal(new Date(`${rows[0].task.date}T12:00`).getDay(), 5, 'Friday is worked out by Taskie');
   assert.equal(rows[0].task.time, '17:00');
   assert.equal(rows[1].task.date.slice(8), '18', '"the 18th" is the 18th');
   assert.deepEqual(rows[3].task.repeat?.days, [1, 3]);
@@ -419,7 +419,7 @@ await check('voice commands change what is planned; everything else is added', a
   assert.equal(p(listToTag('prepare onboarding checklist on the Marketing board')).project, 'Marketing');
   store.tasks = keep;
 });
-await check("Budgie's server AI: the same instructions, and its answer checked", async () => {
+await check("Taskie's server AI: the same instructions, and its answer checked", async () => {
   const { cloudSplit } = await import('../../worker/cloudai.js');
   let sent = null;
   const env = { AI: { run: async (model, input) => { sent = { model, input }; return { response: { items: [{ title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '17:00', course: 'Chemistry', priority: 'high' }, { title: '<b>x</b>', kind: 'spaceship', date: 'soon', time: '25:00' }] } }; } } };
@@ -482,7 +482,7 @@ await check("Budgie's server AI: the same instructions, and its answer checked",
     assert.equal(newWords('Essay due Friday at 5. Gym on Monday at 6.', 'Essay due Friday at 5.'), '');
     assert.equal(newWords('', 'Call mom'), 'Call mom');
   });
-  await check('your corrections become words Budgie knows', () => {
+  await check('your corrections become words Taskie knows', () => {
     assert.deepEqual(learnCorrections('call grace in kegali about the itd f project', 'Call Grace in Kigali about the ITDF project'), [{ heard: 'kegali', word: 'Kigali' }, { heard: 'itd f', word: 'ITDF' }]);
     assert.equal(applyVocab('meeting in kegali about itd f', [{ heard: 'kegali', word: 'Kigali' }, { heard: 'itd f', word: 'ITDF' }]), 'meeting in Kigali about ITDF');
   });

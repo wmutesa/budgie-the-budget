@@ -5,7 +5,7 @@ import { store } from '../lib/store';
 import { inFocus, focusAllow } from '../lib/focus';
 import Icon from './Icon.vue';
 
-// Budgie's suggestions behind a bell in the top bar: a count of unread ones, a
+// Taskie's suggestions behind a bell in the top bar: a count of unread ones, a
 // dropdown of short cards: click one to go where it is about (the Schedule).
 // Opening the bell reads nothing: a notification counts as read once you rest
 // on it, focus it or act on it.
@@ -60,7 +60,7 @@ onUnmounted(() => { stopRead(); document.removeEventListener('mousedown', outsid
           <button class="bell-x" type="button" title="Dismiss" :aria-label="`Dismiss: ${c.title}`" @click="dismiss(c)"><Icon name="x" :size="12" /></button>
         </li>
       </ul>
-      <div v-else class="bell-empty"><span class="bell-ic" aria-hidden="true"><Icon name="check" :size="14" /></span><span><b>You are all caught up</b><span>Budgie will let you know when something needs a look.</span></span></div>
+      <div v-else class="bell-empty"><span class="bell-ic" aria-hidden="true"><Icon name="check" :size="14" /></span><span><b>You are all caught up</b><span>Taskie will let you know when something needs a look.</span></span></div>
     </div>
   </span>
 </template>

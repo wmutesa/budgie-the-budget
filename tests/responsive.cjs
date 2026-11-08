@@ -77,7 +77,7 @@ const SCREENS = [
   ['settings-security', async p => { await p.click('[data-test="acct-tab-security"]'); }],
   ['settings-calendars', async p => { await p.click('[data-test="acct-tab-calendars"]'); }],
   ['settings-people', async p => { await p.click('[data-test="acct-tab-people"]'); }],
-  ['privacy-data', async p => { await p.click('[data-test="account"]'); await p.click('[data-test="menu-privacy"]'); }],
+  ['privacy-data', async p => { await p.click('[data-test="account"]'); await p.click('[data-test=\"menu-settings\"]'); await p.click('[data-test=\"acct-tab-data\"]'); }],
   ['privacy-sessions', async p => { await p.click('[data-test="acct-tab-sessions"]'); }],
 ];
 const WIDTHS = (process.env.WIDTHS || '360,390,600,768,1024,1280,1600').split(',').map(Number);
@@ -92,7 +92,7 @@ async function run(url) {
     await fakeApi(page);
     await page.goto(url, { waitUntil: 'load' });
     await page.click('[data-test="account"]');
-    await page.click('[data-test="menu-privacy"]');
+    await page.click('[data-test=\"menu-settings\"]'); await page.click('[data-test=\"acct-tab-data\"]');
     await page.click('[data-test="sample-add"]');
     await page.waitForTimeout(1500);
     await page.close();

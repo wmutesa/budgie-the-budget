@@ -1,13 +1,13 @@
 // AI for planning, goals and digests. It is on by default and runs
 // on the person's own device: no cloud AI service, no API key.
 //
-// Models, best first, and Budgie picks per task from whichever are ready:
+// Models, best first, and Taskie picks per task from whichever are ready:
 //   - Ollama, if it is running on this computer (usually the largest model).
 //   - In the browser (WebLLM on the graphics chip), downloaded once and kept:
 //       Qwen 2.5 small: quick and good at structured answers (steps, routines).
 //       Qwen 2.5 1.5B: much better at turning what you said into tasks, dates
 //       and categories, and at writing; on capable devices.
-//   - Budgie's built-in rules, when no model is ready.
+//   - Taskie's built-in rules, when no model is ready.
 // If a model fails, the next one takes over.
 import { reactive } from 'vue';
 // The processor engine's WebAssembly file, from the jsDelivr CDN (same pinned
@@ -114,7 +114,7 @@ async function checkDevice() {
   if (!browserAISupported()) return (gpuInfo = { ok: false, why: 'This browser cannot run AI on the device. Use an up-to-date Chrome, Edge or Safari on a recent device.' });
   try {
     const adapter = await navigator.gpu.requestAdapter();
-    if (!adapter) return (gpuInfo = { ok: false, why: 'This device did not offer its graphics chip to the browser, so the AI cannot run here. Budgie uses its built-in rules.' });
+    if (!adapter) return (gpuInfo = { ok: false, why: 'This device did not offer its graphics chip to the browser, so the AI cannot run here. Taskie uses its built-in rules.' });
     gpuInfo = { ok: true, f16: adapter.features.has('shader-f16') };
   } catch {
     return (gpuInfo = { ok: false, why: 'The graphics chip could not be reached, so the AI cannot run here.' });
@@ -127,13 +127,13 @@ async function checkDevice() {
 }
 const modelId = (key, info) => (info?.f16 ? MODELS[key].id : MODELS[key].id32);
 
-// Models download through Budgie's own address (the Worker fetches them from
+// Models download through Taskie's own address (the Worker fetches them from
 // Hugging Face and GitHub), so content blockers, private relays and strict
 // networks that block those sites do not stop the AI.
-const viaBudgie = url => url.replace('https://huggingface.co/', `${location.origin}/api/model/hf/`).replace('https://raw.githubusercontent.com/', `${location.origin}/api/model/gh/`);
+const viaTaskie = url => url.replace('https://huggingface.co/', `${location.origin}/api/model/hf/`).replace('https://raw.githubusercontent.com/', `${location.origin}/api/model/gh/`);
 function budgieAppConfig(webllm) {
   const base = webllm.prebuiltAppConfig;
-  return { ...base, model_list: base.model_list.map(m => ({ ...m, model: viaBudgie(m.model), model_lib: viaBudgie(m.model_lib) })) };
+  return { ...base, model_list: base.model_list.map(m => ({ ...m, model: viaTaskie(m.model), model_lib: viaTaskie(m.model_lib) })) };
 }
 // Network hiccups get a second try before giving up.
 const isNetwork = e => /Load failed|Failed to fetch|NetworkError|network/i.test(String(e?.message || e || ''));
@@ -241,7 +241,7 @@ export function loadCpuModel() {
           progressCallback: ({ loaded, total }) => { last = Date.now(); Object.assign(ai.cpu, { progress: total ? Math.round((loaded / total) * 100) : 0, text: 'Downloading' }); },
         });
       };
-      // Through Budgie first; if that fails on the network, wait and try once more.
+      // Through Taskie first; if that fails on the network, wait and try once more.
       const attempt = async () => {
         try { return await download(`${location.origin}${MODELS.cpu.path}`); } catch (e) {
           if (!isNetwork(e)) throw e;
@@ -296,7 +296,7 @@ export async function startBrowserModels({ force = false } = {}) {
   const failed = Number(read(FAIL_KEY)) || 0;
   if (!force && failed && Date.now() - failed < 864e5) {
     // The graphics chip failed recently: skip it and go straight to the processor engine.
-    if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'skipped', error: 'The graphics chip did not work last time, so Budgie uses the processor instead.' });
+    if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'skipped', error: 'The graphics chip did not work last time, so Taskie uses the processor instead.' });
     if (ai.medium.state === 'idle') Object.assign(ai.medium, { state: 'skipped', error: '' });
     refreshLabel();
     if (!meteredConnection()) await loadCpuModel();
@@ -463,7 +463,7 @@ export async function aiRewriteDictation(text, chunks = null) {
 // ---------- what you said, as planner items (on this device) ----------
 // A free Hugging Face model in the browser (Qwen 2.5) reads what was said and
 // lists each item: a clear title, its kind, the date and time words copied
-// exactly as said, and the course. Budgie's own reader then works out the
+// exactly as said, and the course. Taskie's own reader then works out the
 // exact dates from those words, which small models get wrong. Returns
 // [{ title, kind, when, time, course }] or null.
 const ITEM_KINDS = ['task', 'assignment', 'exam', 'class', 'event', 'routine', 'goal'];

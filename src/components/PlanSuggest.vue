@@ -8,7 +8,7 @@ import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
 import { planGoal } from '../lib/goals';
 
-// Ideas Budgie spots from your planner and goals. One tap to add.
+// Ideas Taskie spots from your planner and goals. One tap to add.
 const extra = ref([]);
 const asking = ref(false);
 const note = ref('');
@@ -48,7 +48,7 @@ const acceptAI = x => { store.tasks.unshift(makeTask({ title: x.title, notes: x.
       </li>
     </ul>
     <button v-if="unique.length > 3" type="button" class="pln-more" @click="allIdeas = !allIdeas">{{ allIdeas ? 'Show fewer' : `Show all ${unique.length}` }}</button>
-    <p v-else-if="!suggestions.length && !extra.length" class="empty-note">No ideas right now. Add deadlines, a routine or a calendar, and Budgie will spot what to prepare for.</p>
+    <p v-else-if="!suggestions.length && !extra.length" class="empty-note">No ideas right now. Add deadlines, a routine or a calendar, and Taskie will spot what to prepare for.</p>
     <p v-if="note" class="muted small">{{ note }}</p>
   </section>
 </template>

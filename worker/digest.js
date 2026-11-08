@@ -61,7 +61,7 @@ export function profileFromAccount(data = {}, stream = {}) {
 // ---------- fetching ----------
 async function getText(url) {
   const u = checkFeedUrl(url);
-  const res = await fetch(u.toString(), { headers: { Accept: 'application/rss+xml, application/atom+xml, application/json, text/xml;q=0.9, */*;q=0.5', 'User-Agent': 'Budgie digest' }, signal: AbortSignal.timeout(8000), cf: { cacheTtl: 1800, cacheEverything: true } });
+  const res = await fetch(u.toString(), { headers: { Accept: 'application/rss+xml, application/atom+xml, application/json, text/xml;q=0.9, */*;q=0.5', 'User-Agent': 'Taskie digest' }, signal: AbortSignal.timeout(8000), cf: { cacheTtl: 1800, cacheEverything: true } });
   if (!res.ok) throw new Error(`status ${res.status}`);
   const reader = res.body.getReader();
   const chunks = [];

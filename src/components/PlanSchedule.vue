@@ -372,7 +372,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
               <span class="sch-row-acts">
                 <button v-if="!x.summary && !x.done" type="button" class="sch-icon" :aria-label="`Lock in on ${x.task.title}`" title="Lock In: a timer for just this" data-test="row-lockin" @click="startFocus(x.task)"><Icon name="timer" :size="15" /></button>
                 <button type="button" class="sch-icon" :aria-expanded="whenKey === x.key" :aria-label="`Date and time of ${x.task.title}`" title="Date and time" data-test="row-when" @click="whenKey = whenKey === x.key ? '' : x.key"><Icon name="when" :size="15" /></button>
-                <button v-if="!x.summary && !x.task.subtasks?.length" type="button" class="sch-icon" :class="{ spin: splittingKey === x.key }" :aria-label="`Break ${x.task.title} into steps`" title="Break it into steps" data-test="row-split" @click="splitRow(x)"><Icon name="split" :size="15" /></button>
+                <button v-if="!x.summary" type="button" class="sch-icon" :class="{ spin: splittingKey === x.key }" :aria-label="`Break ${x.task.title} into steps`" :title="x.task.subtasks?.length ? 'Break it down further' : 'Break it into steps'" data-test="row-split" @click="splitRow(x)"><Icon name="split" :size="15" /></button>
                 <button type="button" class="sch-icon danger" :aria-label="`Delete ${x.task.title}`" title="Delete" data-test="row-delete" @click="deleteTask(x.task)"><Icon name="trash" :size="15" /></button>
               </span>
               <div v-if="whenKey === x.key" class="sch-when" data-test="row-when-pop">

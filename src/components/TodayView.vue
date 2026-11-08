@@ -54,7 +54,7 @@ const nextStep = computed(() => {
   <section class="card cell headline td-brief-card" id="today" data-test="today">
     <p class="label">{{ weekday }} brief</p>
     <p class="greet">Good <em>{{ part }}</em>.</p>
-    <p v-if="empty" class="lede">Budgie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Schedule</b>.</p>
+    <p v-if="empty" class="lede">Taskie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Schedule</b>.</p>
     <p v-else class="lede" data-test="brief">
       <template v-if="items.length">Today you have <mark class="m-violet">{{ items.length }} {{ items.length === 1 ? 'thing' : 'things' }}</mark> planned<template v-if="items.length - left.length">, {{ items.length - left.length }} done</template>. </template>
       <template v-else>Nothing is planned for today yet. </template>
@@ -85,7 +85,7 @@ const nextStep = computed(() => {
         <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
       </li>
     </ul>
-    <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
+    <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Taskie plans the milestones.</p>
   </section>
   <!-- One card for what is coming up: today, this week's deadlines and ideas -->
   <NextCard :up-next="upNext" :deadlines="deadlines" />

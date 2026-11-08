@@ -16,7 +16,7 @@ function readKey(key) {
 const pickMe = p => (p && typeof p === 'object' ? Object.fromEntries(['name', 'school', 'study', 'year', 'location', 'about'].map(k => [k, String(p[k] || '')])) : {});
 // Build the saved part of the state from a stored object, filling gaps with defaults.
 // Anything else in the stored object (such as money data from older versions
-// of Budgie) is left out, so it is removed from the account on the next save.
+// of Taskie) is left out, so it is removed from the account on the next save.
 function fromSaved(saved = {}) {
   return {
     guide: saved.guide && typeof saved.guide === 'object' ? saved.guide : { done: false },
@@ -43,9 +43,9 @@ function fromSaved(saved = {}) {
     digest: saved.digest && typeof saved.digest === 'object' ? saved.digest : { autoTasks: true, used: [], streams: [{ id: 'main', name: 'My brief', auto: true }] },
     // About you, for digests and drafts: { name, school, study, year, location, about }.
     me: saved.me && typeof saved.me === 'object' ? saved.me : pickMe(saved.digest?.profile),
-    // How you look in Budgie: { color } for your avatar, picked at random at first and editable.
+    // How you look in Taskie: { color } for your avatar, picked at random at first and editable.
     profile: saved.profile && typeof saved.profile === 'object' ? saved.profile : {},
-    // Words Budgie should know (names, places, apps, course codes), and corrections it learned
+    // Words Taskie should know (names, places, apps, course codes), and corrections it learned
     // from your edits to what it heard: { word, heard?, learned? }. Used for spelling and your accent.
     vocab: Array.isArray(saved.vocab) ? saved.vocab.filter(v => v && typeof v.word === 'string' && v.word.trim()).slice(-300) : [],
   };

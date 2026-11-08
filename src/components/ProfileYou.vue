@@ -4,7 +4,7 @@ import { store } from '../lib/store';
 import Icon from './Icon.vue';
 
 // About you, for your digests and draft emails. Saved in your account as you
-// type; never part of Budgie's code.
+// type; never part of Taskie's code.
 if (!store.me || typeof store.me !== 'object') store.me = {};
 const me = store.me;
 
@@ -23,7 +23,7 @@ async function toggleRemind() {
 
 <template>
   <section class="acct-sec t-b you" data-test="profile-you">
-    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="user" :size="12" /></span>About you</p><span class="muted small">Helps Budgie plan for you</span></div>
+    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="user" :size="12" /></span>About you</p><span class="muted small">Helps Taskie plan for you</span></div>
     <div class="you-grid">
       <label class="tk-f"><span>Name</span><input v-model="me.name" maxlength="60" autocomplete="name" data-test="you-name" /></label>
       <label class="tk-f"><span>School or work</span><input v-model="me.school" maxlength="80" placeholder="e.g. State University" /></label>
@@ -38,7 +38,7 @@ async function toggleRemind() {
     <div class="you-remind">
       <div>
         <b>Remind me before timed items</b>
-        <p class="muted small">A notification 10 minutes before anything with a time, while a Budgie tab is open.</p>
+        <p class="muted small">A notification 10 minutes before anything with a time, while a Taskie tab is open.</p>
         <p v-if="!canNotify" class="muted small">This browser cannot show notifications.</p>
         <p v-if="remindNote" class="small pln-err" role="alert">{{ remindNote }}</p>
       </div>

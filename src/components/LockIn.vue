@@ -7,7 +7,7 @@ import Icon from './Icon.vue';
 import { catColor } from '../lib/cats';
 import BlockField from './BlockField.vue';
 
-// Lock In: Budgie's timer, full screen. A chunky toy timer on a black field of
+// Lock In: Taskie's timer, full screen. A chunky toy timer on a black field of
 // scattered Tetris blocks,
 // with a pixel screen: ▲ adds five minutes, ▼ takes five off, the long
 // button pauses. Minimise (Esc) keeps it in the top bar.

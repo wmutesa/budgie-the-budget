@@ -201,7 +201,7 @@ const hp = computed(() => (hover.value >= 0 ? pts.value[hover.value] : null));
 const total = computed(() => (metric.value === 'done' ? cur.value.done.length : cur.value.focus));
 const totalDelta = computed(() => (metric.value === 'done' ? delta(cur.value.done.length, prev.value.done.length) : delta(cur.value.focus, prev.value.focus)));
 
-// ---------- the verdict, with how sure Budgie is ----------
+// ---------- the verdict, with how sure Taskie is ----------
 const verdict = computed(() => {
   const s = stats.value; const c = cur.value;
   const label = c.rate >= 75 && s.consistency >= 70 ? 'On track' : c.rate >= 55 ? 'Steady, with gaps' : 'Overloaded';

@@ -1,4 +1,4 @@
-// Digests in the browser. Budgie's server writes each digest from free sources
+// Digests in the browser. Taskie's server writes each digest from free sources
 // and, when you have added a Gemini key in your profile, Gemini with Google
 // Search at the same time. "My brief" takes its topics from your goals,
 // projects and studies; other digests follow a one-line focus. New editions
@@ -150,7 +150,7 @@ export function planStory(s) {
   store.tasks.unshift(makeTask({ title: s.headline.slice(0, 120), notes: `${s.desc || s.dek || ''} ${s.fit || ''}`.trim().slice(0, 400), link: s.ctaLink, date: s.dueIso && s.dueIso >= today() ? s.dueIso : today(), kind: s.tag === 'EVENT' ? 'event' : s.dueIso ? 'assignment' : 'task', project: 'Digest', source: 'digest' }));
 }
 // Did you act on it? Saving, hiding or adding it to the Planner yourself counts
-// (deadlines Budgie added on its own do not).
+// (deadlines Taskie added on its own do not).
 export const actedOn = s => isSaved(s) || isHidden(s) || store.tasks.some(t => t.link === s.ctaLink && !t.uid);
 const draftKey = (ed, d) => `${ed.stream || 'main'}:${ed.id}:${d.no}`;
 export const draftBody = (ed, d) => store.digest.drafts?.[draftKey(ed, d)] ?? d.body;

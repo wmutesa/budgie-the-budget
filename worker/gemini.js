@@ -26,7 +26,7 @@ export async function checkKey(raw) {
   const res = await fetch(`${API}/${MODEL}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
   if (res.ok) return { ok: true, message: 'Google accepted the key. What you say in Add will be broken down by Gemini.' };
   const j = await res.json().catch(() => ({}));
-  if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Gemini takes over again when it resets; until then Budgie uses its own rules.' };
+  if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Gemini takes over again when it resets; until then Taskie uses its own rules.' };
   return { ok: false, message: googleSays(res.status, j) };
 }
 const https = u => typeof u === 'string' && /^https:\/\/[^\s<>"]+$/i.test(u) && u.length < 600;
@@ -58,7 +58,7 @@ Plain text in every field, no markdown.`;
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   const m = raw.match(/<digest>([\s\S]*?)<\/digest>/) || [null, raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1)];
   let out;
-  try { out = JSON.parse(m[1]); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  try { out = JSON.parse(m[1]); } catch { throw new Error('Gemini sent something Taskie could not read'); }
   const story = s => (s && https(s.ctaLink) && s.headline ? {
     tag: TAGS.includes(String(s.tag).toUpperCase()) ? String(s.tag).toUpperCase() : 'PROGRAM',
     headline: text(s.headline, 160), desc: text(s.desc, 320), fit: text(s.fit, 200) || 'Check eligibility on the page',
@@ -133,7 +133,7 @@ Items: [{"title":"Psychology midterm","kind":"exam","date":"${tue}","time":"10:0
 }
 export const SYSTEM_TEXT = 'You are a precise assistant for a student planner. You extract tasks, deadlines and plans from what someone said and reply only with correct JSON that matches the schema.';
 const SYSTEM = { parts: [{ text: 'You are a precise assistant for a student planner. You extract tasks, deadlines and plans from what someone said and reply only with correct JSON that matches the schema.' }] };
-// The breakdown instructions, shared by Gemini and Budgie's own server AI.
+// The breakdown instructions, shared by Gemini and Taskie's own server AI.
 export function splitPrompt({ text: said, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = [] }) {
   return `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
 Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
@@ -167,7 +167,7 @@ export async function geminiSplit(key, args) {
   if (!res.ok) throw new Error(googleSays(res.status, j));
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   let out;
-  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Taskie could not read'); }
   return cleanItems(out.items);
 }
 // Every item checked: plain text, known kinds and days, real dates and times.
@@ -215,7 +215,7 @@ ${categories.length ? `The person already uses these categories; when an item be
   if (!res.ok) throw new Error(googleSays(res.status, j));
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   let out;
-  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Taskie could not read'); }
   return { transcript: String(out.transcript || '').replace(/[<>]/g, '').trim().slice(0, 12000), items: cleanItems(out.items) };
 }
 

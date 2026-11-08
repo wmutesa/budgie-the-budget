@@ -9,25 +9,25 @@ const props = defineProps({ page: { type: String, required: true } });
 const emit = defineEmits(['page', 'done']);
 
 const steps = [
-  { title: `Welcome to Budgie${account.user?.name ? `, ${account.user.name.split(' ')[0]}` : ''}`,
-    body: 'Budgie plans your days and keeps your goals moving, so your brain can do the fun parts. This tour takes about a minute. Shorter than a coffee line.',
-    note: 'Budgie starts empty, like a fresh notebook. The quickest start: tap Add and say a few things out loud.' },
+  { title: `Welcome to Taskie${account.user?.name ? `, ${account.user.name.split(' ')[0]}` : ''}`,
+    body: 'Taskie plans your days and keeps your goals moving, so your brain can do the fun parts. This tour takes about a minute. Shorter than a coffee line.',
+    note: 'Taskie starts empty, like a fresh notebook. The quickest start: tap Add and say a few things out loud.' },
   { page: 'Overview', target: '.nb-pages', title: 'Two pages, zero clutter',
     body: 'Overview is your day at a glance, with how the week went further down. Schedule shows your day, week and month, with your activity beside it. Every activity has a timer icon: tap it to Lock In.' },
   { page: 'Overview', target: '#today', title: 'Your day in a sentence',
-    body: 'Budgie writes what is on today, what is next, deadlines this week and your streaks. It updates as you tick things off.' },
+    body: 'Taskie writes what is on today, what is next, deadlines this week and your streaks. It updates as you tick things off.' },
   { page: 'Overview', target: '[data-test="capture"]', title: 'Add anything',
-    body: 'Tap Add and just talk: "essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March". Budgie sorts each thing into a task, routine or goal and puts it in place.' },
+    body: 'Tap Add and just talk: "essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March". Taskie sorts each thing into a task, routine or goal and puts it in place.' },
   { page: 'Schedule', target: '[data-test="schedule"]', title: 'Plan your days',
     body: 'Tasks, an agenda and a calendar like the ones you know. Import your Canvas, Google, Apple or Outlook calendar and it stays up to date.' },
   { page: 'Schedule', target: '[data-test="schedule"]', title: 'Check before it counts',
-    body: 'After you add, Budgie shows each new thing where it landed, highlighted. Keep it, switch it to a task, routine or goal, rename it or remove it.' },
+    body: 'After you add, Taskie shows each new thing where it landed, highlighted. Keep it, switch it to a task, routine or goal, rename it or remove it.' },
   { target: '[data-test="account"]', title: 'Keep your passkey safe', passkeys: true,
     body: 'You sign in with a passkey instead of a password. Read how it works and the few things that can go wrong. You can find this note again in the account menu.' },
   { target: '[data-test="account"]', title: 'Your account',
     body: 'Your data follows you to every device. Tap your avatar for Settings (profile, AI, calendars, devices), Privacy (your data, sessions) or to sign out.' },
   { title: 'You are all set',
-    body: 'Start by adding what is on your mind today. Budgie learns your routine as you go. No pressure. Well, a little.',
+    body: 'Start by adding what is on your mind today. Taskie learns your routine as you go. No pressure. Well, a little.',
     note: 'Tip: the tour lives in the avatar menu, in case you miss it already.' },
 ];
 
@@ -111,7 +111,7 @@ onUnmounted(() => {
       <div class="gt-acts">
         <button v-if="i > 0" class="btn small" type="button" @click="back">Back</button>
         <button class="btn primary small gt-next" type="button" data-test="guide-next" @click="next">
-          {{ i === 0 ? 'Show me around' : last ? 'Start using Budgie' : 'Next' }}
+          {{ i === 0 ? 'Show me around' : last ? 'Start using Taskie' : 'Next' }}
         </button>
       </div>
     </div>

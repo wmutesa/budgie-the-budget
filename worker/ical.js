@@ -170,7 +170,7 @@ export async function fetchFeed(raw) {
   const before = linkAdvice(raw);
   if (before) throw Object.assign(new Error(before), { status: 422 });
   for (let hop = 0; hop < 4; hop++) {
-    const res = await fetch(url.toString(), { redirect: 'manual', headers: { Accept: 'text/calendar, text/plain;q=0.9, */*;q=0.5', 'User-Agent': 'Mozilla/5.0 (compatible; Budgie calendar import)' }, signal: AbortSignal.timeout(12000) });
+    const res = await fetch(url.toString(), { redirect: 'manual', headers: { Accept: 'text/calendar, text/plain;q=0.9, */*;q=0.5', 'User-Agent': 'Mozilla/5.0 (compatible; Taskie calendar import)' }, signal: AbortSignal.timeout(12000) });
     if (res.status >= 300 && res.status < 400 && res.headers.get('Location')) { url = checkFeedUrl(new URL(res.headers.get('Location'), url).toString()); continue; }
     if (!res.ok) {
       const refused = res.status === 404 || res.status === 401 || res.status === 403 || res.status === 410;

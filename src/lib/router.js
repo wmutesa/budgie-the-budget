@@ -1,5 +1,5 @@
 // The Add button (and voice): write or say anything, one thing per
-// line, and Budgie decides what each line is: a task (or event, class,
+// line, and Taskie decides what each line is: a task (or event, class,
 // deadline), a routine (something that repeats), or a life goal. You can
 // change any choice before sending.
 import { store, newId } from './store';
@@ -21,7 +21,7 @@ export function route(line) {
   let dest = 'task';
   if (task.repeat) dest = 'routine';
   else if (GOAL_WORDS.test(text) && !task.time) dest = 'goal';
-  const why = { task: task.date ? 'Something to do on a day' : 'Something to do', routine: 'Something that repeats', goal: 'Something you are working towards: Budgie adds milestones' }[dest];
+  const why = { task: task.date ? 'Something to do on a day' : 'Something to do', routine: 'Something that repeats', goal: 'Something you are working towards: Taskie adds milestones' }[dest];
   return { id: newId(), text, dest, task, goal, why };
 }
 // Comma lists ("gym mwf 6pm, call mom sundays") become one line each when every part has a time or day.

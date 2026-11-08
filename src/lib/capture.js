@@ -1,4 +1,4 @@
-// Capture: one button anywhere in Budgie. Say or type anything; Budgie sorts
+// Capture: one button anywhere in Taskie. Say or type anything; Taskie sorts
 // it in the background into tasks, routines and goals, puts each where it
 // belongs as "pending", then walks you through them one by one so you keep,
 // switch or drop each before it counts.
@@ -54,11 +54,11 @@ function settle(made) {
 // course or verb carries across). With the person's own Gemini key, Gemini
 // reads it; otherwise a free Hugging Face model on this device (Qwen 2.5)
 // lists each item with a clear title, its kind, the date and time words and
-// the course, and Budgie works out the exact dates. An AI answer is used only
+// the course, and Taskie works out the exact dates. An AI answer is used only
 // when it finds about as much as the rules and invents nothing.
 // Open things by name, so "mark the lab report as done" can find one.
 const myOpen = () => store.tasks.filter(t => !t.pending && (!t.done || t.repeat)).slice(-80).map(t => t.title);
-// Words you taught Budgie (and the corrections it learned), so the AI spells them your way.
+// Words you taught Taskie (and the corrections it learned), so the AI spells them your way.
 const myVocab = () => [...new Set((store.vocab || []).map(v => v.word).filter(Boolean))].slice(0, 100);
 const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
 // What Gemini heard in a recording, kept so it is not sent twice when the text is left as written.
@@ -109,13 +109,13 @@ export async function breakDown(text, audio = null) {
       if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
     } catch { /* no key on the server yet, the free limit, or offline: carry on */ }
   }
-  // Budgie's own AI on its server (a large open model on Cloudflare): no key needed.
+  // Taskie's own AI on its server (a large open model on Cloudflare): no key needed.
   try {
     const d = new Date();
     const { items } = await budgieBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen(), myVocab());
     const cmds = (items || []).map(fromItem).filter(Boolean);
     const ok = (items || []).filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));
-    if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Budgie AI'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
+    if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Taskie AI'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
   } catch { /* offline or busy: the device's AI or the rules take over */ }
   if (ai.enabled && ai.ready) {
     // Chunks of a few sentences each, cut at the rules' own breaks, so a small model reads each part fully.

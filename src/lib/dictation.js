@@ -1,5 +1,5 @@
 // Live dictation with the browser's own speech recognition (Chrome, Edge, Safari).
-// Audio is handled by the browser; Budgie only receives the text.
+// Audio is handled by the browser; Taskie only receives the text.
 import { ref, onUnmounted } from 'vue';
 
 const Speech = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;

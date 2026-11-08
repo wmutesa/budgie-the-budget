@@ -12,9 +12,9 @@ const open = page => ({ label: `Open ${page}`, run: () => go(page) });
 export const cards = computed(() => {
   const d = today();
   const out = [];
-  // Things Budgie sorted that are still waiting for a yes.
+  // Things Taskie sorted that are still waiting for a yes.
   const waiting = store.tasks.filter(t => t.pending && !t.goalId).length + store.goals.filter(g => g.pending).length;
-  if (waiting) out.push({ id: `review-${waiting}-${d}`, tone: 'info', title: `${waiting} new thing${waiting === 1 ? '' : 's'} to review`, body: 'Budgie sorted them. Keep, switch or remove each one.', action: { label: 'Review', run: startReview } });
+  if (waiting) out.push({ id: `review-${waiting}-${d}`, tone: 'info', title: `${waiting} new thing${waiting === 1 ? '' : 's'} to review`, body: 'Taskie sorted them. Keep, switch or remove each one.', action: { label: 'Review', run: startReview } });
   const late = store.tasks.filter(t => !t.repeat && !t.done && t.date && t.date < d);
   if (late.length) out.push({ id: `plan-late-${d}`, tone: 'warn', title: `${late.length} overdue task${late.length === 1 ? '' : 's'}`, body: `${late.slice(0, 3).map(t => t.title).join(', ')}. Do them, move them or let them go.`, action: open('Schedule') });
   store.tasks.filter(t => !t.repeat && !t.done && t.date === addDays(d, 1) && ['assignment', 'exam'].includes(t.kind))

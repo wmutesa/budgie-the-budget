@@ -1,4 +1,4 @@
-// Gemini's items as lines Budgie's own reader understands, e.g.
+// Gemini's items as lines Taskie's own reader understands, e.g.
 // "Lab report due Nov 12 at 5pm 90 min #Chemistry" or "Gym Mon Wed at 6pm".
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYNAME = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -17,7 +17,7 @@ export function itemLine(x) {
   else if (x.date) when = `${['assignment', 'exam'].includes(x.kind) ? ' due' : ' on'} ${md(x.date)}`;
   return `${x.title}${when}${x.time ? ` at ${ampm(x.time)}` : ''}${x.minutes ? ` ${x.minutes} min` : ''}${pri(x)}${course}`;
 }
-// Said priority, in words Budgie's reader knows.
+// Said priority, in words Taskie's reader knows.
 const pri = x => (x.priority === 'high' ? ' high priority' : x.priority === 'low' ? ' low priority' : '');
 
 // Words of 3+ letters, or numbers, from a title must appear in what was said: no made-up items.

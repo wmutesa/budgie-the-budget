@@ -1,5 +1,5 @@
 // Calendar imports for the Planner. Paste the iCal link from Canvas, Google
-// Calendar, Apple iCloud or Outlook; Budgie's server reads it (browsers cannot
+// Calendar, Apple iCloud or Outlook; Taskie's server reads it (browsers cannot
 // fetch other sites' calendars directly), and events become Planner items.
 // Links are kept in your private account data and refresh on their own.
 import { store, newId } from './store';

@@ -1,7 +1,7 @@
-// Live voice: Budgie listens to the microphone itself, in every browser,
+// Live voice: Taskie listens to the microphone itself, in every browser,
 // without the browser's own speech recognition (which needs Dictation on in
 // Safari, cannot share the microphone and fails silently). While you talk,
-// each phrase is cut at a natural pause and written down by Budgie's server
+// each phrase is cut at a natural pause and written down by Taskie's server
 // (Cloudflare's Whisper, or your Gemini key), so the words appear in the card
 // a moment after you say them. Stop hands back the whole recording, as 16 kHz
 // mono WAV, for Gemini to read in full when you have a key.
@@ -10,7 +10,7 @@ import { diag } from './diag';
 
 export const canCapture = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!(window.AudioContext || window.webkitAudioContext);
 // Safari on a Mac: Safari > Settings for this website; macOS: Privacy & Security > Microphone.
-const BLOCKED = 'The microphone is blocked for Budgie. On a Mac in Safari: Safari menu, Settings for this website, Microphone: Allow (and System Settings, Privacy & Security, Microphone: Safari on). On iPhone: Settings, Apps, Safari or Chrome, Microphone: on. Then tap Speak again.';
+const BLOCKED = 'The microphone is blocked for Taskie. On a Mac in Safari: Safari menu, Settings for this website, Microphone: Allow (and System Settings, Privacy & Security, Microphone: Safari on). On iPhone: Settings, Apps, Safari or Chrome, Microphone: on. Then tap Speak again.';
 export const MAX_SECONDS = 5 * 60;
 const RATE = 16000;
 const QUIET = 0.012;      // a normal microphone: below this counts as silence
@@ -141,7 +141,7 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
     if (!silentTold) {
       silentTold = true;
       diag('silent');
-      onError?.('Your device is giving Budgie a muted microphone (no sound at all). Close anything else using the microphone (a call, Voice Memos, Siri or another tab), then tap Stop and Speak again.', 'silent');
+      onError?.('Your device is giving Taskie a muted microphone (no sound at all). Close anything else using the microphone (a call, Voice Memos, Siri or another tab), then tap Stop and Speak again.', 'silent');
     }
   }
 

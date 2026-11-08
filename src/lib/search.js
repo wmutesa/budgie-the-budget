@@ -1,4 +1,4 @@
-// One search for everything in Budgie: tasks, routines and classes, goals,
+// One search for everything in Taskie: tasks, routines and classes, goals,
 // calendars and pages. What you type can also become an
 // action (add a task, a routine or a goal), ranked by the shape of the text.
 import { store } from './store';

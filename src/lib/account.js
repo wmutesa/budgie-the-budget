@@ -247,7 +247,7 @@ export async function signOut() {
 // Friendly text for errors from the browser's passkey prompt.
 export function passkeyError(e) {
   if (e?.name === 'NotAllowedError') return 'The passkey prompt was closed or timed out.';
-  if (e?.name === 'InvalidStateError') return 'This device already has a passkey for Budgie. Sign in instead.';
+  if (e?.name === 'InvalidStateError') return 'This device already has a passkey for Taskie. Sign in instead.';
   return e?.message || 'Something went wrong.';
 }
 
@@ -290,11 +290,11 @@ export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', 
 // Gemini (the person's own key, kept server-side) breaks a recording into planner items.
 // Gemini hears a recording (base64 audio) and returns { transcript, items }.
 export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', body: payload });
-// Live words: one short piece of a recording, written down by Budgie's server.
+// Live words: one short piece of a recording, written down by Taskie's server.
 // terms: the person's own words (categories, course codes, task names), to help the speech model spell them.
 export const adminSummary = () => api('/api/admin/summary');
 export const liveWords = (audio, prompt, terms = [], partial = false) => api('/api/voice/live', { method: 'POST', body: { audio, prompt, terms, partial } }).then(r => r.text || '');
 export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/gemini/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
-// Budgie's own server AI: the same breakdown, for everyone, without a key.
+// Taskie's own server AI: the same breakdown, for everyone, without a key.
 export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/voice/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

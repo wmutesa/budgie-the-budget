@@ -1,6 +1,6 @@
-// Reminders on this device: while Budgie is open, a notification shortly
+// Reminders on this device: while Taskie is open, a notification shortly
 // before anything with a time. Turned on in your profile; nothing is sent
-// through a server, so reminders only arrive while a Budgie tab is open.
+// through a server, so reminders only arrive while a Taskie tab is open.
 // During Lock In, what gets through follows your choice in Settings;
 // the rest is held and summed up when the session ends.
 import { store } from './store';

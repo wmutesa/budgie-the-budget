@@ -24,7 +24,7 @@ export function matchTask(name, list = open()) {
   return scored.length > 1 && scored[1].s === scored[0].s ? null : scored[0].t;
 }
 
-// Rules: the command sentences Budgie knows, matched only at the start of a sentence.
+// Rules: the command sentences Taskie knows, matched only at the start of a sentence.
 const PATTERNS = [
   { act: 'done', re: /^(?:please\s+)?(?:mark|tick|check off|set)\s+(.+?)\s+(?:as\s+)?(?:done|complete|completed|finished)$/i },
   { act: 'done', re: /^(?:please\s+)?(?:tick off|check off|cross off)\s+(.+)$/i },

@@ -140,7 +140,7 @@ async function add() {
   const id = loading('Importing your calendar…');
   try {
     const r = await addFeed(url);
-    message.value = `Imported ${r.added} item${r.added === 1 ? '' : 's'}. Budgie refreshes this calendar every few hours.`;
+    message.value = `Imported ${r.added} item${r.added === 1 ? '' : 's'}. Taskie refreshes this calendar every few hours.`;
     finish(id, message.value, { title: 'Calendar imported' });
     link.value = '';
   } catch (e) {
@@ -169,7 +169,7 @@ function remove(f) {
     <div class="pln-card-head"><h3>{{ props.show === 'add' ? 'Add a calendar' : 'Your calendars' }}</h3><button type="button" class="ibtn ghost" :aria-expanded="help" title="Where is my calendar link?" aria-label="Where is my calendar link?" @click="help = !help"><Icon name="help" /></button></div>
     <ul v-if="help" class="pln-help">
       <li v-for="(k, id) in FEED_KINDS" :key="id"><b>{{ k.name }}:</b> {{ k.help }}</li>
-      <li class="muted">The link is private, like a password to that calendar. Budgie keeps it in your account only.</li>
+      <li class="muted">The link is private, like a password to that calendar. Taskie keeps it in your account only.</li>
     </ul>
     <ul v-if="props.show !== 'add' && store.feeds.length" class="pln-feeds" data-test="feed-list">
       <li v-for="f in store.feeds" :key="f.id" :class="{ bad: f.error }">

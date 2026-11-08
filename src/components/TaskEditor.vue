@@ -40,7 +40,7 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
     <label class="tk-f"><span>Kind</span>
       <select :value="t.kind" @change="setKind($event.target.value)"><option v-for="(k, id) in KINDS" :key="id" :value="id">{{ k.label }}</option></select>
     </label>
-    <div class="tk-f"><span>Priority</span><span class="tk-ai-pri" :title="'Set by Budgie\'s AI from what you said and the deadline'" data-test="ai-priority">{{ { high: 'High', medium: 'Normal', low: 'Low' }[t.priority] || 'Normal' }} · by AI</span></div>
+    <div class="tk-f"><span>Priority</span><span class="tk-ai-pri" :title="'Set by Taskie\'s AI from what you said and the deadline'" data-test="ai-priority">{{ { high: 'High', medium: 'Normal', low: 'Low' }[t.priority] || 'Normal' }} · by AI</span></div>
     <label class="tk-f"><span>Repeats</span>
       <select v-model="repeatEvery" data-test="task-repeat">
         <option value="">Does not repeat</option><option value="day">Every day</option><option value="weekdays">Weekdays</option><option value="week">Some days each week</option><option value="month">Every month</option>

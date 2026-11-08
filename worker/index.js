@@ -1,4 +1,4 @@
-// Budgie's Worker: serves the site and runs the /api routes for personal
+// Taskie's Worker: serves the site and runs the /api routes for personal
 // accounts. Sign-in is invite-only and uses passkeys; each person's data is
 // one JSON document in D1.
 import {
@@ -58,7 +58,7 @@ async function body(request) {
 
 // The site's own address decides the passkey domain, so it works on
 // workers.dev, a custom domain and localhost without configuration.
-const rp = url => ({ rpID: url.hostname, origin: url.origin, rpName: 'Budgie' });
+const rp = url => ({ rpID: url.hostname, origin: url.origin, rpName: 'Taskie' });
 
 // ---------- recovery codes ----------
 // Ten characters from an alphabet without look-alikes (no 0/O, 1/I/L), shown as XXXXX-XXXXX.
@@ -320,7 +320,7 @@ async function routes(request, env, url) {
     const saved = await takeChallenge(env, challengeId, 'login');
     if (!saved) return fail(400, 'That took too long. Try again.');
     const cred = response?.id ? await env.DB.prepare('SELECT * FROM credentials WHERE id = ?').bind(String(response.id)).first() : null;
-    if (!cred) return fail(401, 'This passkey is not registered with Budgie. Ask for an invite.');
+    if (!cred) return fail(401, 'This passkey is not registered with Taskie. Ask for an invite.');
     const { rpID, origin } = rp(url);
     let result;
     try {
@@ -354,7 +354,7 @@ async function routes(request, env, url) {
     return json({ ok: true }, 200, { 'Set-Cookie': sessionCookie('', 0) });
   }
 
-  // Delete my account and all my data. The owner cannot, so Budgie is never left without one.
+  // Delete my account and all my data. The owner cannot, so Taskie is never left without one.
   if (path === '/api/me' && method === 'DELETE') {
     if (user.role === 'owner') return fail(400, 'The owner account cannot be deleted from the app.');
     const { confirm } = await body(request).catch(() => ({}));
@@ -399,7 +399,7 @@ async function routes(request, env, url) {
     return json({ version: base === 0 ? 1 : next, updatedAt: t });
   }
 
-  // --- AI model files, through Budgie's own address (see models.js) ---
+  // --- AI model files, through Taskie's own address (see models.js) ---
   if (path.startsWith('/api/model/') && (method === 'GET' || method === 'HEAD')) {
     const source = modelSource(path);
     return source ? modelResponse(request, source) : fail(404, 'Not found');
@@ -437,7 +437,7 @@ async function routes(request, env, url) {
     const gkey = tidyKey(data?.digest?.geminiKey);
     if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
     const key = `gemini-split:${user.id}`;
-    if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
+    if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Taskie used its own rules instead.');
     await countFailure(env, key);
     const { text, today, weekday, timeZone, categories, hints, existing, vocab } = await body(request);
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
@@ -447,10 +447,10 @@ async function routes(request, env, url) {
       return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) }) });
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
   }
-  // Budgie's own AI breaks what was said into separate items: for everyone, no key needed.
+  // Taskie's own AI breaks what was said into separate items: for everyone, no key needed.
   if (path === '/api/voice/breakdown' && method === 'POST') {
     const key = `voice-split:${user.id}`;
-    if (await tooManyAttempts(env, key, 200)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
+    if (await tooManyAttempts(env, key, 200)) return fail(429, 'Many breakdowns this hour. Taskie used its own rules instead.');
     await countFailure(env, key);
     const { text, today, weekday, timeZone, categories, hints, existing, vocab } = await body(request);
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
@@ -462,7 +462,7 @@ async function routes(request, env, url) {
       await bump(env, user.id, 'split-budgie');
       await bump(env, user.id, 'ms-split-budgie', Date.now() - ts);
       return json({ items });
-    } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
+    } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Taskie AI could not be reached.').slice(0, 200)); }
   }
   // Diagnostics from the Add card (states and counts, never words), so a
   // problem on one device can be traced. The newest 50 per person are kept.
@@ -528,7 +528,7 @@ async function routes(request, env, url) {
     if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
     if (data?.planner?.geminiAudio === false) return fail(403, 'Sending recordings to Gemini is turned off.');
     const key = `gemini-voice:${user.id}`;
-    if (await tooManyAttempts(env, key, 60)) return fail(429, 'Many recordings this hour. Budgie used the live text instead.');
+    if (await tooManyAttempts(env, key, 60)) return fail(429, 'Many recordings this hour. Taskie used the live text instead.');
     await countFailure(env, key);
     const { audio, mime, typed, today, weekday, timeZone, categories, existing } = await body(request);
     if (typeof audio !== 'string' || !audio || audio.length > 18 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That recording could not be read.');

@@ -75,9 +75,9 @@ async function split() { splitting.value = true; await breakDown(t); splitting.v
         <b v-if="when">{{ overdue ? `Overdue · ${when}` : when }}</b>
         <span v-if="t.time"><Icon name="clock" :size="11" />{{ timeLabel(t.time) }}<template v-if="t.mins"> · {{ t.mins >= 60 ? `${+(t.mins / 60).toFixed(1)} h` : `${t.mins} min` }}</template></span>
       </span>
-      <span v-if="t.priority === 'high' || urgent" class="tk-flag" :title="urgent && t.priority !== 'high' ? 'Budgie thinks this is urgent' : 'High priority'">{{ t.priority === 'high' ? 'High' : 'Urgent' }}</span>
+      <span v-if="t.priority === 'high' || urgent" class="tk-flag" :title="urgent && t.priority !== 'high' ? 'Taskie thinks this is urgent' : 'High priority'">{{ t.priority === 'high' ? 'High' : 'Urgent' }}</span>
       <span class="tk-tools">
-        <button v-if="!t.subtasks?.length && !done" type="button" class="ibtn ghost ai" :disabled="splitting" title="Break into steps with AI" :aria-label="`Break ${t.title} into steps`" data-test="row-breakdown" @click="split"><Icon :name="splitting ? 'refresh' : 'sparkle'" /></button>
+        <button v-if="!done" type="button" class="ibtn ghost ai" :disabled="splitting" title="Break into steps with AI" :aria-label="`Break ${t.title} into steps`" data-test="row-breakdown" @click="split"><Icon :name="splitting ? 'refresh' : 'sparkle'" /></button>
         <button v-if="!done" type="button" class="ibtn ghost" title="Lock In: a timer for just this" :aria-label="`Lock in on ${t.title}`" @click="startFocus(t)"><Icon name="timer" /></button>
         <button type="button" class="ibtn ghost" title="Edit" :aria-label="`Edit ${t.title}`" @click="open = !open"><Icon name="edit" /></button>
         <button type="button" class="ibtn ghost danger" title="Delete (Delete key)" :aria-label="`Delete ${t.title}`" data-test="task-delete" @click="deleteTask(t)"><Icon name="trash" /></button>

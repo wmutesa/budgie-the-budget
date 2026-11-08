@@ -9,7 +9,7 @@ export const PAGES = ['Overview', 'Schedule'];
 export const ADMIN_PAGES = ['People', 'Voice', 'Models', 'Errors', 'Sync', 'AI usage', 'Calendars'];
 export const ALL_PAGES = [...PAGES, ...ADMIN_PAGES, 'Settings', 'Privacy'];
 const savedMode = (() => { try { return localStorage.getItem('budgie.view') === 'admin' ? 'admin' : 'user'; } catch { return 'user'; } })();
-// mode: 'user' (your planner) or 'admin' (the owner's view of how Budgie is doing), remembered on this device.
+// mode: 'user' (your planner) or 'admin' (the owner's view of how Taskie is doing), remembered on this device.
 export const nav = reactive({ page: 'Overview', anchor: '', task: '', day: '', mode: savedMode });
 export function setMode(mode) {
   nav.mode = mode === 'admin' ? 'admin' : 'user';

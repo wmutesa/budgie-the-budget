@@ -27,23 +27,24 @@ const emit = defineEmits(['tour']);
 
 const isOwner = computed(() => account.user?.role === 'owner');
 const SETTINGS = computed(() => [
-  ['profile', 'Profile', 'user', 'Who you are, so Budgie plans like it knows you. Because it does.'],
+  ['profile', 'Profile', 'user', 'Who you are, so Taskie plans like it knows you. Because it does.'],
   ['digests', DIGESTS_LIVE ? 'Digests & AI' : 'AI', 'sparkle', 'The brains of the operation. Pick how much thinking happens on your device.'],
   ['calendars', 'Calendars', 'calendar', 'Every calendar you brought along, in one tidy drawer.'],
   ['security', 'Devices & security', 'shield', 'Passkeys, devices and a spare key under the mat (recovery codes).'],
-  ...(isOwner.value ? [['people', 'People', 'list', 'Who else gets to use your Budgie.']] : []),
+  ...(isOwner.value ? [['people', 'People', 'list', 'Who else gets to use your Taskie.']] : []),
 ]);
 const PRIVACY = [
   ['data', 'Your data', 'download', 'It is yours. Take a copy, fill it with samples, or clear them out.'],
   ['sessions', 'Sessions', 'logout', 'Everywhere you are signed in, and the big red button for all of them.'],
   ['delete', 'Delete account', 'trash', 'The nuclear option. We will miss you, quietly.'],
 ];
-// In the Admin view, Settings shows only what is about running Budgie: people and devices.
+// In the Admin view, Settings shows only what is about running Taskie: people and devices.
 const adminView = computed(() => nav.mode === 'admin' && isOwner.value);
-const tabs = computed(() => (props.kind === 'privacy' ? PRIVACY : adminView.value ? SETTINGS.value.filter(t => ['people', 'security'].includes(t[0])) : SETTINGS.value));
+// One Settings page: your settings, then privacy (your data, sessions, deleting the account).
+const tabs = computed(() => (adminView.value ? SETTINGS.value.filter(t => ['people', 'security'].includes(t[0])) : [...SETTINGS.value, ...PRIVACY]));
 watch(tabs, t => { if (!t.some(x => x[0] === tab.value)) tab.value = t[0][0]; });
-const tab = ref(nav.anchor === '#calendars' ? 'calendars' : tabs.value[0][0]);
-watch(() => props.kind, () => { tab.value = tabs.value[0][0]; });
+const tab = ref(nav.anchor === '#calendars' ? 'calendars' : props.kind === 'privacy' ? 'data' : tabs.value[0][0]);
+watch(() => props.kind, k => { tab.value = k === 'privacy' ? 'data' : tabs.value[0][0]; });
 watch(() => nav.anchor, a => { if (a === '#calendars' && props.kind === 'settings') tab.value = 'calendars'; });
 const current = computed(() => tabs.value.find(t => t[0] === tab.value) || tabs.value[0]);
 
@@ -110,18 +111,18 @@ const makeCodes = () => act(async () => {
 });
 const dropInvite = id => act(async () => { await cancelInvite(id); await load(); });
 const dropPasskey = p => act(async () => { if (!confirm(`Remove the passkey "${p.label}"? That device will not be able to sign in.`)) return; await removePasskey(p.id); await load(); });
-const dropPerson = p => act(async () => { if (!confirm(`Remove ${p.name}? Their account and all of their Budgie data will be deleted. This cannot be undone.`)) return; await removePerson(p.id); await load(); });
+const dropPerson = p => act(async () => { if (!confirm(`Remove ${p.name}? Their account and all of their Taskie data will be deleted. This cannot be undone.`)) return; await removePerson(p.id); await load(); });
 async function copy() { try { await navigator.clipboard.writeText(link.value.url); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* select it by hand */ } }
 function downloadData() {
-  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), app: 'Budgie', user: account.user?.name, data: snapshot() }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), app: 'Taskie', user: account.user?.name, data: snapshot() }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `budgie-data-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `taskie-data-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 const leaveEverywhere = () => act(async () => { if (!confirm('Sign out on every device, including this one? You will need your passkey to sign in again.')) return; await signOutEverywhere(); });
-const removeMe = () => act(async () => { const typed = prompt('This deletes your Budgie account and all of your data for good. Type DELETE to confirm.'); if (typed !== 'DELETE') return; await deleteMyAccount(); });
+const removeMe = () => act(async () => { const typed = prompt('This deletes your Taskie account and all of your data for good. Type DELETE to confirm.'); if (typed !== 'DELETE') return; await deleteMyAccount(); });
 </script>
 
 <template>
@@ -135,8 +136,11 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
         </div>
       </div>
       <nav class="set-nav" :aria-label="kind === 'privacy' ? 'Privacy' : 'Settings'">
-        <p class="set-kicker">{{ kind === 'privacy' ? 'Privacy' : 'Settings' }}</p>
-        <button v-for="[id, label, ic] in tabs" :key="id" type="button" :class="{ on: tab === id }" :aria-current="tab === id ? 'page' : undefined" :data-test="`acct-tab-${id}`" @click="tab = id"><Icon :name="ic" :size="16" />{{ label }}</button>
+        <p class="set-kicker">Settings</p>
+        <template v-for="[id, label, ic] in tabs" :key="id">
+        <p v-if="id === 'data'" class="set-kicker set-kicker-2">Privacy</p>
+        <button type="button" :class="{ on: tab === id }" :aria-current="tab === id ? 'page' : undefined" :data-test="`acct-tab-${id}`" @click="tab = id"><Icon :name="ic" :size="16" />{{ label }}</button>
+        </template>
       </nav>
     </aside>
 
@@ -219,12 +223,12 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
             <button v-if="!sampleOn" class="btn small" type="button" data-test="sample-add" @click="loadSample"><Icon name="sparkle" :size="14" />Fill with sample data</button>
             <button v-else class="btn small" type="button" data-test="sample-remove" @click="clearSample"><Icon name="trash" :size="14" />Remove sample data</button>
           </div>
-          <p class="small muted">See Budgie full: about 300 made-up tasks, classes, routines and goals. Removing them leaves everything you added yourself.</p>
+          <p class="small muted">See Taskie full: about 300 made-up tasks, classes, routines and goals. Removing them leaves everything you added yourself.</p>
         </section>
         <section class="set-sec">
-          <div class="set-sec-head acct-sec-head"><h2>What Budgie keeps</h2></div>
-          <p class="small muted">Your planner lives in your account and on this device. Your calendar links stay private, like a password to that calendar. When you record, only short pieces of audio go to Budgie's server to be written down, and they are not kept.</p>
-          <p class="small muted" data-test="privacy-diag">To keep recording working, Budgie notes what the Add card did (opened, microphone on, words heard or not, errors), never the words themselves. Those notes are deleted after 30 days. The owner of this Budgie sees counts and states for each person, never anyone's tasks or words.</p>
+          <div class="set-sec-head acct-sec-head"><h2>What Taskie keeps</h2></div>
+          <p class="small muted">Your planner lives in your account and on this device. Your calendar links stay private, like a password to that calendar. When you record, only short pieces of audio go to Taskie's server to be written down, and they are not kept.</p>
+          <p class="small muted" data-test="privacy-diag">To keep recording working, Taskie notes what the Add card did (opened, microphone on, words heard or not, errors), never the words themselves. Those notes are deleted after 30 days. The owner of this Taskie sees counts and states for each person, never anyone's tasks or words.</p>
         </section>
       </template>
 
@@ -238,7 +242,7 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
       <template v-else-if="tab === 'delete'">
         <section class="set-sec">
           <div class="set-sec-head acct-sec-head"><h2>Delete my account</h2><button v-if="!isOwner" class="btn small set-danger" type="button" data-test="delete-account" :disabled="busy" @click="removeMe"><Icon name="trash" :size="14" />Delete</button></div>
-          <p class="small muted">{{ isOwner ? 'You own this Budgie, so it cannot be deleted from here. Every other person can delete their own account.' : 'Removes your account and all of your data for good. There is no undo, not even a sad one.' }}</p>
+          <p class="small muted">{{ isOwner ? 'You own this Taskie, so it cannot be deleted from here. Every other person can delete their own account.' : 'Removes your account and all of your data for good. There is no undo, not even a sad one.' }}</p>
         </section>
       </template>
     </div>

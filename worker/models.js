@@ -1,8 +1,8 @@
-// AI model downloads through Budgie's own address. The in-browser models live
+// AI model downloads through Taskie's own address. The in-browser models live
 // on Hugging Face (weights) and GitHub (WebGPU code). Some browsers and
 // networks block those sites (content blockers, private relays, school and
 // work networks), so the app fetches them from /api/model/... instead and
-// Cloudflare caches them at the edge. Only the exact files Budgie uses can be
+// Cloudflare caches them at the edge. Only the exact files Taskie uses can be
 // fetched: this is not an open proxy.
 
 const HF_REPOS = [
@@ -17,7 +17,7 @@ const GGUF_FILE = 'Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-ins
 const SAFE_FILE = /^[\w.-]+$/;
 
 // Map /api/model/hf/<repo>/resolve/main/<file> or /api/model/gh/<path> to the
-// real address, or return null when the path is not one of Budgie's files.
+// real address, or return null when the path is not one of Taskie's files.
 export function modelSource(path) {
   const m = path.match(/^\/api\/model\/(hf|gh)\/(.+)$/);
   if (!m || m[2].includes('..') || m[2].includes('//')) return null;

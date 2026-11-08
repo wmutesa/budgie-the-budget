@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import SignIn from './components/SignIn.vue';
+import HomePage from './components/HomePage.vue';
 import AccountMenu from './components/AccountMenu.vue';
 import NoticeBell from './components/NoticeBell.vue';
 import GuideTour from './components/GuideTour.vue';
@@ -69,7 +70,7 @@ const endTour = () => { touring.value = false; store.guide = { done: true, at: n
 let wasOffline = false;
 watch(() => account.sync, s => {
   if (s === 'offline') { wasOffline = true; toast('Your changes are saved on this device and sync when you are back online.', { kind: 'warn', title: 'Offline', id: 'sync' }); }
-  else if (s === 'error') toast('Your latest changes could not be saved to your account. They are kept on this device; Budgie will try again.', { kind: 'error', title: 'Not synced', id: 'sync' });
+  else if (s === 'error') toast('Your latest changes could not be saved to your account. They are kept on this device; Taskie will try again.', { kind: 'error', title: 'Not synced', id: 'sync' });
   else if (s === 'saved' && wasOffline) { wasOffline = false; toast('Back online. All changes are saved.', { kind: 'success', id: 'sync' }); }
 });
 watch(() => account.note, n => { if (n) toast(n, { kind: 'info' }); });
@@ -100,12 +101,14 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
 </script>
 
 <template>
-  <div v-if="account.status === 'loading'" class="boot" aria-busy="true"><span class="brand-word">BUDGIE</span></div>
-  <SignIn v-else-if="account.status === 'signed-out'" />
+  <div v-if="account.status === 'loading'" class="boot" aria-busy="true"><span class="brand-word">TASKIE</span></div>
+  <!-- Not signed in: the home page, with the sign-in card in its first screen; an invite goes straight to joining -->
+  <SignIn v-else-if="account.status === 'signed-out' && account.invite?.token" />
+  <HomePage v-else-if="account.status === 'signed-out'" />
   <main v-else-if="account.recoveryCodes" class="signin">
     <SignInBackdrop />
     <section class="si-card">
-      <p class="brand-word">BUDGIE</p>
+      <p class="brand-word">TASKIE</p>
       <h1>Save your recovery codes</h1>
       <RecoveryCodes :codes="account.recoveryCodes" :name="account.user?.name" @done="account.recoveryCodes = null" @skip="skipCodes" />
     </section>
@@ -115,7 +118,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
       <header ref="navBar" class="cell nav-bar span-12">
         <div class="nb-brand">
-          <span class="brand-word">BUDGIE</span>
+          <span class="brand-word">TASKIE</span>
           <span v-if="adminView" class="nb-admin" data-test="admin-badge">Admin</span>
           <span v-else class="muted small nb-date">{{ today }}</span>
         </div>

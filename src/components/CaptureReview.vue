@@ -6,7 +6,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { capture, current, itemOf, placeOf, keep, drop, keepAll, later, switchTo, DESTS } from '../lib/capture';
 import Icon from './Icon.vue';
 
-// Review what Budgie sorted, one item at a time, highlighted where it now
+// Review what Taskie sorted, one item at a time, highlighted where it now
 // lives: keep it, switch what it is, rename it or drop it.
 const x = computed(() => current());
 const item = computed(() => (x.value ? itemOf(x.value) : null));
@@ -49,7 +49,7 @@ onUnmounted(() => { window.removeEventListener('resize', measure); window.remove
 </script>
 
 <template>
-  <div v-if="x && item" class="cr" role="dialog" aria-label="Review what Budgie added" data-test="capture-review">
+  <div v-if="x && item" class="cr" role="dialog" aria-label="Review what Taskie added" data-test="capture-review">
     <div v-if="rect" class="cr-hole" :style="{ top: rect.top + 'px', left: rect.left + 'px', width: rect.width + 'px', height: rect.height + 'px' }" />
     <div v-else class="cr-dim" />
     <div ref="card" class="cr-card" :style="pos">

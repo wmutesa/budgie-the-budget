@@ -1,4 +1,4 @@
-// Smoke test for the built Budgie web app. Serves dist/, fakes the live
+// Smoke test for the built Taskie web app. Serves dist/, fakes the live
 // account server so the test runs offline, then checks Today, the Schedule,
 // the Add button and its review, voice, search and the first-run guide.
 //
@@ -69,12 +69,12 @@ const voiceCalls = [];
 // Live words: each piece of audio the page sends gets the next scripted phrase ('' once they run out; 503 means unavailable).
 const liveScript = [];
 let partialCalls = 0; // quick guesses while talking (they do not use up the script)
-// Budgie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
+// Taskie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
 let budgieItems = null;
 const budgieCalls = [];
 let liveCalls = 0;
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-// Money data saved by an older version of Budgie: it must be dropped.
+// Money data saved by an older version of Taskie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
 // A sample edition, as the server would write it from free sources.
 const { sampleEdition, olderEditions } = require('./fixtures/sample-edition.cjs');
@@ -144,7 +144,7 @@ const fakeNetwork = (page, account) => fakeApi(page, account);
 const tab = name => `.nb-pages button:has-text("${name}")`;
 
 async function run(url) {
-  // A fake microphone (a repeating beep) so Budgie's own listening runs for real.
+  // A fake microphone (a repeating beep) so Taskie's own listening runs for real.
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const errors = [];
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -158,7 +158,7 @@ async function run(url) {
   assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule'], 'two pages: Progress is part of the Overview');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
-  assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
+  assert.match(await page.textContent('[data-test="today"] .lede'), /Taskie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
   assert.doesNotMatch(await page.textContent('body'), /Net worth|Transactions|Subscriptions|Exchange rates|Emergency fund|Old shop/i, 'no money anywhere');
   await page.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await page.waitForTimeout(1200);
@@ -167,7 +167,7 @@ async function run(url) {
   assert.deepEqual(fakeAccount.data.goals, [], 'old savings goals are removed');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today-empty.png` });
 
-  // Add: one button. Say or type anything; Budgie sorts it, places it, and you review each one.
+  // Add: one button. Say or type anything; Taskie sorts it, places it, and you review each one.
   await page.locator('body').press('n'); // opens Add for typing
   // One long run of words with many things in it is split into each one before anything is added.
   await page.fill('[data-test="capture-text"]', 'okay so for chemistry I have a lab report due Monday and a quiz on Wednesday and I need to finish the problem set by Friday then for history I have an essay due next Tuesday and a reading response tomorrow also call mom on Sunday and dad on Saturday gym every Monday and Wednesday at 6 pm number two pay rent on the 1st another thing buy groceries tomorrow and book a dentist appointment next week oh and I want to run a 10K by March plus meditate every morning at 7 and finally email professor Smith about the extension');
@@ -359,7 +359,7 @@ async function run(url) {
   const boxes = await page.locator('[data-test="sch-box"]').count();
   assert.ok(boxes >= 1, 'timed items sit on the time line');
   await page.click('[data-test="plan-day"]');
-  // Late in the day there may be no free time left; then Budgie says so instead.
+  // Late in the day there may be no free time left; then Taskie says so instead.
   await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n || /no free time left/.test(document.querySelector('[data-test="toasts"]')?.textContent || ''), boxes);
   if (await page.locator('[data-test="sch-box"]').count() > boxes) assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
   // The calendar shows no steps; clicking a box shows its row in the activity list, highlighted.
@@ -419,7 +419,7 @@ async function run(url) {
 
   // Your details live in Settings (from the avatar menu); the AI page has no digest settings while digests are on hold.
   await page.click('[data-test="account"]');
-  assert.deepEqual(await page.$$eval('[data-test="account-menu"] [role="menuitem"]', b => b.map(x => x.textContent.trim())), ['Settings', 'Privacy', 'Take the tour', 'Sign out'], 'the avatar opens Settings, Privacy, the tour and Sign out');
+  assert.deepEqual(await page.$$eval('[data-test="account-menu"] [role="menuitem"]', b => b.map(x => x.textContent.trim())), ['Settings', 'Take the tour', 'Sign out'], 'the avatar opens Settings (with privacy inside), the tour and Sign out');
   await page.click('[data-test="menu-settings"]');
   assert.ok(await page.$('[data-test="settings-page"]'), 'Settings is a page of its own');
   await page.waitForSelector('[data-test="profile-you"]');
@@ -513,7 +513,7 @@ async function run(url) {
   await page.waitForSelector('[data-test="schedule"]');
   assert.equal(await page.$('[data-test="bell-pop"]'), null, 'the list closes');
 
-  // Voice: tap Add and Budgie listens to the microphone itself; words appear in the card as they are written down.
+  // Voice: tap Add and Taskie listens to the microphone itself; words appear in the card as they are written down.
   const voice = await context.newPage();
   await fakeNetwork(voice);
   await voice.goto(url, { waitUntil: 'load' });
@@ -541,7 +541,7 @@ async function run(url) {
   assert.ok(liveCalls - live0 >= 3, 'each phrase went to the server as audio');
   assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
   if (process.env.SHOTS) { await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` }); await voice.locator('header').first().screenshot({ path: `${process.env.SHOTS}/recording-bar.png` }); }
-  // Stop: Budgie's server AI breaks what was said into separate things, and each is placed.
+  // Stop: Taskie's server AI breaks what was said into separate things, and each is placed.
   budgieItems = [
     { title: 'Essay', kind: 'assignment', date: '', time: '17:00', minutes: 0, repeat: 'none', days: ['fri'].slice(0, 0), course: '', priority: '', action: 'add', target: '' },
     { title: 'Gym', kind: 'routine', date: '', time: '18:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '', action: 'add', target: '' },
@@ -551,7 +551,7 @@ async function run(url) {
   await voice.click('[data-test="capture-mic"]');
   await voice.waitForSelector('[data-test="capture-review"]');
   budgieItems = null;
-  assert.equal(budgieCalls.length, bc0 + 1, 'what was said went to Budgie\'s AI once');
+  assert.equal(budgieCalls.length, bc0 + 1, 'what was said went to Taskie\'s AI once');
   assert.match(budgieCalls[bc0].text, /essay due friday[\s\S]*books this year/, 'with the edited live words');
   assert.match(await voice.textContent('.cr-count'), /of 3/, 'three separate things come back and are sorted');
   { const titles = []; for (let i = 0; i < 3; i++) { titles.push(await voice.inputValue('.cr-title')); if (i < 2) { await voice.click('[data-test="review-keep"]'); await voice.waitForTimeout(150); } } assert.deepEqual(titles.map(t => t.toLowerCase()), ['essay', 'gym', 'read 12 books'], `each is its own item (${titles})`); }
@@ -606,7 +606,7 @@ async function run(url) {
   await fakeNetwork(guide, fresh);
   await guide.goto(url, { waitUntil: 'load' });
   await guide.waitForSelector('[data-test="guide"]');
-  assert.match(await guide.textContent('[data-test="guide"]'), /Welcome to Budgie, Willy/, 'new people get a welcome note');
+  assert.match(await guide.textContent('[data-test="guide"]'), /Welcome to Taskie, Willy/, 'new people get a welcome note');
   let steps = 0;
   let seen = '';
   while (await guide.$('[data-test="guide"]')) {
@@ -628,10 +628,10 @@ async function run(url) {
   assert.equal(fresh.data?.guide?.done, true, 'finishing the guide is saved to the account');
   // Privacy: download a copy of your data.
   await guide.click('[data-test="account"]');
-  await guide.click('[data-test="menu-privacy"]');
-  assert.deepEqual(await guide.$$eval('[data-test="privacy-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Your data', 'Sessions', 'Delete account'], 'Privacy has your data, sessions and deleting the account');
+  await guide.click('[data-test=\"menu-settings\"]'); await guide.click('[data-test=\"acct-tab-data\"]');
+  assert.deepEqual(await guide.$$eval('[data-test="settings-page"] .set-nav button', b => b.map(x => x.textContent.trim()).slice(-3)), ['Your data', 'Sessions', 'Delete account'], 'Settings includes privacy: your data, sessions and deleting the account');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
-  assert.match(dl.suggestedFilename(), /^budgie-data-.*\.json$/, 'you can download a copy of your data');
+  assert.match(dl.suggestedFilename(), /^taskie-data-.*\.json$/, 'you can download a copy of your data');
   // Settings: square, with only the avatar round.
   await guide.click('[data-test="account"]');
   await guide.click('[data-test="menu-settings"]');
@@ -657,8 +657,8 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Schedule', 'Settings', 'Privacy']) {
-    if (p === 'Settings' || p === 'Privacy') { await mobile.click('[data-test="account"]'); await mobile.click(`[data-test="menu-${p.toLowerCase()}"]`); } else
+  for (const p of ['Overview', 'Schedule', 'Settings']) {
+    if (p === 'Settings') { await mobile.click('[data-test="account"]'); await mobile.click('[data-test="menu-settings"]'); } else
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -673,7 +673,7 @@ async function run(url) {
   await fakeNetwork(full);
   await full.goto(url, { waitUntil: 'load' });
   await full.click('[data-test="account"]');
-  await full.click('[data-test="menu-privacy"]');
+  await full.click('[data-test=\"menu-settings\"]'); await full.click('[data-test=\"acct-tab-data\"]');
   await full.click('[data-test="sample-add"]');
   const filled = await full.textContent('[data-test="toast"]:has-text("Sample data")');
   await full.keyboard.press('Escape');
@@ -696,7 +696,7 @@ async function run(url) {
   console.log('with sample data:', n, 'tasks;', Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', '));
   for (const [k, v] of Object.entries(timings)) assert.ok(v < 2500, `${k} stays quick with sample data (${v} ms)`);
   await full.click('[data-test="account"]');
-  await full.click('[data-test="menu-privacy"]');
+  await full.click('[data-test=\"menu-settings\"]'); await full.click('[data-test=\"acct-tab-data\"]');
   await full.click('[data-test="sample-remove"]');
   await full.waitForSelector('[data-test="sample-add"]');
   await full.close();

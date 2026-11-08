@@ -1,4 +1,4 @@
-// Sample data, to see how Budgie looks and runs when it is full. Every item it
+// Sample data, to see how Taskie looks and runs when it is full. Every item it
 // adds is marked `sample: true`, so removing it leaves your own things alone.
 import { store, newId } from './store';
 import { makeTask, today, addDays, fromIso, isoDay } from './tasks';

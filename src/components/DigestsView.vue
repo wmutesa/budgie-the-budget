@@ -267,7 +267,7 @@ const shortDate = s => (s ? fromIso(s).toLocaleDateString('en-US', { weekday: 's
 
       <footer class="dg-foot">
         <p v-if="ed.sources?.length" class="small"><b>Sources:</b> <template v-for="(s, i) in ed.sources" :key="s.url + i"><a :href="s.url" target="_blank" rel="noopener noreferrer">{{ s.title }}</a><template v-if="i < ed.sources.length - 1">, </template></template></p>
-        <p class="muted small" data-test="digest-made">Written from {{ ed.provider || 'free sources' }}<template v-if="ed.topics?.length"> · following {{ ed.topics.join(', ') }}</template>. Check details on the official page before you apply. Budgie never sends email for you.</p>
+        <p class="muted small" data-test="digest-made">Written from {{ ed.provider || 'free sources' }}<template v-if="ed.topics?.length"> · following {{ ed.topics.join(', ') }}</template>. Check details on the official page before you apply. Taskie never sends email for you.</p>
         <p v-if="ed.researchError" class="muted small">Deeper research was skipped this time: {{ ed.researchError }}.</p>
       </footer>
     </article>

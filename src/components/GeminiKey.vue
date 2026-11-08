@@ -6,7 +6,7 @@ import { checkGeminiKey, saveNow } from '../lib/account';
 
 // Your own free Gemini key. With it, what you say or type in Add is broken
 // into every separate thing by Gemini. The key is saved in your account and
-// sent only to Google, from Budgie's server.
+// sent only to Google, from Taskie's server.
 const show = ref(false);
 // Pasted keys can carry spaces or quotes; keys come in more than one format.
 const tidy = v => String(v || '').replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '');
@@ -26,7 +26,7 @@ async function check() {
 <template>
   <section class="acct-sec t-a" data-test="gemini-key">
     <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="sparkle" :size="12" /></span>Gemini for what you say</p><span class="muted small">Free, optional</span></div>
-    <p class="small">Optional. With your own free key, Gemini reads everything you say or type in <b>Add</b> and splits it into each task, class, routine and goal, with dates and times. Without one, Budgie's own rules do it. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>.</p>
+    <p class="small">Optional. With your own free key, Gemini reads everything you say or type in <b>Add</b> and splits it into each task, class, routine and goal, with dates and times. Without one, Taskie's own rules do it. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>.</p>
     <span class="you-key">
       <input v-model="key" :type="show ? 'text' : 'password'" autocomplete="off" spellcheck="false" placeholder="Paste your Gemini API key" aria-label="Gemini API key" data-test="you-key" />
       <button type="button" class="ibtn ghost" :title="show ? 'Hide' : 'Show'" :aria-label="show ? 'Hide key' : 'Show key'" @click="show = !show"><Icon :name="show ? 'x' : 'search'" /></button>
@@ -35,6 +35,6 @@ async function check() {
     <p v-if="!keyOk" class="pln-err small">That does not look like an API key. Copy it again from Google AI Studio (the copy button next to the key).</p>
     <p v-else-if="result" :class="result.ok ? 'pln-ok' : 'pln-err'" class="small" role="status" data-test="you-key-result">{{ result.message }}</p>
     <label class="dgp-check" data-test="gemini-audio"><input v-model="sendAudio" type="checkbox" :disabled="!key" /> Also send the whole recording to Gemini when I tap Stop</label>
-    <p class="muted small">Live words while you talk come from Budgie's server either way. Your key stays in your account and goes only to Google; Budgie keeps no recordings.</p>
+    <p class="muted small">Live words while you talk come from Taskie's server either way. Your key stays in your account and goes only to Google; Taskie keeps no recordings.</p>
   </section>
 </template>
