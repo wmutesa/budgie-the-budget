@@ -40,7 +40,8 @@ const usageRows = computed(() => [
 // The models behind recording and sorting, with this week's use, misses and speed.
 const avg = (msKey, keys) => { const n = keys.reduce((a, k) => a + (u.value[k] || 0), 0); return n ? Math.round((u.value[msKey] || 0) / n) : null; };
 const models = computed(() => [
-  { name: 'Whisper large v3 turbo', job: 'Writes down what you say, phrase by phrase', where: 'Cloudflare Workers AI', calls: (u.value['live-final-whisper'] || 0) + (u.value['live-partial-whisper'] || 0) + (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), misses: (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), ms: avg('ms-whisper', ['live-final-whisper', 'live-partial-whisper', 'live-final-whisper-empty', 'live-partial-whisper-empty']), state: 'In use' },
+  { name: 'Deepgram Nova-3 (live)', job: 'Writes down what you say as you say it, over one live connection', where: 'Cloudflare Workers AI', calls: (u.value['stream-nova'] || 0) + (u.value['stream-nova-failed'] || 0), misses: u.value['stream-nova-failed'] || 0, ms: null, state: 'In use · first choice' },
+  { name: 'Whisper large v3 turbo', job: 'Writes down what you say, phrase by phrase when the live connection cannot start', where: 'Cloudflare Workers AI', calls: (u.value['live-final-whisper'] || 0) + (u.value['live-partial-whisper'] || 0) + (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), misses: (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), ms: avg('ms-whisper', ['live-final-whisper', 'live-partial-whisper', 'live-final-whisper-empty', 'live-partial-whisper-empty']), state: 'Fallback' },
   { name: 'Gemini Flash (own key)', job: 'Writes down and sorts, for people with their own key', where: 'Google', calls: (u.value['live-final-gemini'] || 0) + (u.value['live-partial-gemini'] || 0), misses: 0, ms: avg('ms-gemini-live', ['live-final-gemini', 'live-partial-gemini']), state: 'Optional' },
   { name: 'Llama 3.3 70B', job: 'Splits what was said into tasks, routines, events and goals', where: 'Cloudflare Workers AI', calls: (u.value['split-budgie'] || 0) + (u.value['split-budgie-failed'] || 0), misses: u.value['split-budgie-failed'] || 0, ms: avg('ms-split-budgie', ['split-budgie']), state: 'In use · teacher for training' },
   { name: 'Qwen 2.5 (0.5B and 1.5B)', job: 'On-device splitting when the server is unreachable', where: "The person's browser", calls: null, misses: null, ms: null, state: 'Fallback · to be fine-tuned daily from Nov 9' },
@@ -166,7 +167,7 @@ const DESC = {
             <div><dt>First run</dt><dd>Mon Nov 9, then a new model every day</dd></div>
             <div><dt>Corrections learned (training signal)</dt><dd>{{ learnedTotal }}</dd></div>
             <div><dt>Opted in to help Taskie hear better</dt><dd>Not built yet</dd></div>
-            <div><dt>Plan and scores</dt><dd><a href="https://github.com/wmutesa/budgie-the-budget/issues/4" target="_blank" rel="noopener noreferrer">Issue #4</a></dd></div>
+            <div><dt>Plan and scores</dt><dd><a href="https://github.com/wmutesa/taskie-the-task/issues/4" target="_blank" rel="noopener noreferrer">Issue #4</a></dd></div>
           </dl>
         </section>
       </template>

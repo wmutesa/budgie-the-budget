@@ -42,7 +42,11 @@ function freshContext() {
 // send(wavBase64, prompt, partial) → text; onText(newWords); onPartial(guessSoFar); onLevel(0..1); onError(message, code)
 // Like ElevenLabs' Scribe: a quick guess at the phrase while you talk (partial),
 // then the final words once you pause (committed).
-export function createLive({ send, onText, onPartial, onLevel, onError }) {
+// streamUrl(): where to stream audio live (a WebSocket to Taskie's server, which
+// passes it to Deepgram Nova-3 on Cloudflare): words arrive as you speak, in
+// pieces that firm up. If the stream cannot start or goes quiet, Taskie falls
+// back to writing down phrase by phrase, so recording never gets worse.
+export function createLive({ send, onText, onPartial, onLevel, onError, streamUrl }) {
   let stream = null, src = null, proc = null;
   let all = [];            // every 16 kHz sample so far, in blocks
   let piece = [];          // samples of the phrase being spoken
@@ -95,6 +99,38 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
     });
   }
 
+  // ---------- the live stream ----------
+  let ws = null, wsOpen = false, streaming = false, gotWords = false, voicedSecs = 0, queue = [];
+  const toInt16 = f => { const o = new Int16Array(f.length); for (let i = 0; i < f.length; i++) { const x = Math.max(-1, Math.min(1, f[i])); o[i] = x < 0 ? x * 0x8000 : x * 0x7fff; } return o.buffer; };
+  function openStream() {
+    const url = streamUrl?.();
+    if (!url || typeof WebSocket === 'undefined') return;
+    try { ws = new WebSocket(url); } catch { return; }
+    ws.binaryType = 'arraybuffer';
+    streaming = true; wsOpen = false; gotWords = false; voicedSecs = 0; queue = [];
+    diag('stream-open');
+    ws.onopen = () => { wsOpen = true; diag('stream-ready'); for (const b of queue) ws.send(b); queue = []; };
+    ws.onmessage = ev => {
+      let m; try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(ev.data)); } catch { return; }
+      if (m.type !== 'Results') return;
+      const t = String(m.channel?.alternatives?.[0]?.transcript || '').trim();
+      if (!t) return;
+      gotWords = true;
+      if (m.is_final) { sentAny = true; said = `${said} ${t}`.trim(); onPartial?.(''); onText?.(t); diag('stream-final', { chars: t.length }); }
+      else onPartial?.(t);
+    };
+    ws.onerror = () => diag('stream-error');
+    ws.onclose = e => { const was = wsOpen; wsOpen = false; diag('stream-closed', { code: e.code, was }); if (live && streaming) fallBack('closed'); };
+  }
+  // Back to phrase by phrase, keeping the audio of the last few seconds.
+  function fallBack(why) {
+    if (!streaming) return;
+    streaming = false; diag('stream-fallback', { why });
+    try { ws?.close(); } catch { /* gone */ }
+    ws = null; wsOpen = false;
+    const tail = all.slice(-4); piece = [...tail]; pieceLen = tail.reduce((n, b) => n + b.length, 0) / RATE; loud = true; quietFor = 0;
+  }
+
   let ticks = 0, peak = 0, heardAny = false, rebuilt = false, silentTold = false, watchdog = null;
   let floor = 1, sentAny = false;
   let sincePartial = 0, partialBusy = false, pieceNo = 0; // the quietest level heard (the room), and whether any phrase was sent
@@ -113,9 +149,21 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
       if (++ticks === 1 || ticks % 12 === 0) { diag('audio', { ticks, peak: +peak.toFixed(4), ctx: ctx.state, muted: stream?.getAudioTracks()[0]?.muted }); peak = 0; }
       onLevel?.(Math.min(1, level * 12));
       const block = down(input, ctx.sampleRate);
-      all.push(block); piece.push(block);
+      all.push(block);
       const secs = block.length / RATE;
-      pieceLen += secs; total += secs;
+      total += secs;
+      if (streaming) {
+        // Live: every block goes straight to the stream (queued until it opens).
+        const buf = toInt16(block);
+        if (wsOpen) ws.send(buf); else if (queue.length < 60) queue.push(buf);
+        if (level >= voiceAt()) voicedSecs += secs;
+        // Talking for a while and no words back: the stream is not working here.
+        if (!gotWords && voicedSecs > 6) fallBack('no-words');
+        if (total >= MAX_SECONDS) stop();
+        return;
+      }
+      piece.push(block);
+      pieceLen += secs;
       if (level >= voiceAt()) { loud = true; quietFor = 0; } else quietFor += secs;
       sincePartial += secs;
       if ((pieceLen >= MIN_PIECE && quietFor >= PAUSE && loud) || pieceLen >= MAX_PIECE) cut();
@@ -172,6 +220,7 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
     all = []; piece = []; pieceLen = 0; quietFor = 0; loud = false; total = 0; said = ''; failures = 0;
     wire();
     live = true;
+    openStream();
     clearTimeout(watchdog); watchdog = setTimeout(checkSilence, 2500);
     diag('listening');
     return true;
@@ -182,7 +231,14 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
     if (!live) return null;
     live = false;
     diag('stop', { secs: Math.round(total) });
-    if (pieceLen) cut();
+    if (streaming && ws) {
+      // Ask the stream for its last words, then wait a moment for them.
+      const sock = ws; streaming = false;
+      try { if (wsOpen) sock.send(JSON.stringify({ type: 'CloseStream' })); } catch { /* fine */ }
+      await new Promise(r => { const t = setTimeout(r, 1800); sock.addEventListener('close', () => { clearTimeout(t); r(); }); });
+      try { sock.close(); } catch { /* gone */ }
+      ws = null; wsOpen = false;
+    } else if (pieceLen) cut();
     teardown();
     await chain;
     const pcm = join(all);
@@ -199,7 +255,7 @@ export function createLive({ send, onText, onPartial, onLevel, onError }) {
     }
     return pcm.length > RATE * 0.6 ? { data: b64(wav(pcm)), mime: 'audio/wav' } : null;
   }
-  function cancel() { diag('cancel', { was: live }); live = false; piece = []; all = []; teardown(); }
+  function cancel() { diag('cancel', { was: live }); live = false; streaming = false; try { ws?.close(); } catch { /* gone */ } ws = null; piece = []; all = []; teardown(); }
   function teardown() {
     clearTimeout(watchdog); watchdog = null;
     try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }

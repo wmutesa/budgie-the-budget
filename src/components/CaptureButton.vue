@@ -58,6 +58,8 @@ let liveFailed = false;
 const live = createLive({
   send: (audio, prompt, isPartial) => liveWords(audio, prompt, keyterms(), Boolean(isPartial)),
   onPartial: t => { partial.value = t; },
+  // Live words over one connection (Deepgram Nova-3 through Taskie's server); phrase by phrase if that cannot start.
+  streamUrl: () => (typeof location !== 'undefined' && store.planner?.liveStream !== false ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/voice/stream` : null),
   onLevel: v => { level.value = v; },
   onText: t => { spoken.value = true; liveFailed = false; const fresh = newWords(capture.text, applyVocab(spokenMarks(t), store.vocab)); heardRaw += ` ${fresh}`; capture.text = join(capture.text, fresh); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {

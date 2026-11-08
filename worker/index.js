@@ -483,6 +483,26 @@ async function routes(request, env, url) {
     await env.DB.prepare('DELETE FROM diag_logs WHERE created_at < ?').bind(now() - 30 * 86400e3).run();
     return json({ ok: true });
   }
+  // Live words as you speak: a WebSocket straight through to Deepgram Nova-3 on
+  // Workers AI. The app sends 16 kHz 16-bit mono PCM and gets words back in
+  // pieces (interim) that become final at each pause. Audio is not kept.
+  if (path === '/api/voice/stream' && method === 'GET') {
+    if (request.headers.get('Upgrade') !== 'websocket') return fail(426, 'Live words need a WebSocket.');
+    if (!env.AI) return fail(503, 'Live words are not available on this server.');
+    const key = `voice-stream:${user.id}`;
+    if (await tooManyAttempts(env, key, 300)) return fail(429, 'Many live sessions this hour. Phrase-by-phrase still works.');
+    await countFailure(env, key);
+    await bump(env, user.id, 'stream-nova');
+    try {
+      return await env.AI.run('@cf/deepgram/nova-3', {
+        encoding: 'linear16', sample_rate: '16000', channels: 1,
+        interim_results: true, smart_format: true, punctuate: true, endpointing: '400',
+      }, { websocket: true });
+    } catch (e) {
+      await bump(env, user.id, 'stream-nova-failed');
+      return fail(502, String(e?.message || 'Live words could not start.').slice(0, 200));
+    }
+  }
   // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
   // Cloudflare's Whisper first (free, no key); the person's Gemini key otherwise.
   if (path === '/api/voice/live' && method === 'POST') {
