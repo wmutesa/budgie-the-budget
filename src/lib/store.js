@@ -51,8 +51,21 @@ const SAVED_FIELDS = Object.keys(fromSaved());
 
 export const store = reactive({ ...fromSaved(), query: '' });
 
+// Calendars carry a short-lived `busy` flag while they refresh; it is not saved.
+const dropBusy = feeds => (Array.isArray(feeds) ? feeds.map(f => { if (f && typeof f === 'object') { const { busy, ...rest } = f; return rest; } return f; }) : feeds);
 // The saved part of the state, as a plain object.
-export const snapshot = () => JSON.parse(JSON.stringify(Object.fromEntries(SAVED_FIELDS.map(k => [k, store[k]]))));
+export const snapshot = () => {
+  const out = JSON.parse(JSON.stringify(Object.fromEntries(SAVED_FIELDS.map(k => [k, store[k]]))));
+  out.feeds = dropBusy(out.feeds);
+  return out;
+};
+// What snapshot() would return after applySnapshot(data), without touching the store.
+// Used to compare a copy from the server with this device's own.
+export const normalise = data => {
+  const out = JSON.parse(JSON.stringify(fromSaved(data || {})));
+  out.feeds = dropBusy(out.feeds);
+  return out;
+};
 
 // Replace the saved part of the state, for example with data from the server.
 export function applySnapshot(data) {

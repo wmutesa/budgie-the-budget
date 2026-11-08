@@ -34,14 +34,16 @@ const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
 const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Progress: 'trend' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
-// AI starts once someone is signed in, so the sign-in page downloads nothing.
-watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immediate: true });
-// Calendars refresh, and reminders run, once your data has loaded.
 let started = false;
+// AI starts once someone is signed in, so the sign-in page downloads nothing.
+watch(() => account.status, s => { if (s === 'signed-in') detectAI(); if (s === 'signed-out') started = false; }, { immediate: true });
+// Calendars refresh, and reminders run, once your data has loaded.
 watch(() => account.sync, s => {
-  if (account.status !== 'signed-in' || s !== 'saved') return;
+  // Once per load, not after every save: these change your data, and running them
+  // on each save (or each copy from another device) kept two open devices saving in turn.
+  if (account.status !== 'signed-in' || s !== 'saved' || started) return;
+  started = true;
   refreshFeeds(); startReminders(); ensureColor();
-  if (!started) { started = true; }
 });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {
   if (account.status === 'signed-in' && account.sync !== 'saving' && !account.recoveryCodes && store.guide && !store.guide.done) touring.value = true;

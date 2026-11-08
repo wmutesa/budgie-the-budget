@@ -2,7 +2,7 @@
 // data to their account. The server side is worker/index.js.
 import { reactive, watch } from 'vue';
 import { startRegistration, startAuthentication, browserSupportsWebAuthn } from '@simplewebauthn/browser';
-import { snapshot, applySnapshot, openLocal, readLegacy, clearLegacy, clearLocal } from './store';
+import { snapshot, normalise, applySnapshot, openLocal, readLegacy, clearLegacy, clearLocal } from './store';
 
 const USER_KEY = 'budgie.user';
 const pendingKey = id => `budgie.pending:${id}`;
@@ -42,17 +42,49 @@ const read = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { 
 const write = (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage blocked */ } };
 
 // ---------- syncing ----------
+// `version` is the server's version this device last saw; `lastSent` is that
+// version's data as snapshot() writes it, so an unchanged store is never sent.
+// Saves and reads run one at a time, so a device never conflicts with itself.
 let version = 0;
 let lastSent = '';
 let timer = null;
 let stopWatch = null;
+let queue = Promise.resolve();
+const serial = fn => (queue = queue.then(fn, fn));
 
 function setPending(on) {
   if (!account.user) return;
   write(pendingKey(account.user.id), on ? { version } : null);
 }
 
-async function push() {
+// Another device saved first. Keep what changed here since the last sync (by
+// part: tasks, goals, settings…) and take the rest from the server's copy.
+function merge(theirs) {
+  const base = lastSent ? JSON.parse(lastSent) : null;
+  const ours = snapshot();
+  const merged = {};
+  let fromThem = false;
+  for (const k of Object.keys(theirs)) {
+    const mine = JSON.stringify(ours[k]);
+    const keepMine = base && mine !== JSON.stringify(base[k]);
+    merged[k] = keepMine ? ours[k] : theirs[k];
+    if (!keepMine && mine !== JSON.stringify(theirs[k])) fromThem = true;
+  }
+  return { merged, fromThem };
+}
+
+// Take a newer copy from the server. Returns true if something here still needs saving.
+function takeRemote(data, v) {
+  const theirs = normalise(data);
+  const { merged, fromThem } = merge(theirs);
+  version = v;
+  lastSent = JSON.stringify(theirs);
+  applySnapshot(merged);
+  if (fromThem) account.note = 'Updated with changes from another device.';
+  return JSON.stringify(snapshot()) !== lastSent;
+}
+
+async function pushOnce(tries = 0) {
   if (!account.user) return;
   const data = snapshot();
   const text = JSON.stringify(data);
@@ -68,13 +100,10 @@ async function push() {
     setPending(false);
   } catch (e) {
     if (e.status === 409 && e.body?.data) {
-      // Another device saved first: show its version.
-      version = e.body.version;
-      lastSent = JSON.stringify(e.body.data);
-      applySnapshot(e.body.data);
+      const more = takeRemote(e.body.data, e.body.version);
       account.sync = 'saved';
-      account.note = 'Updated with changes from another device.';
       setPending(false);
+      if (more && tries < 3) await pushOnce(tries + 1);
     } else if (e.status === 401) {
       signedOutLocally();
     } else {
@@ -83,6 +112,34 @@ async function push() {
     }
   }
 }
+const push = () => serial(() => pushOnce());
+
+// Check the server for changes made on another device.
+async function pullOnce() {
+  if (!account.user || account.offline || account.status !== 'signed-in') return;
+  if (JSON.stringify(snapshot()) !== lastSent) return pushOnce(); // unsaved changes here: saving also brings the other device's
+  try {
+    const res = await api(`/api/data?known=${version}`);
+    if (res.same || !res.data || res.version <= version) return;
+    if (takeRemote(res.data, res.version)) await pushOnce();
+    account.syncedAt = Date.now();
+  } catch (e) {
+    if (e.status === 401) signedOutLocally();
+  }
+}
+export const pull = () => serial(pullOnce);
+
+const PULL_MS = 15000;
+let pullTimer = null;
+const visible = () => typeof document === 'undefined' || document.visibilityState !== 'hidden';
+function startPulling() {
+  clearInterval(pullTimer);
+  pullTimer = setInterval(() => { if (visible()) pull(); }, PULL_MS);
+}
+if (typeof window !== 'undefined') {
+  document.addEventListener('visibilitychange', () => { if (visible()) pull(); });
+  window.addEventListener('focus', () => pull());
+}
 
 function watchChanges() {
   stopWatch?.();
@@ -90,6 +147,7 @@ function watchChanges() {
     clearTimeout(timer);
     timer = setTimeout(push, 1200);
   }, { deep: true });
+  startPulling();
 }
 
 // Load the person's data: this device's copy first, then the server's.
@@ -142,6 +200,7 @@ async function becomeSignedIn(user) {
 function signedOutLocally() {
   stopWatch?.();
   clearTimeout(timer);
+  clearInterval(pullTimer);
   openLocal(null);
   account.user = null;
   account.status = 'signed-out';

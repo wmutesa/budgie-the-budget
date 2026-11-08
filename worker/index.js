@@ -364,6 +364,12 @@ async function routes(request, env, url) {
 
   // --- synced data ---
   if (path === '/api/data' && method === 'GET') {
+    // ?known=N: the device already has version N, so say "same" instead of sending it all again.
+    const known = url.searchParams.get('known');
+    if (known !== null) {
+      const v = await env.DB.prepare('SELECT version, updated_at FROM user_data WHERE user_id = ?').bind(user.id).first();
+      if ((v?.version || 0) === Number(known)) return json({ same: true, version: v?.version || 0, updatedAt: v?.updated_at || null });
+    }
     const row = await env.DB.prepare('SELECT data, version, updated_at FROM user_data WHERE user_id = ?').bind(user.id).first();
     return json(row ? { data: JSON.parse(row.data), version: row.version, updatedAt: row.updated_at } : { data: null, version: 0 });
   }

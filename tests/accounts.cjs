@@ -172,6 +172,73 @@ async function main() {
     await laptop.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Blue Bottle')));
     await laptop.page.click('.nb-pages button:has-text("Schedule")');
     await laptop.page.waitForSelector('[data-test="schedule"]');
+
+    // Two devices open on one account stay quiet when idle, and still see each other's edits.
+    const puts = { owner: 0, laptop: 0 };
+    let lastPut = Date.now();
+    for (const [who, p] of [['owner', owner.page], ['laptop', laptop.page]]) {
+      p.on('request', r => { if (r.method() === 'PUT' && new URL(r.url()).pathname === '/api/data') { puts[who] += 1; lastPut = Date.now(); } });
+    }
+    // A calendar that is due for a refresh on both devices and takes a while to read:
+    // each device refreshes it as it opens, while the other may be saving.
+    const soon = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
+    for (const p of [owner.page, laptop.page]) {
+      await p.route('**/api/calendar', async r => {
+        await new Promise(res => setTimeout(res, 2500));
+        await r.fulfill({ json: { name: 'Classes', kind: 'other', events: [{ uid: 'chem-lab', title: 'Chemistry Lab', start: { date: soon } }] } });
+      });
+    }
+    const before = await getJSON(owner.page, '/api/data');
+    const withFeed = { ...before.body.data, feeds: [{ id: 'feed1', name: 'Classes', url: 'https://calendar.example.com/classes.ics', kind: 'other', lastSync: new Date(Date.now() - 864e5).toISOString(), count: 1, error: '' }] };
+    assert.equal(await owner.page.evaluate(async b => (await fetch('/api/data', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })).status, { data: withFeed, version: before.body.version }), 200);
+    await Promise.all([owner.page.reload(), laptop.page.reload()]);
+    await Promise.all([owner.page.waitForSelector('.nb-pages'), laptop.page.waitForSelector('.nb-pages')]);
+    const quiet = async (ms, what) => {
+      // Let the saves already under way finish: a few seconds with none.
+      const t0 = Date.now();
+      while (Date.now() - lastPut < 5000) {
+        assert.ok(Date.now() - t0 < 30000, `${what}: the devices keep saving (${JSON.stringify(puts)})`);
+        await new Promise(r => setTimeout(r, 250));
+      }
+      puts.owner = 0; puts.laptop = 0;
+      await new Promise(r => setTimeout(r, ms));
+      assert.deepEqual(puts, { owner: 0, laptop: 0 }, `${what}: no saves while both devices are idle`);
+    };
+    await quiet(18000, 'after both devices open'); // longer than one check for changes (15 s)
+    // Both devices read the calendar: its event is in the account once, and it was refreshed.
+    const opened = (await getJSON(owner.page, '/api/data')).body.data;
+    assert.equal(opened.tasks.filter(t => t.title === 'Chemistry Lab').length, 1, 'the calendar event is added once');
+    assert.ok(Date.parse(opened.feeds[0].lastSync) > Date.now() - 6e5, 'the calendar was refreshed');
+    assert.ok(!('busy' in opened.feeds[0]), 'a calendar\'s busy flag is not saved');
+    await Promise.all([owner.page.unroute('**/api/calendar'), laptop.page.unroute('**/api/calendar')]);
+    // An edit on one device reaches the other, which does not save it back.
+    puts.owner = 0; puts.laptop = 0;
+    await owner.page.locator('body').press('n');
+    await owner.page.fill('[data-test="capture-text"]', 'Email Dr Okafor about the lab report');
+    await owner.page.click('[data-test="capture-sort"]');
+    await owner.page.click('[data-test="review-keep"]');
+    await laptop.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Okafor')), null, { timeout: 30000 });
+    assert.ok(puts.owner >= 1, 'the edit is saved');
+    assert.equal(puts.laptop, 0, 'the other device takes the edit without saving it back');
+    await quiet(18000, 'after an edit');
+    // A conflict with a copy written elsewhere, holding fields from an older Budgie,
+    // is settled with one more save, not a loop; both sides' changes are kept.
+    const cur = await getJSON(owner.page, '/api/data');
+    const older = { ...cur.body.data, money: { accounts: [] }, tasks: [...cur.body.data.tasks] };
+    older.me = { ...(older.me || {}), school: 'Northfield College' };
+    const wroteOlder = await owner.page.evaluate(async b => (await fetch('/api/data', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) })).status, { data: older, version: cur.body.version });
+    assert.equal(wroteOlder, 200);
+    await owner.page.locator('body').press('n');
+    await owner.page.fill('[data-test="capture-text"]', 'Return library books on Friday');
+    await owner.page.click('[data-test="capture-sort"]');
+    await owner.page.click('[data-test="review-keep"]');
+    await owner.page.waitForFunction(async () => {
+      const d = (await (await fetch('/api/data')).json()).data || {};
+      return JSON.stringify(d.tasks).toLowerCase().includes('library books') && d.me?.school === 'Northfield College';
+    }, null, { timeout: 30000 });
+    await laptop.page.waitForFunction(() => Object.keys(localStorage).some(k => k.startsWith('budgie.v3') && (localStorage.getItem(k) || '').includes('Northfield College') && /library books/i.test(localStorage.getItem(k) || '')), null, { timeout: 30000 });
+    assert.ok(puts.owner <= 3, `a conflict is settled in a few saves (${puts.owner})`);
+    await quiet(18000, 'after a conflict');
     await laptop.context.close();
 
     // Lost every device: a recovery code leads to a new passkey.

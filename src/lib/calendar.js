@@ -78,21 +78,29 @@ export function mergeEvents(feed, events) {
 
 export async function syncFeed(feed, { quiet = false } = {}) {
   feed.busy = true;
+  // A copy from another device can replace the list while this waits: write to the feed as it is now.
+  const current = () => store.feeds.find(f => f.id === feed.id);
   try {
     const out = await readCalendar(feed.url);
-    if (out.name && (!feed.name || feed.name === FEED_KINDS[feed.kind]?.name)) feed.name = out.name;
-    if (out.kind) feed.kind = out.kind;
-    const r = mergeEvents(feed, out.events || []);
-    Object.assign(feed, { lastSync: new Date().toISOString(), count: (out.events || []).length, error: '' });
+    const live = current();
+    if (!live) return null; // removed meanwhile
+    if (out.name && (!live.name || live.name === FEED_KINDS[live.kind]?.name)) live.name = out.name;
+    if (out.kind) live.kind = out.kind;
+    const r = mergeEvents(live, out.events || []);
+    Object.assign(live, { lastSync: new Date().toISOString(), count: (out.events || []).length, error: '' });
     return r;
   } catch (e) {
-    const before = feed.error;
-    feed.error = e.message || 'The calendar could not be read.';
-    if (feed.lastSync && feed.error !== before && !quiet) toast(feed.error, { kind: 'warn', title: `${feed.name} did not update`, ms: 12000 });
-    feed.lastSync = new Date().toISOString();
+    const live = current();
+    if (!live) return null;
+    const before = live.error;
+    live.error = e.message || 'The calendar could not be read.';
+    if (live.lastSync && live.error !== before && !quiet) toast(live.error, { kind: 'warn', title: `${live.name} did not update`, ms: 12000 });
+    live.lastSync = new Date().toISOString();
     return null;
   } finally {
     delete feed.busy;
+    const live = current();
+    if (live) delete live.busy;
   }
 }
 
