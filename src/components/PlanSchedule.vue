@@ -198,8 +198,6 @@ const tickX = x => toggleDone(x.task, x.date);
 // the list opens (and its category, over a week or month), and its row is
 // scrolled into view and highlighted briefly.
 const flashKey = ref('');
-// The date and time row under one activity (the calendar icon on its row).
-const whenKey = ref('');
 let flashTimer = null;
 function pick(x, then) {
   listOpen.value = true;
@@ -370,15 +368,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
               <span class="sch-row-acts">
                 <button v-if="!x.summary && !x.done" type="button" class="sch-icon" :aria-label="`Lock in on ${x.task.title}`" title="Lock In: a timer for just this" data-test="row-lockin" @click="startFocus(x.task)"><Icon name="timer" :size="15" /></button>
-                <button type="button" class="sch-icon" :aria-expanded="whenKey === x.key" :aria-label="`Date and time of ${x.task.title}`" title="Date and time" data-test="row-when" @click="whenKey = whenKey === x.key ? '' : x.key"><Icon name="when" :size="15" /></button>
+                <WhenField v-if="!x.summary" icon :label="x.task.title" v-model:date="x.task.date" v-model:time="x.task.time" />
                 <button v-if="!x.summary" type="button" class="sch-icon" :class="{ spin: splittingKey === x.key }" :aria-label="`Break ${x.task.title} into steps`" :title="x.task.subtasks?.length ? 'Break it down further' : 'Break it into steps'" data-test="row-split" @click="splitRow(x)"><Icon name="split" :size="15" /></button>
                 <button type="button" class="sch-icon danger" :aria-label="`Delete ${x.task.title}`" title="Delete" data-test="row-delete" @click="deleteTask(x.task)"><Icon name="trash" :size="15" /></button>
               </span>
-              <div v-if="whenKey === x.key" class="sch-when" data-test="row-when-pop">
-                <WhenField v-model:date="x.task.date" v-model:time="x.task.time" />
-                <label class="sch-when-min"><input v-model.number="x.task.mins" type="number" min="0" step="5" aria-label="Minutes" placeholder="min" /><span>min</span></label>
-                <button type="button" class="sch-icon" title="Done" aria-label="Done" @click="whenKey = ''"><Icon name="check" :size="15" /></button>
-              </div>
               <ul v-if="x.task.subtasks?.length && !x.summary" class="sch-steps" data-test="row-steps">
                 <li v-for="st in x.task.subtasks" :key="st.id" :class="{ done: st.done }"><label><input v-model="st.done" type="checkbox" />{{ st.title }}</label></li>
               </ul>

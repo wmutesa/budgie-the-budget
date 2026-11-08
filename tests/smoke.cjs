@@ -271,9 +271,7 @@ async function run(url) {
   assert.equal(await page.$('[data-test="ai-priority"], .sch-row .seg'), null, 'no priority buttons: the AI sets priority');
   await row('Essay 2').hover();
   await row('Essay 2').locator('[data-test="row-when"]').click();
-  const when = page.locator('[data-test="row-when-pop"]');
-  // One field for the day and the time: a month on top, hour and minute wheels below.
-  await when.locator('[data-test="when-field"]').click();
+  // The calendar icon opens one card for the day and the time: a month on top, hour and minute wheels below.
   await page.waitForSelector('[data-test="when-pop"] .wf-day.today');
   assert.equal(await page.locator('[data-test="when-pop"] .wf-day').count(), 42, 'the month shows six weeks');
   if (process.env.SHOTS) { const b = await page.locator('[data-test="when-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/whenpicker.png`, clip: { x: b.x - 20, y: b.y - 20, width: b.width + 40, height: b.height + 40 } }); }
@@ -281,10 +279,9 @@ async function run(url) {
   await page.click('[data-test="tp-h-4"]');
   await page.click('[data-test="tp-m-30"]');
   await page.click('[data-test="tp-pm"]');
-  assert.match(await when.locator('[data-test="when-field"]').textContent(), /4:30 PM/, 'the day and the time are picked together');
+  assert.match(await row('Essay 2').locator('[data-test="row-when"]').getAttribute('title'), /4:30 PM/, 'the day and the time are picked together');
   await page.keyboard.press('Escape');
   assert.equal(await page.$('[data-test="when-pop"]'), null, 'Escape closes the picker');
-  await page.locator('[data-test="row-when-pop"] [aria-label="Done"]').click();
   await page.click('[data-test="sch-today"]');
   await page.click('.sch-pick-today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.

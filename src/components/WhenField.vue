@@ -6,7 +6,8 @@ import Icon from './Icon.vue';
 
 // One button for when something happens: the day and the time together.
 // It opens one card: the month on top, the hour and minute wheels below.
-const props = defineProps({ date: { type: String, default: '' }, time: { type: String, default: '' } });
+// icon: show just the calendar icon (on activity rows); the card opens from it.
+const props = defineProps({ date: { type: String, default: '' }, time: { type: String, default: '' }, icon: { type: Boolean, default: false }, label: { type: String, default: '' } });
 const emit = defineEmits(['update:date', 'update:time']);
 const open = ref(false);
 const field = ref(null);
@@ -34,6 +35,7 @@ async function toggle() {
   await nextTick();
   const r = field.value.getBoundingClientRect();
   const w = 284, h = pop.value?.offsetHeight || 480;
+  // From an icon, the card opens beside it, kept on screen.
   const below = r.bottom + 6 + h < window.innerHeight;
   pos.value = { left: `${Math.max(8, Math.min(r.left, window.innerWidth - w - 8))}px`, top: `${below ? r.bottom + 6 : Math.max(8, Math.min(r.top - h - 6, window.innerHeight - h - 8))}px` };
 }
@@ -44,7 +46,8 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
 </script>
 
 <template>
-  <button ref="field" type="button" class="pk-field wf-field" :class="{ empty: !date, on: open }" :aria-label="`When: ${text}`" :aria-expanded="open" aria-haspopup="dialog" data-test="when-field" @click="toggle">
+ <button v-if="icon" ref="field" type="button" class="sch-icon" :aria-expanded="open" :aria-label="`Day and time${label ? ` of ${label}` : ''}: ${text}`" :title="text" data-test="row-when" @click="toggle"><Icon name="when" :size="15" /></button>
+  <button v-else ref="field" type="button" class="pk-field wf-field" :class="{ empty: !date, on: open }" :aria-label="`When: ${text}`" :aria-expanded="open" aria-haspopup="dialog" data-test="when-field" @click="toggle">
     <Icon name="when" :size="15" /><span>{{ text }}</span>
   </button>
   <Teleport to="body">
