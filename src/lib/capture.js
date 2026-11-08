@@ -7,7 +7,9 @@ import { store } from './store';
 import { routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
 import { ai, aiRewriteDictation } from './ai';
 import { tidyDictation } from './tidy';
-import { today, addDays, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
+import { geminiBreakdown } from './account';
+import { itemLine } from './itemline';
+import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
 import { go, nav } from './nav';
 
@@ -17,6 +19,7 @@ export const capture = reactive({
   sorting: false,
   review: [],        // [{ id, to, r }] waiting for a decision, in order
   at: -1,            // which one the review is showing (-1: not reviewing)
+  via: '',           // what broke the last one down: Gemini, on-device AI or rules
 });
 export { DESTS };
 
@@ -43,23 +46,34 @@ function settle(made) {
 
 // Sort what was said or typed and put it in place, pending review.
 // What was said, broken down into every separate thing, one per line. The
-// rules always run (they split at sentence ends, numbering, "then / also",
-// "and" before a new thing, listed items, and carry a course or verb across).
-// When the on-device AI is ready it reads the recording in chunks too; its
-// answer is used when it finds at least as many things as the rules, so it
-// can fix wording but never drop items.
+// rules always run (sentence ends, numbering, "then / also", "and" before a
+// new thing, listed items; a course or verb carries across). With the
+// person's own Gemini key, Gemini reads it and gives each item a kind, date,
+// time and course; otherwise the on-device AI may. Either answer is used only
+// when it finds most of what the rules found, so nothing is lost.
 export async function breakDown(text) {
   const split = splitSpoken(text);
   const rules = tidyDictation(split.join('\n'));
-  if (!(ai.enabled && ai.ready)) return rules;
-  // Chunks of a few sentences each, cut at the rules' own breaks.
-  const chunks = [];
-  let cur = '';
-  for (const line of split) { if (cur && cur.length + line.length > 600) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
-  if (cur) chunks.push(cur);
-  const byAI = await aiRewriteDictation(text, chunks).catch(() => null);
   const count = t => (t ? t.split('\n').filter(Boolean).length : 0);
-  return byAI && count(byAI) >= count(rules) ? byAI : rules;
+  if (store.digest?.geminiKey) {
+    try {
+      const d = new Date();
+      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone);
+      const lines = (items || []).map(itemLine).filter(Boolean).join('\n');
+      if (count(lines) >= Math.ceil(count(rules) * 0.6)) { capture.via = 'Gemini'; return lines; }
+    } catch { /* no key on the server yet, the free limit, or offline: carry on */ }
+  }
+  if (ai.enabled && ai.ready) {
+    // Chunks of a few sentences each, cut at the rules' own breaks.
+    const chunks = [];
+    let cur = '';
+    for (const line of split) { if (cur && cur.length + line.length > 600) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
+    if (cur) chunks.push(cur);
+    const byAI = await aiRewriteDictation(text, chunks).catch(() => null);
+    if (byAI && count(byAI) >= count(rules)) { capture.via = 'on-device AI'; return byAI; }
+  }
+  capture.via = 'rules';
+  return rules;
 }
 
 export async function sortAndPlace(text = capture.text, { spoken = false } = {}) {

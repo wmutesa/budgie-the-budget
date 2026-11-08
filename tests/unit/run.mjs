@@ -259,6 +259,43 @@ await check('it does not split what belongs together', () => {
   const rows = breakDownRules('call mom and dad tomorrow, meet Sam between 2 and 4 pm on Thursday, gym Monday and Wednesday, finish the first draft by Friday, book a table for next Tuesday');
   assert.deepEqual(rows.map(r => r.text), ['Call mom and dad tomorrow', 'Meet Sam between 2 and 4pm on Thursday', 'Gym Monday and Wednesday', 'Finish the first draft by Friday', 'Book a table for next Tuesday']);
 });
+const { itemLine } = await import('../../src/lib/itemline.js');
+await check("Gemini's items become planner items with their kind, date, time, repeat and course", () => {
+  const items = [
+    { title: 'Lab report', kind: 'assignment', date: '2026-11-12', time: '17:00', minutes: 90, repeat: '', days: [], course: 'Chemistry' },
+    { title: 'Midterm', kind: 'exam', date: '2026-11-16', time: '', minutes: 0, repeat: '', days: [], course: 'History' },
+    { title: 'Gym', kind: 'routine', date: '', time: '18:00', minutes: 60, repeat: 'weekly', days: ['mon', 'wed', 'fri'], course: '' },
+    { title: 'Read before bed', kind: 'routine', date: '', time: '22:00', minutes: 0, repeat: 'daily', days: [], course: '' },
+    { title: 'Run a 10K', kind: 'goal', date: '2027-03-01', time: '', minutes: 0, repeat: '', days: [], course: '' },
+    { title: 'Call mom', kind: 'task', date: '2026-11-15', time: '', minutes: 0, repeat: '', days: [], course: '' },
+    { title: 'Piano lesson', kind: 'class', date: '', time: '16:00', minutes: 45, repeat: 'weekly', days: ['thu'], course: 'Music' },
+  ];
+  const rows = routeAll(items.map(itemLine).join('\n'));
+  assert.equal(rows.length, 7, rows.map(r => r.text).join(' | '));
+  const [lab, mid, gym, read, run, call, piano] = rows;
+  assert.deepEqual([lab.dest, lab.task.title, lab.task.date, lab.task.time, lab.task.mins, lab.task.project, lab.task.kind], ['task', 'Lab report', '2026-11-12', '17:00', 90, 'Chemistry', 'assignment']);
+  assert.deepEqual([mid.task.title, mid.task.date, mid.task.kind, mid.task.project], ['Midterm', '2026-11-16', 'exam', 'History']);
+  assert.deepEqual([gym.dest, gym.task.repeat?.days, gym.task.time], ['routine', [1, 3, 5], '18:00']);
+  assert.deepEqual([read.dest, read.task.repeat?.every], ['routine', 'day']);
+  assert.equal(run.dest, 'goal');
+  assert.deepEqual([call.task.title, call.task.date], ['Call mom', '2026-11-15']);
+  assert.deepEqual([piano.dest, piano.task.repeat?.days, piano.task.project], ['routine', [4], 'Music'], 'one weekly day repeats too');
+});
+const { geminiSplit } = await import('../../worker/gemini.js');
+await check('the Gemini answer is checked before it is used', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items: [
+    { title: '<b>Essay</b>', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: 'none', days: [], course: 'English' },
+    { title: 'Gym', kind: 'workout', date: 'friday', time: '6pm', minutes: -5, repeat: 'weekly', days: ['mon', 'xyz', 'mon'], course: '' },
+    { title: '', kind: 'task' },
+  ] }) }] } }] }) });
+  try {
+    const items = await geminiSplit('k'.repeat(30), { text: 'essay due friday at 5 and gym mondays', today: '2026-11-08', weekday: 'Sunday', timeZone: 'UTC' });
+    assert.equal(items.length, 2, 'items without a title are dropped');
+    assert.deepEqual(items[0], { title: 'Essay', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: '', days: [], course: 'English' });
+    assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' }, 'bad kinds, dates, times and days are cleaned');
+  } finally { globalThis.fetch = realFetch; }
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

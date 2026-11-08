@@ -4,6 +4,7 @@ import { capture, sortAndPlace } from '../lib/capture';
 import { routeAll, splitSpoken, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
+import { store } from '../lib/store';
 import Icon from './Icon.vue';
 
 // The one way to add anything. Tap Add and talk: the words appear as you speak
@@ -76,7 +77,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
       <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
         <header class="cap-head">
           <div>
-            <h2>{{ capture.sorting ? 'Breaking it down…' : listening ? 'Listening…' : 'Add anything' }}</h2>
+            <h2>{{ capture.sorting ? (store.digest?.geminiKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : listening ? 'Listening…' : 'Add anything' }}</h2>
             <p class="muted small">{{ listening ? 'Say everything on your mind, and fix any word as you go. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
           <button type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>

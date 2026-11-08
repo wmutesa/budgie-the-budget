@@ -8,7 +8,7 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
-import { geminiResearch, checkKey, tidyKey, keyShapeOk } from './gemini.js';
+import { geminiResearch, geminiSplit, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -420,6 +420,21 @@ async function routes(request, env, url) {
     const data = await accountData(env, user.id);
     const st = { id: stream.id, name: String(stream.name || '').slice(0, 60), focus: String(stream.focus || '').slice(0, 120) };
     return json(await writeDigestFor(env, user.id, data, st, typeof timeZone === 'string' ? timeZone.slice(0, 60) : ''));
+  }
+  // Break a recording into planner items with the person's own Gemini key (kept in their data, sent only to Google).
+  if (path === '/api/gemini/breakdown' && method === 'POST') {
+    const data = await accountData(env, user.id);
+    const gkey = tidyKey(data?.digest?.geminiKey);
+    if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
+    const key = `gemini-split:${user.id}`;
+    if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
+    await countFailure(env, key);
+    const { text, today, weekday, timeZone } = await body(request);
+    const said = String(text || '').slice(0, 12000);
+    if (!said.trim()) return fail(400, 'Nothing to break down.');
+    try {
+      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60) }) });
+    } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
   }
   if (path === '/api/gemini/check' && method === 'POST') {
     const key = `gemini-check:${user.id}`;

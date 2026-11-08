@@ -24,9 +24,9 @@ export async function checkKey(raw) {
   const key = tidyKey(raw);
   if (!keyShapeOk(key)) return { ok: false, message: 'That does not look like an API key. Copy it again from Google AI Studio.' };
   const res = await fetch(`${API}/${MODEL}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
-  if (res.ok) return { ok: true, message: 'Google accepted the key. Your digests will be researched with Gemini.' };
+  if (res.ok) return { ok: true, message: 'Google accepted the key. What you say in Add will be broken down by Gemini.' };
   const j = await res.json().catch(() => ({}));
-  if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Research resumes when it resets.' };
+  if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Gemini takes over again when it resets; until then Budgie uses its own rules.' };
   return { ok: false, message: googleSays(res.status, j) };
 }
 const https = u => typeof u === 'string' && /^https:\/\/[^\s<>"]+$/i.test(u) && u.length < 600;
@@ -76,4 +76,69 @@ Plain text in every field, no markdown.`;
     action: out.action?.text ? { text: text(out.action.text, 240), label: 'Open', link: https(out.action.link) ? out.action.link : '' } : null,
     sources: (Array.isArray(out.sources) ? out.sources : []).filter(s => https(s?.url)).map(s => ({ title: text(s.title, 80) || 'Source', url: s.url })).slice(0, 10),
   };
+}
+
+// ---------- breaking a recording into planner items ----------
+// One recording can hold dozens of things. Gemini lists each one with its
+// kind, exact date (worked out from "next Tuesday" and the like), time,
+// length, repeat days and course, as JSON checked here before it is used.
+const KINDS = ['task', 'assignment', 'exam', 'class', 'event', 'routine', 'goal'];
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const SPLIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          kind: { type: 'string', enum: KINDS },
+          date: { type: 'string', description: 'YYYY-MM-DD, or empty' },
+          time: { type: 'string', description: '24-hour HH:MM, or empty' },
+          minutes: { type: 'integer' },
+          repeat: { type: 'string', enum: ['none', 'daily', 'weekdays', 'weekly', 'monthly'] },
+          days: { type: 'array', items: { type: 'string', enum: DAYS } },
+          course: { type: 'string', description: 'course, subject or project, or empty' },
+        },
+        required: ['title', 'kind'],
+      },
+    },
+  },
+  required: ['items'],
+};
+export async function geminiSplit(key, { text: said, today, weekday, timeZone }) {
+  const prompt = `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
+Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
+People say many things at once (sometimes 50 or more) without pausing. List EVERY separate item, in the order said: assignments, exams, classes, tasks, errands, events, routines, habits and goals. Never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two items. When a course or subject is said once for several items ("for chemistry I have X and Y"), give each that course. Carry a shared verb ("call mom Sunday and dad Saturday" is two calls).
+For each item: a short title without the date or time ("Lab report", "Call mom"); kind (assignment for homework, essays, reports and problem sets; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday" or "next Tuesday" (the next such day after today), empty if none; time in 24-hour HH:MM, empty if none; minutes if a length was said; repeat and days for things that recur; course if one applies.
+Fix words speech recognition clearly misheard. Do not add anything that was not said.
+
+Note:
+${said}`;
+  const res = await fetch(`${API}/${MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: SPLIT_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 16000 },
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(googleSays(res.status, j));
+  const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  let out;
+  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  const hhmm = s => (/^([01]\d|2[0-3]):[0-5]\d$/.test(s || '') ? s : '');
+  return (Array.isArray(out.items) ? out.items : []).slice(0, 200).map(x => ({
+    title: text(x.title, 120),
+    kind: KINDS.includes(x.kind) ? x.kind : 'task',
+    date: isoDate(x.date),
+    time: hhmm(x.time),
+    minutes: Number.isInteger(x.minutes) && x.minutes > 0 && x.minutes <= 1440 ? x.minutes : 0,
+    repeat: ['daily', 'weekdays', 'weekly', 'monthly'].includes(x.repeat) ? x.repeat : '',
+    days: Array.isArray(x.days) ? [...new Set(x.days.filter(d => DAYS.includes(d)))] : [],
+    course: text(x.course, 40),
+  })).filter(x => x.title);
 }

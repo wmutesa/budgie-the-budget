@@ -11,6 +11,7 @@ import RecoveryCodes from './RecoveryCodes.vue';
 import AIPanel from './AIPanel.vue';
 import ProfileYou from './ProfileYou.vue';
 import DigestSettings from './DigestSettings.vue';
+import GeminiKey from './GeminiKey.vue';
 import { addSample, removeSample, hasSample } from '../lib/sample';
 import { DIGESTS_LIVE } from '../lib/digest';
 import {
@@ -160,6 +161,7 @@ const tour = () => { open.value = false; emit('tour'); };
         </template>
 
         <template v-else-if="tab === 'digests'">
+          <GeminiKey />
           <DigestSettings v-if="DIGESTS_LIVE" />
           <AIPanel class="t-violet" />
         </template>

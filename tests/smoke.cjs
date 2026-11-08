@@ -64,6 +64,7 @@ window.webkitSpeechRecognition = FakeRec;
 // A stand-in for the account server (worker/index.js): signed in as the owner,
 // with data kept in memory so reloads and other pages see the same account.
 // tests/accounts.cjs tests the real server.
+const geminiCalls = [];
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Budgie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
@@ -108,6 +109,15 @@ async function fakeApi(page, account = fakeAccount) {
       if (!/^https:\/\//.test(url)) return route.fulfill({ status: 400, json: { error: 'Use the https or webcal link of the calendar.' } });
       return route.fulfill({ json: { kind: 'canvas', name: 'Fall courses', events: [{ uid: 'a1', title: 'Lab report [CHEM 110 Fall 2026]', start: { date: inDays(3) }, end: null, location: '', url: 'https://school.instructure.com/courses/1', notes: '', repeat: null }] } });
     }
+    // Gemini with the person's own key: a canned answer, as Google would send it through the server.
+    if (p === '/api/gemini/check') return route.fulfill({ json: { ok: true, message: 'Google accepted the key. What you say in Add will be broken down by Gemini.' } });
+    if (p === '/api/gemini/breakdown') { geminiCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { items: [
+      { title: 'Stats problem set', kind: 'assignment', date: inDays(2), time: '17:00', minutes: 60, repeat: '', days: [], course: 'Statistics' },
+      { title: 'Biology midterm', kind: 'exam', date: inDays(5), time: '', minutes: 0, repeat: '', days: [], course: 'Biology' },
+      { title: 'Swim', kind: 'routine', date: '', time: '07:00', minutes: 45, repeat: 'weekly', days: ['tue', 'thu'], course: '' },
+      { title: 'Call grandma', kind: 'task', date: inDays(1), time: '', minutes: 0, repeat: '', days: [], course: '' },
+      { title: 'Learn to play guitar', kind: 'goal', date: '', time: '', minutes: 0, repeat: '', days: [], course: '' },
+    ] } }); }
     if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
     if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
     if (p === '/api/people') return route.fulfill({ json: { people: [{ id: 'u1', name: 'Willy', role: 'owner', last_seen: Date.now() }], invites: [] } });
@@ -330,8 +340,36 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="profile-remind"]'), /Task reminders[\s\S]*10 minutes before/, 'task reminders are a switch on the Profile page');
   assert.equal(await page.textContent('[data-test="acct-tab-digests"]'), 'AI', 'the settings page is called AI for now');
   await page.click('[data-test="acct-tab-digests"]');
-  assert.equal(await page.$('[data-test="you-key"]'), null, 'no Gemini key while digests are on hold');
+  // Your own free Gemini key breaks what you say into items.
+  await page.fill('[data-test="you-key"]', 'AIzaSyFakeKeyForTheTest_1234567890');
+  await page.click('[data-test="you-key-check"]');
+  assert.match(await page.textContent('[data-test="you-key-result"]'), /broken down by Gemini/, 'the key is checked with Google');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/settings.png` });
+  await page.keyboard.press('Escape');
+  await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
+  await page.click('[data-test="capture"]');
+  await page.fill('[data-test="capture-text"]', 'stats problem set due tuesday at five for statistics and the bio midterm on friday swim tuesdays and thursdays at seven call grandma tomorrow and I want to learn guitar');
+  await page.click('[data-test="capture-sort"]');
+  await page.waitForSelector('[data-test="capture-review"]');
+  assert.equal(geminiCalls.length, 1, 'Gemini is asked once, with the whole note');
+  assert.match(geminiCalls[0].today || '', /^\d{4}-\d{2}-\d{2}$/, "today's date goes with it, so Gemini can work out \"tuesday\"");
+  // Walk the review: each of Gemini's items is there, with its date, time, repeat and course.
+  const reviewed = [];
+  for (let i = 0; i < 12 && await page.$('[data-test="capture-review"]'); i++) {
+    reviewed.push(`${await page.inputValue('.cr-title')} | ${await page.textContent('.cr-where')}`);
+    await page.click('[data-test="review-keep"]');
+    await page.waitForTimeout(150);
+  }
+  const has = (re, what) => assert.ok(reviewed.some(x => re.test(x)), `${what} (${reviewed.join(' ;; ')})`);
+  has(/^Stats problem set \| Schedule · Assignment · .* · 5 PM · #Statistics/, 'the assignment keeps its day, time and course');
+  has(/^Biology midterm \| Schedule · Exam · .*#Biology/, 'the exam is an exam');
+  has(/^Swim \| Schedule · Routine/, 'the weekly swim is a routine');
+  has(/^Call grandma \| Schedule · Task · Tomorrow/, 'the call is tomorrow');
+  has(/^Learn to play guitar \| Overview · Goals/, 'the goal is a goal');
+  // Back to the built-in rules for the rest of the test.
+  await page.click('[data-test="account"]');
+  await page.click('[data-test="acct-tab-digests"]');
+  await page.fill('[data-test="you-key"]', '');
   await page.keyboard.press('Escape');
   await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
 
