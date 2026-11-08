@@ -3204,3 +3204,24 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .cal-item.box.done, .cal-item.chip.done { opacity: 1 !important; background: #fafafa !important; border-color: #ececf0 !important; }
 .cal-item.box.done b, .cal-item.box.done .cal-box-time, .cal-item.chip.done { color: #a1a1aa !important; }
 .cal-item.box.done b { text-decoration: line-through; }
+/* Top bar: the focus pill, beside Add, the bell and your profile */
+.nb-focus { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px 0 9px; border: 1px solid #ddd6fe !important; border-radius: 999px !important; background: #f5f3ff; color: #4c1d95; font: 600 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; cursor: pointer; flex: none; }
+.nb-focus .ico { color: #7c3aed; }
+.nb-focus:not(.paused):not(.ended) .ico { animation: nb-focus-pulse 2s ease-in-out infinite; }
+.nb-focus.paused { background: #fafafa; border-color: #e4e4e7 !important; color: #71717a; }
+.nb-focus.ended { background: #f0fdf4; border-color: #bbf7d0 !important; color: #15803d; }
+.nb-focus.ended .ico { color: #16a34a; }
+@keyframes nb-focus-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .nb-focus .ico { animation: none !important; } }
+@media (max-width: 640px) { .nb-focus { padding: 0 8px; } }
+/* Focus: what gets through */
+.fcs-allow { display: grid; gap: 10px; }
+.fcs-allow > p { margin: 0; max-width: 70ch; }
+.fcs-allow-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fcs-opt { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid #ececf0; border-radius: 14px; background: #fff; cursor: pointer; }
+.fcs-opt:hover { border-color: #ddd6fe; }
+.fcs-opt.on { border-color: #c4b5fd; background: #faf8ff; }
+.fcs-opt input { margin-top: 3px; accent-color: #7c3aed; }
+.fcs-opt > span { display: grid; gap: 2px; }
+.fcs-held { color: #6d28d9 !important; font-weight: 600; }
+@media (max-width: 760px) { .fcs-allow-opts { grid-template-columns: minmax(0, 1fr); } }

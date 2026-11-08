@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { cards } from '../lib/notices';
 import { store } from '../lib/store';
+import { inFocus, focusAllow } from '../lib/focus';
 import Icon from './Icon.vue';
 
 // Budgie's suggestions behind a bell in the top bar: a count of unread ones, a
@@ -21,6 +22,8 @@ const root = ref(null);
 const list = computed(() => cards.value);
 const seen = computed(() => new Set(store.seenNotices || []));
 const unread = computed(() => list.value.filter(c => !seen.value.has(c.id)).length);
+// During focus the count stays quiet (unless everything is let through); it comes back after.
+const quiet = computed(() => inFocus() && focusAllow() !== 'all');
 
 const markRead = ids => { store.seenNotices = [...new Set([...(store.seenNotices || []), ...ids])].slice(-200); };
 const isUnread = c => !seen.value.has(c.id);
@@ -42,7 +45,7 @@ onUnmounted(() => { stopRead(); document.removeEventListener('mousedown', outsid
   <span ref="root" class="bell">
     <button class="bell-btn" type="button" :aria-label="unread ? `Notifications, ${unread} new` : 'Notifications'" :aria-expanded="open" data-test="bell" @click="toggle">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 10a6 6 0 1 1 12 0v4l2 3H4l2-3z M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" /></svg>
-      <span v-if="unread" class="bell-count" data-test="bell-count">{{ unread > 9 ? '9+' : unread }}</span>
+      <span v-if="unread && !quiet" class="bell-count" data-test="bell-count">{{ unread > 9 ? '9+' : unread }}</span>
     </button>
 
     <div v-if="open" ref="pop" class="bell-pop" role="dialog" aria-label="Notifications" data-test="bell-pop" @mouseleave="tip = null">

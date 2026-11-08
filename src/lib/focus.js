@@ -12,10 +12,35 @@
 import { reactive, watch } from 'vue';
 import { isDone, toggleDone } from './tasks';
 import { store, newId } from './store';
+import { toast } from './toast';
 
 // `spent` counts the seconds actually focused, for Reports. `ended` is true from
 // the moment the time is up until the session is closed.
-export const focus = reactive({ task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false, mini: false });
+export const focus = reactive({ task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false, mini: false, held: [] });
+
+// ---------- what gets through while you focus ----------
+// 'all': everything; 'starting': only events and classes about to start; 'none': nothing.
+export const ALLOW = [
+  ['starting', 'Only what is starting', 'Events and classes about to begin still reach you; task reminders wait.'],
+  ['none', 'Nothing', 'Every Budgie reminder waits until the session ends.'],
+  ['all', 'Everything', 'Reminders arrive as usual.'],
+];
+export const focusAllow = () => (ALLOW.some(([k]) => k === store.planner?.focusAllow) ? store.planner.focusAllow : 'starting');
+export const inFocus = () => !!focus.task && !focus.ended;
+// May a reminder of this kind ('starting' or 'other') reach you now? If not, it is held for the summary.
+export function focusGate(kind, note) {
+  if (!inFocus()) return true;
+  const allow = focusAllow();
+  if (allow === 'all' || (allow === 'starting' && kind === 'starting')) return true;
+  if (note) focus.held.push({ ...note, at: new Date().toISOString() });
+  return false;
+}
+// When a session ends, say what was held back.
+function releaseHeld() {
+  const held = focus.held.splice(0);
+  if (!held.length) return;
+  toast(held.slice(0, 4).map(h => h.title).join(', ') + (held.length > 4 ? ` and ${held.length - 4} more.` : '.'), { kind: 'info', title: `While you focused: ${held.length} held` });
+}
 let endsAt = 0;
 let lastTick = 0;
 let countdown = null;
@@ -71,6 +96,7 @@ export function stopFocus() {
   if (focus.running) tick();
   clearInterval(countdown);
   logSession();
+  releaseHeld();
   stopAlarm();
   closeMini();
   Object.assign(focus, { task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false });
@@ -87,6 +113,7 @@ function timeUp() {
   chime();
   notifyEnd();
   flashTitle();
+  releaseHeld();
 }
 
 // A soft three-note chime, played twice, made in the browser (no sound file).

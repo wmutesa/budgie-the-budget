@@ -267,6 +267,12 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
   // The tab shows the countdown, its icon becomes a ring, and pause and +5 work.
   assert.match(await page.title(), /^⏱ 2[45]:\d\d · .*Essay 2/, `the tab title counts down (${await page.title()})`);
+  // In focus: a pill in the top bar shows the time left; you choose what gets through, and the bell goes quiet.
+  assert.match(await page.textContent('[data-test="nb-focus"]'), /2[45]:\d\d/, 'the top bar shows the focus countdown');
+  assert.equal(await page.isChecked('[data-test="allow-starting"]'), true, 'by default only things starting now get through');
+  await page.check('[data-test="allow-none"]');
+  assert.equal(await page.isChecked('[data-test="allow-none"]'), true, 'you can hold everything while you focus');
+  assert.equal(await page.$('[data-test="bell-count"]'), null, 'the bell count stays quiet during focus');
   assert.match(await page.getAttribute('link[rel="icon"]', 'href'), /^data:image\/png/, 'the tab icon shows the time left');
   await page.click('[data-test="timer-toggle"]');
   assert.match(await page.title(), /^⏸ /, 'a paused session shows in the title');

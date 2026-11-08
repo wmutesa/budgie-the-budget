@@ -21,6 +21,7 @@ import { refreshFeeds } from './lib/calendar';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
+import { focus, mmss } from './lib/focus';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
@@ -105,6 +106,8 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </nav>
         <GlobalSearch />
         <div class="nb-actions">
+          <!-- In focus: a pill with the time left, like a status icon in a menu bar -->
+          <button v-if="focus.task" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Focusing on ${focus.task.title}`" :aria-label="focus.ended ? 'Focus session ended: open Focus' : `In focus, ${mmss(focus.left)} left: open Focus`" data-test="nb-focus" @click="go('Focus')"><Icon name="target" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
           <CaptureButton v-if="account.status === 'signed-in'" />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
