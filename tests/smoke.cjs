@@ -359,10 +359,11 @@ async function run(url) {
   await voice.keyboard.type(' soon');
   await voice.waitForTimeout(500);
   { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /books soon this year$|books this year soon$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
-  assert.ok(await voice.locator('[data-test="capture-accent"] option').count() >= 15, 'you can pick your accent');
-  assert.ok(await voice.$('[data-test="capture-tidy"]'), 'dictation can be tidied up or rewritten');
+  assert.equal(await voice.$('[data-test="capture-accent"]'), null, 'no accent to pick: listening uses the browser language');
+  assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
   if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
-  await voice.click('[data-test="capture-sort"]');
+  // Stop: Budgie breaks what was said into separate things and places each one.
+  await voice.click('[data-test="capture-mic"]');
   await voice.waitForSelector('[data-test="capture-review"]');
   assert.match(await voice.textContent('.cr-count'), /of 3/, 'three things are heard and sorted');
   await voice.click('[data-test="review-keep-all"]');

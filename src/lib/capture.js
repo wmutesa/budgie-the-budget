@@ -4,7 +4,9 @@
 // switch or drop each before it counts.
 import { reactive } from 'vue';
 import { store } from './store';
-import { routeAll, routeSpoken, sendAll, undoSend, DESTS } from './router';
+import { routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
+import { ai, aiRewriteDictation } from './ai';
+import { tidyDictation } from './tidy';
 import { today, addDays, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
 import { go, nav } from './nav';
@@ -40,10 +42,20 @@ function settle(made) {
 }
 
 // Sort what was said or typed and put it in place, pending review.
+// What was said, broken down into separate things, one per line: the
+// on-device AI reads and splits it when it is ready, otherwise the rules do
+// (filler out, sentence and "then / also / and I need to" breaks, planner times).
+export async function breakDown(text) {
+  let lines = null;
+  if (ai.enabled && ai.ready) lines = await aiRewriteDictation(text).catch(() => null);
+  return lines || tidyDictation(splitSpoken(text).join('\n'));
+}
+
 export async function sortAndPlace(text = capture.text, { spoken = false } = {}) {
-  const rows = (spoken ? routeSpoken(text) : routeAll(text)).filter(r => r.text);
-  if (!rows.length) return 0;
+  if (!text.trim()) return 0;
   capture.sorting = true;
+  const rows = routeAll(spoken ? await breakDown(text) : text).filter(r => r.text);
+  if (!rows.length) { capture.sorting = false; return 0; }
   const out = await sendAll(rows);
   settle(out.made);
   markPending(out.made);

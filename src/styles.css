@@ -3067,13 +3067,9 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .cal-item.box span { color: color-mix(in srgb, var(--k) 50%, #52525b); }
 .cal-item.chip { border-radius: 5px; }
 .cap-fab { top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; }
-/* Add sheet: accent picker and Tidy up */
+/* Add sheet footer */
 .cap-foot { flex-wrap: wrap; }
-.cap-accent select { height: 38px; max-width: 180px; padding: 0 28px 0 12px; border: 1px solid #e4e4e7; border-radius: 999px; background: #fff; font: 500 13px var(--sans); color: #18181b; cursor: pointer; }
-.cap-tidy { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 14px; border: 1px solid #ddd6fe; border-radius: 999px; background: #f5f3ff; color: #5b21b6; font: 600 13px var(--sans); cursor: pointer; }
-.cap-tidy:hover:not(:disabled) { background: #ede9fe; }
-.cap-tidy:disabled { opacity: .5; cursor: default; }
-@media (max-width: 640px) { .cap-keys { display: none; } .cap-accent select { max-width: 130px; } }
+@media (max-width: 640px) { .cap-keys { display: none; } }
 
 /* Calendar cards, after the reference: a soft tinted card with a thin border,
    rounded corners, the time on a small line above the title, and a faint
@@ -3126,3 +3122,13 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
   .fcs-side .pln-card { position: sticky !important; top: var(--nav-h, 57px); max-height: calc(100dvh - var(--nav-h, 57px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; align-content: start; }
   .fcs-side .pln-card-head { position: sticky; top: -20px; z-index: 1; margin: -20px -22px 0; padding: 20px 22px 10px; background: #fcfcfd; }
 }
+/* Suggested for you: lighter left borders */
+.pln-ideas li { border-left-color: #93c5fd !important; }
+.pln-ideas li.warn { border-left-color: #fda4af !important; }
+.pln-ideas li.good { border-left-color: #86efac !important; }
+.pln-ideas li.ai { border-left-color: #c4b5fd !important; }
+/* Overview: a smaller summary and smaller actions */
+.lede { font-size: clamp(18px, 1.7vw, 24px) !important; line-height: 1.38 !important; max-width: 46ch !important; }
+.brief-acts { gap: 10px !important; margin-top: 18px !important; }
+.brief-acts .btn { height: 34px !important; padding: 0 13px !important; font-size: 13px !important; gap: 7px !important; }
+.brief-acts .btn .ico { width: 14px; height: 14px; }

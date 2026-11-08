@@ -1,29 +1,26 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { capture, sortAndPlace } from '../lib/capture';
-import { routeAll, DESTS } from '../lib/router';
-import { useDictation, canDictate, ACCENTS, defaultAccent } from '../lib/dictation';
-import { store } from '../lib/store';
-import { ai, aiRewriteDictation } from '../lib/ai';
+import { routeAll, splitSpoken, DESTS } from '../lib/router';
+import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
-import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
-// The one way to add anything: tap, talk (or type), and Budgie sorts it.
+// The one way to add anything. Tap Add and talk: the words appear as you speak
+// and you can edit them while it listens. Tap Stop and Budgie breaks what you
+// said into separate things (the on-device AI when it is ready, rules
+// otherwise) and puts each one in place. Typed text is added line by line.
 let base = '';
 const micNote = ref('');
-let spoken = false;
+const spoken = ref(false);
 // New words go after what is there, with a space only when both sides have text.
-const join = (a, b) => { const t = (b || "").trimStart(); return !t ? a : !a || /\s$/.test(a) ? `${a}${t}` : `${a} ${t}`; };
-// The accent to listen for, remembered per account.
-const accent = computed({ get: () => store.planner.accent || defaultAccent(), set: v => { store.planner.accent = v; } });
+const join = (a, b) => { const t = (b || '').trimStart(); return !t ? a : !a || /\s$/.test(a) ? `${a}${t}` : `${a} ${t}`; };
 const dict = useDictation({
   continuous: true,
-  lang: () => accent.value,
   // A blocked microphone is a quiet note in the sheet, not an alarm: typing works too.
   onError: m => { micNote.value = m; },
   onCancel: () => { capture.text = base; },
-  onText: t => { spoken = true; capture.text = join(base, t); },
+  onText: t => { spoken.value = true; capture.text = join(base, t); },
   onFinal: t => { capture.text = join(base, t).trim(); },
 });
 const listening = computed(() => dict.listening.value);
@@ -34,38 +31,27 @@ function onEdit() {
   base = capture.text;
   dict.commit();
 }
-// A new accent applies straight away when listening.
-watch(accent, () => { if (listening.value) { dict.stop(); setTimeout(talk, 250); } });
-// Tidy up: the on-device AI rewrites it when ready, otherwise simple rules do.
-const tidying = ref(false);
-async function tidy() {
-  if (!capture.text.trim() || tidying.value) return;
-  if (listening.value) { dict.toggle(); await new Promise(r => setTimeout(r, 200)); }
-  tidying.value = true;
-  const was = capture.text;
-  let next = null;
-  if (ai.enabled && ai.ready) next = await aiRewriteDictation(was).catch(() => null);
-  const byAI = !!next;
-  next = next || tidyDictation(was);
-  tidying.value = false;
-  if (!next || next === was) { toast('It already reads well.', { kind: 'info' }); return; }
-  capture.text = next;
-  toast(byAI ? 'Rewritten by the on-device AI.' : 'Tidied up.', { kind: 'success', action: { label: 'Undo', run: () => { capture.text = was; } } });
-}
-const talk = () => { if (!listening.value) base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text; dict.toggle(); };
+const listen = () => { base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text; dict.start(); };
 
 // Open: start listening straight away when the browser can.
 function openSheet({ voice = canDictate } = {}) {
-  capture.open = true; spoken = false;
-  nextTick(() => { if (voice && !listening.value) talk(); else box.value?.focus(); });
+  capture.open = true; spoken.value = false; micNote.value = '';
+  nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
 }
-function close() { if (listening.value) dict.toggle(); capture.open = false; }
-const rows = computed(() => routeAll(capture.text));
+function close() { if (listening.value) dict.stop(); capture.open = false; }
+// How it will be split, shown as you go.
+const rows = computed(() => routeAll(spoken.value ? tidyDictation(splitSpoken(capture.text).join('\n')) : capture.text));
 async function sortIt() {
-  if (listening.value) { dict.toggle(); await new Promise(r => setTimeout(r, 200)); }
-  if (!capture.text.trim()) return;
-  await sortAndPlace(capture.text, { spoken: spoken && !capture.text.includes('\n') });
+  if (listening.value) {
+    dict.stop();
+    // Wait for the last words before breaking it down.
+    for (let i = 0; i < 30 && listening.value; i++) await new Promise(r => setTimeout(r, 50));
+  }
+  if (!capture.text.trim() || capture.sorting) return;
+  await sortAndPlace(capture.text, { spoken: spoken.value });
 }
+// The mic: Speak starts listening; Stop ends it and sorts what was said.
+const micTap = () => (listening.value ? sortIt() : (spoken.value = true, listen()));
 const onKey = e => {
   if (e.key === 'Escape' && capture.open) close();
   // "N" anywhere (not while typing) opens it.
@@ -73,7 +59,7 @@ const onKey = e => {
 };
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => window.removeEventListener('keydown', onKey));
-watch(() => capture.open, v => { if (!v && listening.value) dict.toggle(); });
+watch(() => capture.open, v => { if (!v && listening.value) dict.stop(); });
 defineExpose({ openSheet });
 const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call mom Sunday afternoon', 'I want to run a 10K by March'];
 </script>
@@ -89,8 +75,8 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
       <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
         <header class="cap-head">
           <div>
-            <h2>{{ listening ? 'Listening…' : 'Add anything' }}</h2>
-            <p class="muted small">Say or type several things, and edit as you go. Budgie sorts them into tasks, routines and goals, then shows you each one to keep or change.</p>
+            <h2>{{ capture.sorting ? 'Breaking it down…' : listening ? 'Listening…' : 'Add anything' }}</h2>
+            <p class="muted small">{{ listening ? 'Say everything on your mind, and fix any word as you go. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
           <button type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
         </header>
@@ -110,17 +96,12 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
         </div>
 
         <footer class="cap-foot">
-          <button v-if="canDictate" type="button" class="cap-mic" :class="{ on: listening }" :aria-pressed="listening" data-test="capture-mic" @click="talk">
+          <button v-if="canDictate" type="button" class="cap-mic" :class="{ on: listening }" :aria-pressed="listening" :disabled="capture.sorting" data-test="capture-mic" @click="micTap">
             <Icon :name="listening ? 'pause' : 'capture'" :size="16" />{{ listening ? 'Stop' : 'Speak' }}
           </button>
-          <label v-if="canDictate" class="cap-accent" title="Pick your accent so Budgie hears you better">
-            <span class="sr-only">Accent</span>
-            <select v-model="accent" data-test="capture-accent" aria-label="Accent"><option v-for="[code, name] in ACCENTS" :key="code" :value="code">{{ name }}</option></select>
-          </label>
-          <button type="button" class="cap-tidy" :disabled="!capture.text.trim() || tidying" :title="ai.enabled && ai.ready ? 'Rewrite with the on-device AI' : 'Tidy up: one thing per line, no filler'" data-test="capture-tidy" @click="tidy"><Icon :name="tidying ? 'refresh' : 'sparkle'" :size="14" />{{ tidying ? 'Rewriting…' : 'Tidy up' }}</button>
-          <span class="muted small cap-keys">Ctrl or ⌘ + Enter</span>
-          <button type="button" class="btn primary" :disabled="!capture.text.trim() || capture.sorting" data-test="capture-sort" @click="sortIt">
-            <Icon :name="capture.sorting ? 'refresh' : 'sparkle'" :size="15" />{{ capture.sorting ? 'Sorting…' : rows.length > 1 ? `Sort ${rows.length} things` : 'Sort it' }}
+          <span class="muted small cap-keys">{{ listening ? 'Stop sorts it for you' : 'Ctrl or ⌘ + Enter' }}</span>
+          <button v-if="!listening" type="button" class="btn primary" :disabled="!capture.text.trim() || capture.sorting" data-test="capture-sort" @click="sortIt">
+            <Icon :name="capture.sorting ? 'refresh' : 'plus'" :size="15" />{{ capture.sorting ? 'Breaking it down…' : rows.length > 1 ? `Add ${rows.length} things` : 'Add' }}
           </button>
         </footer>
       </section>

@@ -227,6 +227,13 @@ await check('tidying dictation: no filler, one thing per line, planner times', (
 await check('tidying keeps lines that are already clean', () => {
   assert.equal(tidyDictation('Essay due Fri 5pm #English\nGym MWF 6pm'), 'Essay due Fri 5pm #English\nGym MWF 6pm');
 });
+const { routeAll } = await import('../../src/lib/router.js');
+await check('stopping dictation breaks a run-on ramble into separate things', () => {
+  const said = 'um i need to finish the lab report by friday and call mom on sunday then gym monday wednesday at 6 pm also i want to run a 10k by march';
+  const rows = routeAll(tidyDictation(splitSpoken(said).join('\n')));
+  assert.equal(rows.length, 4, rows.map(r => r.text).join(' | '));
+  assert.deepEqual(rows.map(r => r.dest), ['task', 'task', 'routine', 'goal']);
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);
