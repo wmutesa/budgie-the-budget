@@ -100,6 +100,7 @@ const SPLIT_SCHEMA = {
           repeat: { type: 'string', enum: ['none', 'daily', 'weekdays', 'weekly', 'monthly'] },
           days: { type: 'array', items: { type: 'string', enum: DAYS } },
           course: { type: 'string', description: 'course, subject or project, or empty' },
+          priority: { type: 'string', enum: ['low', 'normal', 'high'] },
         },
         required: ['title', 'kind'],
       },
@@ -107,6 +108,23 @@ const SPLIT_SCHEMA = {
   },
   required: ['items'],
 };
+// Extra rules and worked examples, written against the real date so every
+// relative date in them is right (a model copies the pattern of its examples).
+const addIso = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const nextDow = (iso, dow) => { const d = new Date(`${iso}T12:00:00Z`); const k = ((dow - d.getUTCDay() + 7) % 7) || 7; return addIso(iso, k); };
+function guide(today) {
+  const fri = nextDow(today, 5), tue = nextDow(today, 2), tom = addIso(today, 1);
+  return `Priority: "high" when they say it is urgent, important, a must, asap, critical, "super" or "really" important, or "don't forget"; "low" for "no rush", "not important", "whenever", "someday", "if I have time"; otherwise "normal". Never put priority words in the title.
+Length: minutes if a length was said ("for two hours" is 120). If they say it is quick ("won't take long", "real quick", "five minutes") use 15. Otherwise 0.
+Titles start with the action when one was said ("Call Aunt Beate back", "Take shirts to the dry cleaner", "Email Professor Kim about the extension") and drop "I have to", "I need to", "remind me to", "don't forget to".
+Examples (today is ${today}):
+Said: "I have to finish lab report 3 for chem by Friday at 5, super important, and call aunt Beate back tomorrow, that won't take long"
+Items: [{"title":"Lab Report 3","kind":"assignment","date":"${fri}","time":"17:00","minutes":0,"repeat":"none","days":[],"course":"Chemistry","priority":"high"},{"title":"Call Aunt Beate back","kind":"task","date":"${tom}","time":"","minutes":15,"repeat":"none","days":[],"course":"","priority":"normal"}]
+Said: "psych midterm next Tuesday at 10, gym Monday Wednesday Friday at 6 pm for an hour, take my shirts to the dry cleaner whenever"
+Items: [{"title":"Psychology midterm","kind":"exam","date":"${tue}","time":"10:00","minutes":0,"repeat":"none","days":[],"course":"Psychology","priority":"normal"},{"title":"Gym","kind":"routine","date":"","time":"18:00","minutes":60,"repeat":"weekly","days":["mon","wed","fri"],"course":"","priority":"normal"},{"title":"Take shirts to the dry cleaner","kind":"task","date":"","time":"","minutes":0,"repeat":"none","days":[],"course":"","priority":"low"}]
+`;
+}
+const SYSTEM = { parts: [{ text: 'You are a precise assistant for a student planner. You extract tasks, deadlines and plans from what someone said and reply only with correct JSON that matches the schema.' }] };
 export async function geminiSplit(key, { text: said, today, weekday, timeZone, categories = [], hints = [] }) {
   const prompt = `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
 Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
@@ -114,7 +132,7 @@ People say many things at once (sometimes 50 or more) without pausing. List EVER
 For each item: the title is the item's FULL name exactly as said, keeping numbers, chapter or section numbers and subtitles ("Lab Report 3: Titration Analysis", "Problem Set 7", "Essay on the French Revolution", "Read chapter 7 of the biology textbook"), but without the date, time, "due", "I have" or filler; kind (assignment for homework, essays, reports and problem sets; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday", "next Tuesday" (the next such day after today), "the 18th" (the next 18th), "Friday the 21st" (the 21st: a day number wins over a weekday), "11/20" (month/day), "in two weeks" or "end of the month" (its last day); empty if none; time in 24-hour HH:MM ("midnight" or "end of day" is 23:59, "noon" is 12:00), empty if none; minutes if a length was said; repeat and days for things that recur; course: the category, taken from a spoken "hashtag X" or "#X", a course code ("CHEM 110", "CS 61A"), "for <subject>", or the subject in the name ("psych midterm" is Psychology).
 ${categories.length ? `The person already uses these categories; when an item belongs to one, use its exact name: ${categories.join(', ')}.
 ` : ''}Fix words speech recognition clearly misheard. Do not add anything that was not said.
-${hints.length ? `
+${guide(today)}${hints.length ? `
 A simple splitter found these parts; use them only as a checklist so nothing is missed (the note itself is what counts):
 ${hints.map(h => `- ${h}`).join('\n')}
 ` : ''}
@@ -124,6 +142,7 @@ ${said}`;
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
+      systemInstruction: SYSTEM,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: SPLIT_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 16000 },
     }),
@@ -148,6 +167,7 @@ function cleanItems(list) {
     repeat: ['daily', 'weekdays', 'weekly', 'monthly'].includes(x.repeat) ? x.repeat : '',
     days: Array.isArray(x.days) ? [...new Set(x.days.filter(d => DAYS.includes(d)))] : [],
     course: text(x.course, 40),
+    priority: ['low', 'high'].includes(x.priority) ? x.priority : '',
   })).filter(x => x.title);
 }
 
@@ -163,11 +183,12 @@ export async function geminiVoice(key, { audio, mime, typed = '', today, weekday
 Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
 People say many things at once (sometimes 50 or more) without pausing. List EVERY separate item, in the order said: assignments, exams, classes, tasks, errands, events, routines, habits and goals. Never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two items. A course said once for several items applies to each. Carry a shared verb ("call mom Sunday and dad Saturday" is two calls).
 For each item: the title is the item's FULL name exactly as said, keeping numbers, chapter or section numbers and subtitles ("Lab Report 3: Titration Analysis", "Problem Set 7"), but without the date, time, "due", "I have" or filler; kind (assignment for homework, essays, reports, problem sets, projects and presentations; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday", "next Tuesday", "the 18th", "Friday the 21st" (the day number wins), "11/20", "in two weeks" or "end of the month"; empty if none; time in 24-hour HH:MM ("midnight" or "end of day" is 23:59, "noon" is 12:00), empty if none; minutes if a length was said; repeat and days for things that recur; course: from a spoken "hashtag X", a course code, "for <subject>", or the subject in the name.
-${categories.length ? `The person already uses these categories; when an item belongs to one, use its exact name: ${categories.join(', ')}.\n` : ''}${typed ? `While speaking, the person saw this live text and may have corrected it; prefer its spellings of names and words:\n${typed}\n` : ''}Do not add anything that was not said.`;
+${categories.length ? `The person already uses these categories; when an item belongs to one, use its exact name: ${categories.join(', ')}.\n` : ''}${guide(today)}${typed ? `While speaking, the person saw this live text and may have corrected it; prefer its spellings of names and words:\n${typed}\n` : ''}Do not add anything that was not said.`;
   const res = await fetch(`${API}/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
+      systemInstruction: SYSTEM,
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: String(mime).split(';')[0], data: audio } }, { text: prompt }] }],
       generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: VOICE_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 20000 },
     }),

@@ -442,6 +442,8 @@ async function run(url) {
   assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
   assert.match(await voice.textContent('[data-test="capture"]'), /Recording/, 'the Add button shows it is recording');
   assert.ok(await voice.$('[data-test="capture"] .cap-rec'), 'with a recording dot, not a pause sign');
+  await voice.waitForFunction(() => /^0:0[1-9]/.test(document.querySelector('[data-test="capture-live"] .cap-time')?.textContent || ''));
+  assert.equal(await voice.$('[data-test="capture-live"] .cap-stop'), null, 'the timer itself stops it: no separate stop icon');
   // Edit while listening: the typed words stay; speech no longer writes over them.
   await voice.focus('[data-test="capture-text"]');
   await voice.keyboard.press('End');
@@ -450,7 +452,7 @@ async function run(url) {
   { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /books soon this year$|books this year soon$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
   assert.equal(await voice.$('[data-test="capture-accent"]'), null, 'no accent to pick: listening uses the browser language');
   assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
-  if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
+  if (process.env.SHOTS) { await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` }); await voice.locator('header').first().screenshot({ path: `${process.env.SHOTS}/recording-bar.png` }); }
   // Stop: Budgie breaks what was said into separate things and places each one.
   await voice.click('[data-test="capture-mic"]');
   await voice.waitForSelector('[data-test="capture-review"]');

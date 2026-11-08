@@ -15,8 +15,10 @@ export function itemLine(x) {
   // Several days read as one repeat when listed without commas ("Mon Wed Fri"); one day needs "every Monday".
   else if (x.repeat === 'weekly' || x.days?.length) when = x.days?.length > 1 ? ` ${x.days.map(d => DAYNAME[d]).join(' ')}` : x.days?.length ? ` every ${FULL[x.days[0]]}` : ' every week';
   else if (x.date) when = `${['assignment', 'exam'].includes(x.kind) ? ' due' : ' on'} ${md(x.date)}`;
-  return `${x.title}${when}${x.time ? ` at ${ampm(x.time)}` : ''}${x.minutes ? ` ${x.minutes} min` : ''}${course}`;
+  return `${x.title}${when}${x.time ? ` at ${ampm(x.time)}` : ''}${x.minutes ? ` ${x.minutes} min` : ''}${pri(x)}${course}`;
 }
+// Said priority, in words Budgie's reader knows.
+const pri = x => (x.priority === 'high' ? ' high priority' : x.priority === 'low' ? ' low priority' : '');
 
 // Words of 3+ letters, or numbers, from a title must appear in what was said: no made-up items.
 export const saidIn = text => { const w = new Set(String(text).toLowerCase().match(/[a-z]{3,}|\d+/g) || []); return title => (String(title).toLowerCase().match(/[a-z]{3,}|\d+/g) || []).some(x => w.has(x)); };
@@ -24,7 +26,7 @@ export const localLine = x => {
   const course = x.course ? ` #${x.course.replace(/\s+/g, '-')}` : '';
   if (x.kind === 'goal') return `I want to ${x.title.replace(/^(?:to\s+)/i, '').replace(/^\w/, c => c.toLowerCase())}${x.when ? ` ${x.when}` : ''}${course}`;
   const due = x.when && ['assignment', 'exam'].includes(x.kind) && !/^(?:due|by|on|every|each|this|next|in)\b/i.test(x.when) ? ' due' : '';
-  return `${x.title}${x.when ? `${due} ${x.when}` : ''}${x.time ? ` at ${x.time.replace(/^at\s+/i, '')}` : ''}${course}`;
+  return `${x.title}${x.when ? `${due} ${x.when}` : ''}${x.time ? ` at ${x.time.replace(/^at\s+/i, '')}` : ''}${pri(x)}${course}`;
 };
 
 // Apply the kind an AI decided: an exam stays an exam, a goal becomes a goal.

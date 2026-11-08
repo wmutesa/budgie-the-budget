@@ -3279,3 +3279,18 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .sch-over-head b { flex: 1; min-width: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sch-over .tk-edit { padding: 12px 16px 16px; border: 0 !important; margin: 0 !important; background: none !important; }
 @media (max-width: 640px) { .sch-over { left: 12px !important; right: 12px; width: auto !important; } }
+
+/* Recording: the top bar button becomes a white pill with the time you have
+   been talking. Tapping it stops and sorts what was said. */
+.cap-fab.live { width: auto !important; min-width: 0; height: 30px !important; padding: 0 12px 0 10px !important; border-radius: 999px !important; display: inline-flex !important; align-items: center; background: #fff !important; border: 1px solid #18181b !important; box-shadow: none !important; color: #18181b !important; }
+.cap-fab.live:hover { background: #f4f4f5 !important; }
+.cap-live { display: inline-flex; align-items: center; gap: 7px; }
+.cap-live .cap-rec { width: 7px; height: 7px; background: #18181b; border-radius: 50% !important; animation: cap-blink 1.2s ease-in-out infinite; box-shadow: none; }
+@keyframes cap-blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.cap-time { font: 600 12px/1 var(--sans); font-variant-numeric: tabular-nums; min-width: 28px; color: #18181b; }
+.cap-bars { display: inline-flex; align-items: center; gap: 2px; height: 11px; }
+.cap-bars i { display: block; width: 2px; height: 100%; border-radius: 2px !important; background: #18181b; animation: cap-bar 1s ease-in-out infinite; }
+.cap-bars i:nth-child(2) { animation-delay: -.25s; } .cap-bars i:nth-child(3) { animation-delay: -.5s; } .cap-bars i:nth-child(4) { animation-delay: -.75s; }
+@keyframes cap-bar { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+@media (max-width: 640px) { .cap-bars { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cap-bars i, .cap-live .cap-rec { animation: none; } .cap-bars i { transform: scaleY(.7); } }

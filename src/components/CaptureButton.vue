@@ -33,6 +33,12 @@ const canSpeak = computed(() => canDictate || geminiAudio.value);
 const recOnly = ref(false);
 const listening = computed(() => dict.listening.value || recOnly.value);
 const box = ref(null);
+// How long you have been talking, shown on the top bar button.
+const secs = ref(0);
+let clockId = 0;
+watch(listening, on => { clearInterval(clockId); secs.value = 0; if (on) clockId = setInterval(() => { secs.value++; }, 1000); });
+onUnmounted(() => clearInterval(clockId));
+const elapsed = computed(() => `${Math.floor(secs.value / 60)}:${String(secs.value % 60).padStart(2, '0')}`);
 // Edit while you talk: what you typed stays, and new words land after it.
 function onEdit() {
   if (!listening.value) return;
@@ -85,9 +91,12 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
 </script>
 
 <template>
-  <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: tap to stop and sort' : 'Add anything (N)'" :title="listening ? 'Recording: tap to stop' : 'Add anything (N)'" data-test="capture" @click="capture.open ? sortIt() : openSheet()">
-    <span class="cap-glyph"><i v-if="listening" class="cap-rec" aria-hidden="true" /><Icon v-else name="capture" :size="15" /></span>
-    <span class="cap-word">{{ listening ? 'Recording: tap to stop' : 'Add' }}</span>
+  <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: tap to stop and sort' : 'Add anything (N)'" :title="listening ? 'Tap to stop recording' : 'Add anything (N)'" data-test="capture" @click="capture.open ? sortIt() : openSheet()">
+    <span v-if="listening" class="cap-live" aria-hidden="true" data-test="capture-live">
+      <i class="cap-rec" /><span class="cap-time">{{ elapsed }}</span><span class="cap-bars"><i v-for="n in 4" :key="n" /></span>
+    </span>
+    <span v-else class="cap-glyph"><Icon name="capture" :size="15" /></span>
+    <span class="cap-word">{{ listening ? `Recording ${elapsed}: tap to stop` : 'Add' }}</span>
   </button>
 
   <Teleport to="body">

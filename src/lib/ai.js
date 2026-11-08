@@ -474,11 +474,15 @@ For EVERY separate thing said, in order, give:
 - "when": the date or repeat words exactly as said ("Friday", "the 18th", "Friday the 21st", "November 14th", "11/20", "tomorrow", "next week", "every Monday and Wednesday", "by March"), or "".
 - "time": the time exactly as said ("5 pm", "11:59 pm", "noon", "at 6"), or "".
 - "course": the subject or course when one is said or clear ("Chemistry", "CHEM 110", "Biology"), or "". A course said once ("for chemistry I have X and Y") applies to each of its items.
+- "priority": "high" if they say it is urgent, important, a must or "super important"; "low" for "no rush", "whenever" or "not important"; otherwise "normal". Keep these words out of the title.
 Never merge two things and never drop one. Do not add anything that was not said.
-Reply with JSON only: {"items": [{"title": string, "kind": string, "when": string, "time": string, "course": string}]}
+Reply with JSON only: {"items": [{"title": string, "kind": string, "when": string, "time": string, "course": string, "priority": string}]}
 
-Example. Said: "for chemistry I have lab report 3 due friday at 5 pm and a quiz on the 18th, also call mom tomorrow and gym every monday and wednesday"
-{"items": [{"title": "Lab Report 3", "kind": "assignment", "when": "Friday", "time": "5 pm", "course": "Chemistry"}, {"title": "Quiz", "kind": "exam", "when": "the 18th", "time": "", "course": "Chemistry"}, {"title": "Call mom", "kind": "task", "when": "tomorrow", "time": "", "course": ""}, {"title": "Gym", "kind": "routine", "when": "every Monday and Wednesday", "time": "", "course": ""}]}`;
+Example 1. Said: "for chemistry I have lab report 3 due friday at 5 pm super important and a quiz on the 18th, also call mom tomorrow and gym every monday and wednesday"
+{"items": [{"title": "Lab Report 3", "kind": "assignment", "when": "Friday", "time": "5 pm", "course": "Chemistry", "priority": "high"}, {"title": "Quiz", "kind": "exam", "when": "the 18th", "time": "", "course": "Chemistry", "priority": "normal"}, {"title": "Call mom", "kind": "task", "when": "tomorrow", "time": "", "course": "", "priority": "normal"}, {"title": "Gym", "kind": "routine", "when": "every Monday and Wednesday", "time": "", "course": "", "priority": "normal"}]}
+
+Example 2. Said: "I need to take my shirts to the dry cleaner whenever and remind me to email professor kim about the extension today"
+{"items": [{"title": "Take shirts to the dry cleaner", "kind": "task", "when": "", "time": "", "course": "", "priority": "low"}, {"title": "Email Professor Kim about the extension", "kind": "task", "when": "today", "time": "", "course": "", "priority": "normal"}]}`;
 export async function aiExtractItems(chunks, categories = []) {
   const out = [];
   const cats = categories.length ? `\nThe person's categories (use the exact name when one fits): ${categories.slice(0, 40).join(', ')}.` : '';
@@ -490,7 +494,7 @@ export async function aiExtractItems(chunks, categories = []) {
     const list = firstJSON(reply)?.items;
     if (!Array.isArray(list)) return null;
     const clean = (v, n) => String(v ?? '').replace(/[<>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
-    out.push(...list.map(x => ({ title: clean(x?.title, 120), kind: ITEM_KINDS.includes(x?.kind) ? x.kind : 'task', when: clean(x?.when, 60), time: clean(x?.time, 20), course: clean(x?.course, 40) })).filter(x => x.title));
+    out.push(...list.map(x => ({ title: clean(x?.title, 120), kind: ITEM_KINDS.includes(x?.kind) ? x.kind : 'task', when: clean(x?.when, 60), time: clean(x?.time, 20), course: clean(x?.course, 40), priority: ['low', 'high'].includes(x?.priority) ? x.priority : '' })).filter(x => x.title));
   }
   return out.length ? out.slice(0, 200) : null;
 }

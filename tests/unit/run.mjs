@@ -292,8 +292,8 @@ await check('the Gemini answer is checked before it is used', async () => {
   try {
     const items = await geminiSplit('k'.repeat(30), { text: 'essay due friday at 5 and gym mondays', today: '2026-11-08', weekday: 'Sunday', timeZone: 'UTC' });
     assert.equal(items.length, 2, 'items without a title are dropped');
-    assert.deepEqual(items[0], { title: 'Essay', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: '', days: [], course: 'English' });
-    assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' }, 'bad kinds, dates, times and days are cleaned');
+    assert.deepEqual(items[0], { title: 'Essay', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: '', days: [], course: 'English', priority: '' });
+    assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '' }, 'bad kinds, dates, times and days are cleaned');
   } finally { globalThis.fetch = realFetch; }
 });
 await check('assignments keep their full names, their dates and the right category', () => {
@@ -392,5 +392,13 @@ const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);
   assert.ok(ACCENTS.some(([x]) => x === defaultAccent()));
+});
+await check('said priority reaches the task, and stays out of the title', () => {
+  const hi = p(itemLine({ title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 0, course: 'Chemistry', priority: 'high' }));
+  assert.equal(hi.priority, 'high'); assert.equal(hi.title, 'Lab Report 3'); assert.equal(hi.project, 'Chemistry');
+  const lo = p(localLine({ title: 'Take shirts to the dry cleaner', kind: 'task', when: '', time: '', course: '', priority: 'low' }));
+  assert.equal(lo.priority, 'low'); assert.equal(lo.title, 'Take shirts to the dry cleaner');
+  const quick = p(itemLine({ title: 'Call Aunt Beate back', kind: 'task', date: '2026-11-08', time: '', minutes: 15, course: '' }));
+  assert.equal(quick.mins, 15); assert.equal(quick.title, 'Call Aunt Beate back');
 });
 console.log(`\n${n} checks passed`);
