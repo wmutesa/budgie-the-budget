@@ -479,7 +479,7 @@ async function run(url) {
   // The AI helper falls back without breaking when models cannot download.
   await guide.click('[data-test="acct-tab-digests"]');
   await guide.waitForSelector('[data-test="ai-panel"]');
-  assert.match(await guide.textContent('[data-test="ai-panel"]'), /Qwen 2\.5[\s\S]*Llama 3\.2/, 'both browser models are listed');
+  assert.match(await guide.textContent('[data-test="ai-panel"]'), /Qwen 2\.5[\s\S]*Qwen 2\.5 \(1\.5B\)/, 'both browser models are listed');
   await guide.waitForFunction(() => /Not available|Downloading|Waiting|cannot run|could not/.test(document.querySelector('[data-test="ai-panel"]').textContent), null, { timeout: 30000 });
   await guideCtx.close();
 

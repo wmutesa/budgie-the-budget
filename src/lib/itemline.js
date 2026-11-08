@@ -6,7 +6,7 @@ const FULL = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday',
 const md = iso => { const [, m, d] = iso.split('-').map(Number); return `${MON[m - 1]} ${d}`; };
 const ampm = hm => { let [h, m] = hm.split(':').map(Number); const pm = h >= 12; h = h % 12 || 12; return `${h}${m ? `:${String(m).padStart(2, '0')}` : ''}${pm ? 'pm' : 'am'}`; };
 export function itemLine(x) {
-  const course = x.course ? ` #${x.course.replace(/[^\w-]+/g, '')}` : '';
+  const course = x.course ? ` #${x.course.replace(/\s+/g, '-').replace(/[^\w-]+/g, '')}` : '';
   if (x.kind === 'goal') return `I want to ${x.title.replace(/^(?:to\s+)/i, '').replace(/^\w/, c => c.toLowerCase())}${x.date ? ` by ${md(x.date)}` : ''}${course}`;
   let when = '';
   if (x.repeat === 'daily') when = ' every day';
@@ -17,3 +17,21 @@ export function itemLine(x) {
   else if (x.date) when = `${['assignment', 'exam'].includes(x.kind) ? ' due' : ' on'} ${md(x.date)}`;
   return `${x.title}${when}${x.time ? ` at ${ampm(x.time)}` : ''}${x.minutes ? ` ${x.minutes} min` : ''}${course}`;
 }
+
+// Words of 3+ letters, or numbers, from a title must appear in what was said: no made-up items.
+export const saidIn = text => { const w = new Set(String(text).toLowerCase().match(/[a-z]{3,}|\d+/g) || []); return title => (String(title).toLowerCase().match(/[a-z]{3,}|\d+/g) || []).some(x => w.has(x)); };
+export const localLine = x => {
+  const course = x.course ? ` #${x.course.replace(/\s+/g, '-')}` : '';
+  if (x.kind === 'goal') return `I want to ${x.title.replace(/^(?:to\s+)/i, '').replace(/^\w/, c => c.toLowerCase())}${x.when ? ` ${x.when}` : ''}${course}`;
+  const due = x.when && ['assignment', 'exam'].includes(x.kind) && !/^(?:due|by|on|every|each|this|next|in)\b/i.test(x.when) ? ' due' : '';
+  return `${x.title}${x.when ? `${due} ${x.when}` : ''}${x.time ? ` at ${x.time.replace(/^at\s+/i, '')}` : ''}${course}`;
+};
+
+// Apply the kind an AI decided: an exam stays an exam, a goal becomes a goal.
+export function withKind(r, kind) {
+  if (!kind) return r;
+  if (kind === 'goal') return { ...r, dest: 'goal' };
+  const task = { ...r.task, kind: kind === 'routine' && !r.task.repeat ? 'task' : kind };
+  return { ...r, task, dest: r.dest === 'goal' ? (task.repeat ? 'routine' : 'task') : r.dest };
+}
+

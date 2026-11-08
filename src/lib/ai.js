@@ -5,7 +5,8 @@
 //   - Ollama, if it is running on this computer (usually the largest model).
 //   - In the browser (WebLLM on the graphics chip), downloaded once and kept:
 //       Qwen 2.5 small: quick and good at structured answers (steps, routines).
-//       Llama 3.2 medium: better writing (suggestions), on capable devices.
+//       Qwen 2.5 1.5B: much better at turning what you said into tasks, dates
+//       and categories, and at writing; on capable devices.
 //   - Budgie's built-in rules, when no model is ready.
 // If a model fails, the next one takes over.
 import { reactive } from 'vue';
@@ -22,7 +23,7 @@ const OFF_KEY = 'budgie.ai'; // 'off' when someone turned AI off on this device
 // (often Safari).
 export const MODELS = {
   small: { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5', size: 'about 300 MB', mb: 450, good: 'quick answers' },
-  medium: { id: 'Llama-3.2-1B-Instruct-q4f16_1-MLC', id32: 'Llama-3.2-1B-Instruct-q4f32_1-MLC', name: 'Llama 3.2', size: 'about 900 MB', mb: 1300, good: 'writing' },
+  medium: { id: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC', id32: 'Qwen2.5-1.5B-Instruct-q4f32_1-MLC', name: 'Qwen 2.5 (1.5B)', size: 'about 1 GB', mb: 1700, good: 'what you say, and writing' },
   // Runs on the processor (llama.cpp in WebAssembly), so it works in any modern
   // browser, including those without WebGPU. Slower, used when the others cannot run.
   cpu: { url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
@@ -34,6 +35,7 @@ const STALL_MS = 90 * 1000;          // give up if a download makes no progress 
 const ROUTES = {
   advice: ['ollama', 'medium', 'small', 'cpu'],
   plan: ['ollama', 'medium', 'small', 'cpu'],
+  voice: ['ollama', 'medium', 'small', 'cpu'],
   digest: ['ollama', 'medium', 'small', 'cpu'],
 };
 
@@ -46,7 +48,7 @@ export const ai = reactive({
   cpu: engineState(),
   ready: false,                  // any model can answer
   label: 'Built-in rules',       // what is available right now
-  used: { advice: '', plan: '', digest: '' }, // which model last did each task
+  used: { advice: '', plan: '', digest: '', voice: '' }, // which model last did each task
   note: '',                      // e.g. waiting for a faster connection
 });
 
@@ -267,12 +269,13 @@ export function loadCpuModel() {
   return loading.cpu;
 }
 
-async function browserChat(key, messages, { temperature = 0, max_tokens = 200 } = {}) {
+async function browserChat(key, messages, { temperature = 0, max_tokens = 200, json = false } = {}) {
   if (key === 'cpu') {
     const out = await engines.cpu.createChatCompletion({ messages, temperature, max_tokens });
     return out.choices?.[0]?.message?.content || '';
   }
-  const out = await engines[key].chat.completions.create({ messages, temperature, max_tokens });
+  // JSON mode keeps a small model to valid JSON.
+  const out = await engines[key].chat.completions.create({ messages, temperature, max_tokens, ...(json ? { response_format: { type: 'json_object' } } : {}) });
   return out.choices?.[0]?.message?.content || '';
 }
 
@@ -455,4 +458,39 @@ export async function aiRewriteDictation(text, chunks = null) {
     out.push(...list.map(x => String(x || '').replace(/[<>]/g, '').trim()).filter(Boolean));
   }
   return out.length ? out.slice(0, 200).join('\n') : null;
+}
+
+// ---------- what you said, as planner items (on this device) ----------
+// A free Hugging Face model in the browser (Qwen 2.5) reads what was said and
+// lists each item: a clear title, its kind, the date and time words copied
+// exactly as said, and the course. Budgie's own reader then works out the
+// exact dates from those words, which small models get wrong. Returns
+// [{ title, kind, when, time, course }] or null.
+const ITEM_KINDS = ['task', 'assignment', 'exam', 'class', 'event', 'routine', 'goal'];
+const EXTRACT_PROMPT = `You turn what someone said to their planner into a list of separate items. They may list many things at once without pausing.
+For EVERY separate thing said, in order, give:
+- "title": a short, clear title. Tidy the wording (start tasks with a verb: "Call mom", "Book dentist appointment"), but keep names, numbers, course codes and subtitles exactly ("Lab Report 3: Titration Analysis", "Problem Set 7", "CS 61A Project 2"). No dates, times, "due", "I have" or filler in the title.
+- "kind": assignment (homework, essays, papers, reports, problem sets, projects, presentations), exam (tests, quizzes, midterms, finals), class (lectures, seminars, labs that repeat), event (meetings, appointments, plans with a time), routine (habits that repeat), goal (something to achieve by a date, like "I want to run a 10K"), or task.
+- "when": the date or repeat words exactly as said ("Friday", "the 18th", "Friday the 21st", "November 14th", "11/20", "tomorrow", "next week", "every Monday and Wednesday", "by March"), or "".
+- "time": the time exactly as said ("5 pm", "11:59 pm", "noon", "at 6"), or "".
+- "course": the subject or course when one is said or clear ("Chemistry", "CHEM 110", "Biology"), or "". A course said once ("for chemistry I have X and Y") applies to each of its items.
+Never merge two things and never drop one. Do not add anything that was not said.
+Reply with JSON only: {"items": [{"title": string, "kind": string, "when": string, "time": string, "course": string}]}
+
+Example. Said: "for chemistry I have lab report 3 due friday at 5 pm and a quiz on the 18th, also call mom tomorrow and gym every monday and wednesday"
+{"items": [{"title": "Lab Report 3", "kind": "assignment", "when": "Friday", "time": "5 pm", "course": "Chemistry"}, {"title": "Quiz", "kind": "exam", "when": "the 18th", "time": "", "course": "Chemistry"}, {"title": "Call mom", "kind": "task", "when": "tomorrow", "time": "", "course": ""}, {"title": "Gym", "kind": "routine", "when": "every Monday and Wednesday", "time": "", "course": ""}]}`;
+export async function aiExtractItems(chunks, categories = []) {
+  const out = [];
+  const cats = categories.length ? `\nThe person's categories (use the exact name when one fits): ${categories.slice(0, 40).join(', ')}.` : '';
+  for (const part of chunks) {
+    const reply = await route('voice', [
+      { role: 'system', content: EXTRACT_PROMPT + cats },
+      { role: 'user', content: `Said: "${String(part).slice(0, 1200)}"` },
+    ], { json: true, temperature: 0, max_tokens: 900 });
+    const list = firstJSON(reply)?.items;
+    if (!Array.isArray(list)) return null;
+    const clean = (v, n) => String(v ?? '').replace(/[<>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, n);
+    out.push(...list.map(x => ({ title: clean(x?.title, 120), kind: ITEM_KINDS.includes(x?.kind) ? x.kind : 'task', when: clean(x?.when, 60), time: clean(x?.time, 20), course: clean(x?.course, 40) })).filter(x => x.title));
+  }
+  return out.length ? out.slice(0, 200) : null;
 }

@@ -4,11 +4,11 @@
 // switch or drop each before it counts.
 import { reactive } from 'vue';
 import { store } from './store';
-import { routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
-import { ai, aiRewriteDictation } from './ai';
+import { route, routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
+import { ai, aiExtractItems } from './ai';
 import { tidyDictation } from './tidy';
 import { geminiBreakdown } from './account';
-import { itemLine } from './itemline';
+import { itemLine, localLine, withKind, saidIn as said } from './itemline';
 import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
 import { go, nav } from './nav';
@@ -45,44 +45,49 @@ function settle(made) {
 }
 
 // Sort what was said or typed and put it in place, pending review.
-// What was said, broken down into every separate thing, one per line. The
-// rules always run (sentence ends, numbering, "then / also", "and" before a
-// new thing, listed items; a course or verb carries across). With the
-// person's own Gemini key, Gemini reads it and gives each item a kind, date,
-// time and course; otherwise the on-device AI may. Either answer is used only
-// when it finds most of what the rules found, so nothing is lost.
+// What was said, broken down into every separate thing, one per line, with
+// the kind of each when an AI decided it. The rules always run (sentence
+// ends, numbering, "then / also", "and" before a new thing, listed items; a
+// course or verb carries across). With the person's own Gemini key, Gemini
+// reads it; otherwise a free Hugging Face model on this device (Qwen 2.5)
+// lists each item with a clear title, its kind, the date and time words and
+// the course, and Budgie works out the exact dates. An AI answer is used only
+// when it finds about as much as the rules and invents nothing.
+const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
 export async function breakDown(text) {
   const split = splitSpoken(text);
-  const rules = tidyDictation(split.join('\n'));
-  const count = t => (t ? t.split('\n').filter(Boolean).length : 0);
+  const rules = tidyDictation(split.join('\n')).split('\n').filter(Boolean);
+  const fair = n => n >= Math.ceil(rules.length * 0.75);
+  const real = said(text);
   if (store.digest?.geminiKey) {
     try {
       const d = new Date();
       // Your own categories, so items land in them; the rules' split as a checklist so nothing is missed.
-      const categories = [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
-      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, categories, rules.split('\n').filter(Boolean).slice(0, 200));
-      const lines = (items || []).map(itemLine).filter(Boolean).join('\n');
-      if (count(lines) >= Math.ceil(count(rules) * 0.6)) { capture.via = 'Gemini'; return lines; }
+      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), rules.slice(0, 200));
+      const ok = (items || []).filter(x => real(x.title));
+      if (ok.length && fair(ok.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind) }; }
     } catch { /* no key on the server yet, the free limit, or offline: carry on */ }
   }
   if (ai.enabled && ai.ready) {
-    // Chunks of a few sentences each, cut at the rules' own breaks.
+    // Chunks of a few sentences each, cut at the rules' own breaks, so a small model reads each part fully.
     const chunks = [];
     let cur = '';
-    for (const line of split) { if (cur && cur.length + line.length > 600) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
+    for (const line of split) { if (cur && cur.length + line.length > 500) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
     if (cur) chunks.push(cur);
-    const byAI = await aiRewriteDictation(text, chunks).catch(() => null);
-    if (byAI && count(byAI) >= count(rules)) { capture.via = 'on-device AI'; return byAI; }
+    const items = await aiExtractItems(chunks, myCategories()).catch(() => null);
+    const ok = (items || []).filter(x => real(x.title));
+    if (ok.length && fair(ok.length)) { capture.via = 'on-device AI'; return { lines: ok.map(localLine), kinds: ok.map(x => x.kind) }; }
   }
   capture.via = 'rules';
-  return rules;
+  return { lines: rules, kinds: null };
 }
 
 export async function sortAndPlace(text = capture.text, { spoken = false } = {}) {
   if (!text.trim()) return 0;
   capture.sorting = true;
   // Spoken or typed, one long run of words is broken into every separate thing.
-  const rows = routeAll(await breakDown(text)).filter(r => r.text);
+  const { lines, kinds } = await breakDown(text);
+  const rows = (kinds ? lines.map((l, i) => withKind(route(l), kinds[i])) : routeAll(lines.join('\n'))).filter(r => r.text);
   if (!rows.length) { capture.sorting = false; return 0; }
   const out = await sendAll(rows);
   settle(out.made);

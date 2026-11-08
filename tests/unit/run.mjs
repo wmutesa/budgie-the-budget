@@ -336,6 +336,35 @@ await check('Gemini is given your categories and a checklist of what was said', 
     assert.match(sent, /Friday the 21st/);
   } finally { globalThis.fetch = realFetch; }
 });
+const { localLine, withKind, saidIn } = await import('../../src/lib/itemline.js');
+await check('the on-device model\'s items: clear titles, its kinds kept, exact dates worked out by Budgie', () => {
+  const said = 'for chemistry I have lab report 3 due friday at 5 pm and a quiz on the 18th, also need to call mom tomorrow, gym every monday and wednesday and I want to run a 10K by March';
+  const items = [
+    { title: 'Lab Report 3', kind: 'assignment', when: 'Friday', time: '5 pm', course: 'Chemistry' },
+    { title: 'Quiz', kind: 'exam', when: 'the 18th', time: '', course: 'Chemistry' },
+    { title: 'Call mom', kind: 'task', when: 'tomorrow', time: '', course: '' },
+    { title: 'Gym', kind: 'routine', when: 'every Monday and Wednesday', time: '', course: '' },
+    { title: 'Run a 10K', kind: 'goal', when: 'by March', time: '', course: '' },
+    { title: 'Buy a new laptop', kind: 'task', when: '', time: '', course: '' },
+  ];
+  const real = saidIn(said);
+  const ok = items.filter(x => real(x.title));
+  assert.equal(ok.length, 5, 'an item that was never said is dropped');
+  const rows = ok.map(x => withKind(route(localLine(x)), x.kind));
+  assert.deepEqual(rows.map(r => r.dest), ['task', 'task', 'task', 'routine', 'goal']);
+  assert.deepEqual(rows.slice(0, 4).map(r => r.task.title), ['Lab Report 3', 'Quiz', 'Call mom', 'Gym']);
+  assert.deepEqual(rows.slice(0, 2).map(r => [r.task.kind, r.task.project]), [['assignment', 'Chemistry'], ['exam', 'Chemistry']]);
+  assert.equal(new Date(`${rows[0].task.date}T12:00`).getDay(), 5, 'Friday is worked out by Budgie');
+  assert.equal(rows[0].task.time, '17:00');
+  assert.equal(rows[1].task.date.slice(8), '18', '"the 18th" is the 18th');
+  assert.deepEqual(rows[3].task.repeat?.days, [1, 3]);
+});
+await check('a kind the model decided wins over a guess from the words', () => {
+  const r = withKind(route('Chemistry lab practical on Friday'), 'exam');
+  assert.equal(r.task.kind, 'exam');
+  const g = withKind(route('Read 24 books this year'), 'goal');
+  assert.equal(g.dest, 'goal');
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);
