@@ -26,7 +26,7 @@ async function check() {
 <template>
   <section class="acct-sec t-a" data-test="gemini-key">
     <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="sparkle" :size="12" /></span>Gemini for what you say</p><span class="muted small">Free, optional</span></div>
-    <p class="small">With your own key, everything you say or type in <b>Add</b> is read by Gemini and broken into each separate task, assignment, class, routine and goal, with its date and time, even when you list dozens at once. Without a key, Budgie's own rules do it. Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>.</p>
+    <p class="small">Optional. With your own free key, Gemini reads everything you say or type in <b>Add</b> and splits it into each task, class, routine and goal, with dates and times. Without one, Budgie's own rules do it. Get a key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">aistudio.google.com/apikey</a>.</p>
     <span class="you-key">
       <input v-model="key" :type="show ? 'text' : 'password'" autocomplete="off" spellcheck="false" placeholder="Paste your Gemini API key" aria-label="Gemini API key" data-test="you-key" />
       <button type="button" class="ibtn ghost" :title="show ? 'Hide' : 'Show'" :aria-label="show ? 'Hide key' : 'Show key'" @click="show = !show"><Icon :name="show ? 'x' : 'search'" /></button>
@@ -34,7 +34,7 @@ async function check() {
     </span>
     <p v-if="!keyOk" class="pln-err small">That does not look like an API key. Copy it again from Google AI Studio (the copy button next to the key).</p>
     <p v-else-if="result" :class="result.ok ? 'pln-ok' : 'pln-err'" class="small" role="status" data-test="you-key-result">{{ result.message }}</p>
-    <label class="dgp-check" data-test="gemini-audio"><input v-model="sendAudio" type="checkbox" :disabled="!key" /> Send my recordings to Gemini, so it hears names, numbers and accents better than the browser does</label>
-    <p class="muted small">Recordings are sent to Google with your key when you tap Stop, and are not kept by Budgie. Turn this off to send only the text. The key is kept in your account and sent only to Google. Gemini's free tier has a daily limit; when it is reached, Budgie's own rules take over.</p>
+    <label class="dgp-check" data-test="gemini-audio"><input v-model="sendAudio" type="checkbox" :disabled="!key" /> Also send the whole recording to Gemini when I tap Stop</label>
+    <p class="muted small">Live words while you talk come from Budgie's server either way. Your key stays in your account and goes only to Google; Budgie keeps no recordings.</p>
   </section>
 </template>

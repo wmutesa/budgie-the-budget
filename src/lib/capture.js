@@ -7,7 +7,7 @@ import { store } from './store';
 import { route, routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
 import { ai, aiExtractItems } from './ai';
 import { tidyDictation } from './tidy';
-import { geminiBreakdown, geminiHear } from './account';
+import { geminiBreakdown, geminiHear, budgieBreakdown } from './account';
 import { itemLine, localLine, withKind, saidIn as said } from './itemline';
 import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
@@ -106,6 +106,14 @@ export async function breakDown(text, audio = null) {
       if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
     } catch { /* no key on the server yet, the free limit, or offline: carry on */ }
   }
+  // Budgie's own AI on its server (a large open model on Cloudflare): no key needed.
+  try {
+    const d = new Date();
+    const { items } = await budgieBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen());
+    const cmds = (items || []).map(fromItem).filter(Boolean);
+    const ok = (items || []).filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));
+    if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Budgie AI'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
+  } catch { /* offline or busy: the device's AI or the rules take over */ }
   if (ai.enabled && ai.ready) {
     // Chunks of a few sentences each, cut at the rules' own breaks, so a small model reads each part fully.
     const chunks = [];

@@ -68,6 +68,9 @@ const geminiCalls = [];
 const voiceCalls = [];
 // Live words: each piece of audio the page sends gets the next scripted phrase ('' once they run out; 503 means unavailable).
 const liveScript = [];
+// Budgie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
+let budgieItems = null;
+const budgieCalls = [];
 let liveCalls = 0;
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Budgie: it must be dropped.
@@ -123,6 +126,7 @@ async function fakeApi(page, account = fakeAccount) {
       { title: 'Learn to play guitar', kind: 'goal', date: '', time: '', minutes: 0, repeat: '', days: [], course: '' },
     ] } }); }
     // Gemini hears a recording: what was said, and the items in it.
+    if (p === '/api/voice/breakdown') { budgieCalls.push(JSON.parse(req.postData() || '{}')); return budgieItems ? route.fulfill({ json: { items: budgieItems } }) : route.fulfill({ status: 503, json: { error: 'busy' } }); }
     if (p === '/api/voice/live') { liveCalls++; const body = JSON.parse(req.postData() || '{}'); if (!/^UklGR/.test(body.audio || '')) return route.fulfill({ status: 400, json: { error: 'not wav' } }); const t = liveScript.length ? liveScript.shift() : ''; return t === 503 ? route.fulfill({ status: 503, json: { error: 'Live words are not available right now.' } }) : route.fulfill({ json: { text: t } }); }
     if (p === '/api/gemini/voice') { voiceCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
       { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
@@ -530,12 +534,22 @@ async function run(url) {
   assert.ok(liveCalls - live0 >= 3, 'each phrase went to the server as audio');
   assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
   if (process.env.SHOTS) { await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` }); await voice.locator('header').first().screenshot({ path: `${process.env.SHOTS}/recording-bar.png` }); }
-  // Stop: Budgie breaks what was said into separate things and places each one.
+  // Stop: Budgie's server AI breaks what was said into separate things, and each is placed.
+  budgieItems = [
+    { title: 'Essay', kind: 'assignment', date: '', time: '17:00', minutes: 0, repeat: 'none', days: ['fri'].slice(0, 0), course: '', priority: '', action: 'add', target: '' },
+    { title: 'Gym', kind: 'routine', date: '', time: '18:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '', action: 'add', target: '' },
+    { title: 'Read 12 books this year', kind: 'goal', date: '', time: '', minutes: 0, repeat: 'none', days: [], course: '', priority: '', action: 'add', target: '' },
+  ];
+  const bc0 = budgieCalls.length;
   await voice.click('[data-test="capture-mic"]');
   await voice.waitForSelector('[data-test="capture-review"]');
-  assert.match(await voice.textContent('.cr-count'), /of 3/, 'three things are heard and sorted');
-  await voice.click('[data-test="review-keep-all"]');
-  assert.equal(await voice.$('[data-test="capture-review"]'), null, 'Keep all ends the review');
+  budgieItems = null;
+  assert.equal(budgieCalls.length, bc0 + 1, 'what was said went to Budgie\'s AI once');
+  assert.match(budgieCalls[bc0].text, /essay due friday[\s\S]*books this year/, 'with the edited live words');
+  assert.match(await voice.textContent('.cr-count'), /of 3/, 'three separate things come back and are sorted');
+  { const titles = []; for (let i = 0; i < 3; i++) { titles.push(await voice.inputValue('.cr-title')); if (i < 2) { await voice.click('[data-test="review-keep"]'); await voice.waitForTimeout(150); } } assert.deepEqual(titles.map(t => t.toLowerCase()), ['essay', 'gym', 'read 12 books'], `each is its own item (${titles})`); }
+  await voice.click('[data-test="review-keep"]');
+  assert.equal(await voice.$('[data-test="capture-review"]'), null, 'the review ends after the last one');
   await voice.close();
 
   // With a Gemini key, the recording itself goes to Gemini on Stop; what it hears is what gets added.
@@ -608,7 +622,14 @@ async function run(url) {
   await guide.click('[data-test="account"]');
   const sheet = await guide.locator('.acct-sheet').boundingBox();
   const vp = guide.viewportSize();
-  assert.ok(sheet.width <= 990 && Math.abs(sheet.x - (vp.width - sheet.width) / 2) < 2 && Math.abs(sheet.y - 75) < 2 && Math.abs(vp.height - sheet.y - sheet.height - 75) < 2, `the settings card fits its contents, centred, 75px from top and bottom (${JSON.stringify(sheet)})`);
+  assert.ok(sheet.width <= 990 && Math.abs(sheet.x - (vp.width - sheet.width) / 2) < 2 && Math.abs(sheet.y - (vp.height - sheet.height) / 2) < 2, `the profile window is centred (${JSON.stringify(sheet)})`);
+  // Every tab fits in the window: nothing to scroll.
+  for (const t of ['profile', 'digests', 'security', 'data']) {
+    await guide.click(`[data-test="acct-tab-${t}"]`);
+    const over = await guide.$eval('.acct-page', e => e.scrollHeight - e.clientHeight);
+    assert.ok(over <= 1, `the ${t} tab fits without scrolling (${over}px over)`);
+  }
+  await guide.click('[data-test="acct-tab-profile"]');
   await guide.click('[data-test="acct-tab-data"]');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
   await guide.click('[data-test="acct-tab-profile"]');

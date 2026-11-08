@@ -419,4 +419,18 @@ await check('voice commands change what is planned; everything else is added', a
   assert.equal(p(listToTag('prepare onboarding checklist on the Marketing board')).project, 'Marketing');
   store.tasks = keep;
 });
+await check("Budgie's server AI: the same instructions, and its answer checked", async () => {
+  const { cloudSplit } = await import('../../worker/cloudai.js');
+  let sent = null;
+  const env = { AI: { run: async (model, input) => { sent = { model, input }; return { response: { items: [{ title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '17:00', course: 'Chemistry', priority: 'high' }, { title: '<b>x</b>', kind: 'spaceship', date: 'soon', time: '25:00' }] } }; } } };
+  const items = await cloudSplit(env, { text: 'lab report 3 due friday at 5 for chem, super important', today: '2026-11-08', weekday: 'Sunday', timeZone: 'UTC' });
+  assert.match(sent.model, /llama-3\.3-70b/);
+  assert.match(sent.input.messages[1].content, /Today is Sunday, 2026-11-08[\s\S]*lab report 3 due friday/);
+  assert.equal(sent.input.response_format.type, 'json_schema');
+  assert.equal(items[0].title, 'Lab Report 3'); assert.equal(items[0].priority, 'high');
+  assert.deepEqual([items[1].kind, items[1].date, items[1].time], ['task', '', ''], 'bad kinds, dates and times are cleaned');
+  const str = await cloudSplit({ AI: { run: async () => ({ response: 'Sure! {"items": [{"title": "Gym", "kind": "routine"}]}' }) } }, { text: 'gym', today: '2026-11-08', weekday: 'Sunday' });
+  assert.equal(str[0].title, 'Gym', 'JSON inside text is read too');
+  await assert.rejects(cloudSplit({}, { text: 'x', today: '2026-11-08' }), /not set up/);
+});
 console.log(`\n${n} checks passed`);

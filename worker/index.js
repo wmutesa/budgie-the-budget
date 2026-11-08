@@ -8,6 +8,7 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
+import { cloudSplit } from './cloudai.js';
 import { geminiResearch, geminiSplit, geminiVoice, geminiWords, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
@@ -436,6 +437,19 @@ async function routes(request, env, url) {
     try {
       return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
+  }
+  // Budgie's own AI breaks what was said into separate items: for everyone, no key needed.
+  if (path === '/api/voice/breakdown' && method === 'POST') {
+    const key = `voice-split:${user.id}`;
+    if (await tooManyAttempts(env, key, 200)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
+    await countFailure(env, key);
+    const { text, today, weekday, timeZone, categories, hints, existing } = await body(request);
+    const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
+    const said = String(text || '').slice(0, 12000);
+    if (!said.trim()) return fail(400, 'Nothing to break down.');
+    try {
+      return json({ items: await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
+    } catch (e) { return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
   }
   // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
   // Cloudflare's Whisper first (free, no key); the person's Gemini key otherwise.

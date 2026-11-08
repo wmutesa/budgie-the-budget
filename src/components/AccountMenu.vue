@@ -140,22 +140,28 @@ const tour = () => { open.value = false; emit('tour'); };
     <!-- On <body>, so the top bar's blur does not trap the full-window backdrop. -->
     <Teleport to="body">
     <div v-if="open" class="overlay" @click.self="open = false">
-      <div class="sheet acct-sheet" role="dialog" aria-label="Account">
-        <div class="acct-top">
-          <AvatarPicker :initial="initial" :name="account.user?.name" />
-          <div class="acct-who">
-            <p class="label">{{ account.user?.name }} <span class="acct-role">{{ isOwner ? 'Owner' : 'Member' }}</span></p>
-            <p class="acct-sync" :class="account.sync">{{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
-          </div>
-          <button class="icon-x" aria-label="Close" @click="open = false">×</button>
-        </div>
-
+      <div class="sheet acct-sheet abnb" role="dialog" aria-label="Account">
+        <button class="icon-x abnb-x" aria-label="Close" @click="open = false">×</button>
         <div class="acct-body">
-        <nav class="acct-nav" aria-label="Settings">
-          <button v-for="[id, label, ic] in TABS" :key="id" type="button" :class="{ on: tab === id }" :aria-current="tab === id ? 'page' : undefined" :data-test="`acct-tab-${id}`" @click="tab = id"><Icon :name="ic" :size="15" />{{ label }}</button>
-        </nav>
+        <aside class="abnb-rail">
+          <div class="acct-top">
+            <AvatarPicker :initial="initial" :name="account.user?.name" />
+            <div class="acct-who">
+              <p class="abnb-name">{{ account.user?.name }}</p>
+              <p class="acct-sync" :class="account.sync"><span class="acct-role">{{ isOwner ? 'Owner' : 'Member' }}</span> {{ syncText }}<template v-if="account.note"> · {{ account.note }}</template></p>
+            </div>
+          </div>
+          <nav class="acct-nav" aria-label="Settings">
+            <button v-for="[id, label, ic] in TABS" :key="id" type="button" :class="{ on: tab === id }" :aria-current="tab === id ? 'page' : undefined" :data-test="`acct-tab-${id}`" @click="tab = id"><Icon :name="ic" :size="16" />{{ label }}</button>
+          </nav>
+          <div class="acct-foot">
+            <span class="muted small">Changes save as you type.</span>
+            <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="14" />Sign out</button>
+          </div>
+        </aside>
 
         <div class="acct-page" :data-page="tab">
+        <h2 class="abnb-title">{{ TABS.find(t => t[0] === tab)?.[1] }}</h2>
         <template v-if="tab === 'profile'">
           <ProfileYou />
         </template>
@@ -261,10 +267,6 @@ const tour = () => { open.value = false; emit('tour'); };
         </div>
         </div>
 
-        <div class="acct-foot">
-          <span class="muted small">Changes save as you type.</span>
-          <button class="btn acct-out" data-test="sign-out" :disabled="busy" @click="leave"><Icon name="logout" :size="14" />Sign out</button>
-        </div>
       </div>
     </div>
     </Teleport>

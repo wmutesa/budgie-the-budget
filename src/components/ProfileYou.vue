@@ -30,7 +30,7 @@ async function toggleRemind() {
       <label class="tk-f"><span>What you study or do</span><input v-model="me.study" maxlength="80" placeholder="e.g. Electrical Engineering" data-test="you-study" /></label>
       <label class="tk-f"><span>Year or stage</span><input v-model="me.year" maxlength="40" placeholder="e.g. first-year" /></label>
       <label class="tk-f wide"><span>Where you are</span><input v-model="me.location" maxlength="60" placeholder="e.g. Boston" /></label>
-      <label class="tk-f wide"><span>A line about you</span><textarea v-model="me.about" rows="3" maxlength="400" placeholder="What you care about and what you are aiming for." /></label>
+      <label class="tk-f wide full"><span>A line about you</span><textarea v-model="me.about" rows="3" maxlength="400" placeholder="What you care about and what you are aiming for." /></label>
     </div>
   </section>
   <section class="acct-sec t-g" data-test="profile-remind">

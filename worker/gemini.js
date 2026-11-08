@@ -84,7 +84,7 @@ Plain text in every field, no markdown.`;
 // length, repeat days and course, as JSON checked here before it is used.
 const KINDS = ['task', 'assignment', 'exam', 'class', 'event', 'routine', 'goal'];
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-const SPLIT_SCHEMA = {
+export const SPLIT_SCHEMA = {
   type: 'object',
   properties: {
     items: {
@@ -129,9 +129,11 @@ Said: "psych midterm next Tuesday at 10, gym Monday Wednesday Friday at 6 pm for
 Items: [{"title":"Psychology midterm","kind":"exam","date":"${tue}","time":"10:00","minutes":0,"repeat":"none","days":[],"course":"Psychology","priority":"normal"},{"title":"Gym","kind":"routine","date":"","time":"18:00","minutes":60,"repeat":"weekly","days":["mon","wed","fri"],"course":"","priority":"normal"},{"title":"Take shirts to the dry cleaner","kind":"task","date":"","time":"","minutes":0,"repeat":"none","days":[],"course":"","priority":"low"}]
 `;
 }
+export const SYSTEM_TEXT = 'You are a precise assistant for a student planner. You extract tasks, deadlines and plans from what someone said and reply only with correct JSON that matches the schema.';
 const SYSTEM = { parts: [{ text: 'You are a precise assistant for a student planner. You extract tasks, deadlines and plans from what someone said and reply only with correct JSON that matches the schema.' }] };
-export async function geminiSplit(key, { text: said, today, weekday, timeZone, categories = [], hints = [], existing = [] }) {
-  const prompt = `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
+// The breakdown instructions, shared by Gemini and Budgie's own server AI.
+export function splitPrompt({ text: said, today, weekday, timeZone, categories = [], hints = [], existing = [] }) {
+  return `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
 Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
 People say many things at once (sometimes 50 or more) without pausing. List EVERY separate item, in the order said: assignments, exams, classes, tasks, errands, events, routines, habits and goals. Never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two items. When a course or subject is said once for several items ("for chemistry I have X and Y"), give each that course. Carry a shared verb ("call mom Sunday and dad Saturday" is two calls).
 For each item: the title is the item's FULL name exactly as said, keeping numbers, chapter or section numbers and subtitles ("Lab Report 3: Titration Analysis", "Problem Set 7", "Essay on the French Revolution", "Read chapter 7 of the biology textbook"), but without the date, time, "due", "I have" or filler; kind (assignment for homework, essays, reports and problem sets; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday", "next Tuesday" (the next such day after today), "the 18th" (the next 18th), "Friday the 21st" (the 21st: a day number wins over a weekday), "11/20" (month/day), "in two weeks" or "end of the month" (its last day); empty if none; time in 24-hour HH:MM ("midnight" or "end of day" is 23:59, "noon" is 12:00), empty if none; minutes if a length was said; repeat and days for things that recur; course: the category, taken from a spoken "hashtag X" or "#X", a course code ("CHEM 110", "CS 61A"), "for <subject>", or the subject in the name ("psych midterm" is Psychology).
@@ -143,6 +145,9 @@ ${hints.map(h => `- ${h}`).join('\n')}
 ` : ''}
 Note:
 ${said}`;
+}
+export async function geminiSplit(key, args) {
+  const prompt = splitPrompt(args);
   const res = await fetch(`${API}/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
@@ -161,7 +166,7 @@ ${said}`;
   return cleanItems(out.items);
 }
 // Every item checked: plain text, known kinds and days, real dates and times.
-function cleanItems(list) {
+export function cleanItems(list) {
   const hhmm = s => (/^([01]\d|2[0-3]):[0-5]\d$/.test(s || '') ? s : '');
   return (Array.isArray(list) ? list : []).slice(0, 200).map(x => ({
     title: text(x.title, 120),
