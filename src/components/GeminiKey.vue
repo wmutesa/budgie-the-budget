@@ -12,6 +12,8 @@ const show = ref(false);
 const tidy = v => String(v || '').replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '');
 const key = computed({ get: () => store.digest.geminiKey || '', set: v => { store.digest.geminiKey = tidy(v) || undefined; result.value = null; } });
 const keyOk = computed(() => !key.value || /^[A-Za-z0-9._~+/=-]{20,256}$/.test(key.value));
+// Recordings go to Gemini too (it hears better than the browser), unless turned off.
+const sendAudio = computed({ get: () => store.planner?.geminiAudio !== false, set: v => { store.planner.geminiAudio = v; } });
 const checking = ref(false);
 const result = ref(null);
 async function check() {
@@ -32,6 +34,7 @@ async function check() {
     </span>
     <p v-if="!keyOk" class="pln-err small">That does not look like an API key. Copy it again from Google AI Studio (the copy button next to the key).</p>
     <p v-else-if="result" :class="result.ok ? 'pln-ok' : 'pln-err'" class="small" role="status" data-test="you-key-result">{{ result.message }}</p>
-    <p class="muted small">The key is kept in your account and sent only to Google. Gemini's free tier has a daily limit; when it is reached, Budgie's own rules take over.</p>
+    <label class="dgp-check" data-test="gemini-audio"><input v-model="sendAudio" type="checkbox" :disabled="!key" /> Send my recordings to Gemini, so it hears names, numbers and accents better than the browser does</label>
+    <p class="muted small">Recordings are sent to Google with your key when you tap Stop, and are not kept by Budgie. Turn this off to send only the text. The key is kept in your account and sent only to Google. Gemini's free tier has a daily limit; when it is reached, Budgie's own rules take over.</p>
   </section>
 </template>

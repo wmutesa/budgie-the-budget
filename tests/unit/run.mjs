@@ -365,6 +365,29 @@ await check('a kind the model decided wins over a guess from the words', () => {
   const g = withKind(route('Read 24 books this year'), 'goal');
   assert.equal(g.dest, 'goal');
 });
+const { geminiVoice, audioTypeOk } = await import('../../worker/gemini.js');
+await check('a recording goes to Gemini with the live text, and its answer is checked', async () => {
+  const realFetch = globalThis.fetch;
+  let req = null;
+  globalThis.fetch = async (url, opts) => { req = JSON.parse(opts.body); return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ transcript: 'Lab report 3 due Friday <b>and</b> gym Mondays', items: [
+    { title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
+    { title: 'Gym', kind: 'routine', date: '', time: '25:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' },
+  ] }) }] } }] }) }; };
+  try {
+    const out = await geminiVoice('k'.repeat(30), { audio: 'UklGRg==', mime: 'audio/wav', typed: 'lab report three due friday', today: '2026-11-08', weekday: 'Sunday', categories: ['Chemistry'] });
+    const parts = req.contents[0].parts;
+    assert.deepEqual(parts[0].inline_data, { mime_type: 'audio/wav', data: 'UklGRg==' }, 'the recording itself is sent');
+    assert.match(parts[1].text, /word for word/);
+    assert.match(parts[1].text, /prefer its spellings[\s\S]*lab report three due friday/, 'the live text helps with spellings');
+    assert.match(parts[1].text, /Chemistry/);
+    assert.equal(out.transcript, 'Lab report 3 due Friday band/b gym Mondays', 'what was heard comes back as plain text');
+    assert.ok(!/[<>]/.test(out.transcript), 'no markup in what was heard');
+    assert.equal(out.items.length, 2);
+    assert.equal(out.items[1].time, '', 'an impossible time is dropped');
+  } finally { globalThis.fetch = realFetch; }
+  assert.ok(audioTypeOk('audio/wav') && audioTypeOk('audio/webm;codecs=opus') && audioTypeOk('audio/mp4'));
+  assert.ok(!audioTypeOk('video/mp4') && !audioTypeOk('text/html'));
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

@@ -7,7 +7,7 @@ import { store } from './store';
 import { route, routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
 import { ai, aiExtractItems } from './ai';
 import { tidyDictation } from './tidy';
-import { geminiBreakdown } from './account';
+import { geminiBreakdown, geminiHear } from './account';
 import { itemLine, localLine, withKind, saidIn as said } from './itemline';
 import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
@@ -20,6 +20,7 @@ export const capture = reactive({
   review: [],        // [{ id, to, r }] waiting for a decision, in order
   at: -1,            // which one the review is showing (-1: not reviewing)
   via: '',           // what broke the last one down: Gemini, on-device AI or rules
+  heard: '',         // what Gemini heard in the last recording
 });
 export { DESTS };
 
@@ -54,7 +55,20 @@ function settle(made) {
 // the course, and Budgie works out the exact dates. An AI answer is used only
 // when it finds about as much as the rules and invents nothing.
 const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
-export async function breakDown(text) {
+export async function breakDown(text, audio = null) {
+  // The recording first: Gemini hears it, writes down what was said and lists every item.
+  if (audio && store.digest?.geminiKey && store.planner?.geminiAudio !== false) {
+    try {
+      const d = new Date();
+      const heard = await geminiHear({ audio: audio.data, mime: audio.mime, typed: text, today: isoDay(d), weekday: d.toLocaleDateString('en-US', { weekday: 'long' }), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, categories: myCategories() });
+      const words = `${heard.transcript || ''} ${text}`;
+      const ok = (heard.items || []).filter(x => said(words)(x.title));
+      const rulesHeard = tidyDictation(splitSpoken(heard.transcript || text).join('\n')).split('\n').filter(Boolean);
+      if (ok.length && ok.length >= Math.ceil(rulesHeard.length * 0.75)) { capture.via = 'Gemini (recording)'; capture.heard = heard.transcript || ''; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind) }; }
+      if (heard.transcript && !text.trim()) text = heard.transcript; // nothing typed or heard live: use what Gemini wrote down
+    } catch { /* turned off, the free limit, or offline: use the live text */ }
+  }
+  if (!text.trim()) return { lines: [], kinds: null };
   const split = splitSpoken(text);
   const rules = tidyDictation(split.join('\n')).split('\n').filter(Boolean);
   const fair = n => n >= Math.ceil(rules.length * 0.75);
@@ -82,11 +96,11 @@ export async function breakDown(text) {
   return { lines: rules, kinds: null };
 }
 
-export async function sortAndPlace(text = capture.text, { spoken = false } = {}) {
-  if (!text.trim()) return 0;
+export async function sortAndPlace(text = capture.text, { spoken = false, audio = null } = {}) {
+  if (!text.trim() && !audio) return 0;
   capture.sorting = true;
   // Spoken or typed, one long run of words is broken into every separate thing.
-  const { lines, kinds } = await breakDown(text);
+  const { lines, kinds } = await breakDown(text, audio);
   const rows = (kinds ? lines.map((l, i) => withKind(route(l), kinds[i])) : routeAll(lines.join('\n'))).filter(r => r.text);
   if (!rows.length) { capture.sorting = false; return 0; }
   const out = await sendAll(rows);

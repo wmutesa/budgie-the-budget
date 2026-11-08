@@ -134,8 +134,12 @@ ${said}`;
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   let out;
   try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  return cleanItems(out.items);
+}
+// Every item checked: plain text, known kinds and days, real dates and times.
+function cleanItems(list) {
   const hhmm = s => (/^([01]\d|2[0-3]):[0-5]\d$/.test(s || '') ? s : '');
-  return (Array.isArray(out.items) ? out.items : []).slice(0, 200).map(x => ({
+  return (Array.isArray(list) ? list : []).slice(0, 200).map(x => ({
     title: text(x.title, 120),
     kind: KINDS.includes(x.kind) ? x.kind : 'task',
     date: isoDate(x.date),
@@ -145,4 +149,34 @@ ${said}`;
     days: Array.isArray(x.days) ? [...new Set(x.days.filter(d => DAYS.includes(d)))] : [],
     course: text(x.course, 40),
   })).filter(x => x.title);
+}
+
+// ---------- hearing a recording ----------
+// The recording itself goes to Gemini, which hears names, numbers and accents
+// better than a browser's speech recognition. In one step it writes down
+// exactly what was said and lists every item, as checked JSON.
+const AUDIO_TYPES = ['audio/wav', 'audio/x-wav', 'audio/mp3', 'audio/mpeg', 'audio/aac', 'audio/ogg', 'audio/flac', 'audio/webm', 'audio/mp4'];
+export const audioTypeOk = t => AUDIO_TYPES.includes(String(t || '').split(';')[0].trim().toLowerCase());
+const VOICE_SCHEMA = { type: 'object', properties: { transcript: { type: 'string' }, items: SPLIT_SCHEMA.properties.items }, required: ['transcript', 'items'] };
+export async function geminiVoice(key, { audio, mime, typed = '', today, weekday, timeZone, categories = [] }) {
+  const prompt = `This is a recording of someone telling their planner what they need to do. First write down exactly what they said, word for word, as "transcript" (fix nothing but obvious slips; keep names, numbers and course codes as spoken). Then list every separate item in "items".
+Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
+People say many things at once (sometimes 50 or more) without pausing. List EVERY separate item, in the order said: assignments, exams, classes, tasks, errands, events, routines, habits and goals. Never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two items. A course said once for several items applies to each. Carry a shared verb ("call mom Sunday and dad Saturday" is two calls).
+For each item: the title is the item's FULL name exactly as said, keeping numbers, chapter or section numbers and subtitles ("Lab Report 3: Titration Analysis", "Problem Set 7"), but without the date, time, "due", "I have" or filler; kind (assignment for homework, essays, reports, problem sets, projects and presentations; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday", "next Tuesday", "the 18th", "Friday the 21st" (the day number wins), "11/20", "in two weeks" or "end of the month"; empty if none; time in 24-hour HH:MM ("midnight" or "end of day" is 23:59, "noon" is 12:00), empty if none; minutes if a length was said; repeat and days for things that recur; course: from a spoken "hashtag X", a course code, "for <subject>", or the subject in the name.
+${categories.length ? `The person already uses these categories; when an item belongs to one, use its exact name: ${categories.join(', ')}.\n` : ''}${typed ? `While speaking, the person saw this live text and may have corrected it; prefer its spellings of names and words:\n${typed}\n` : ''}Do not add anything that was not said.`;
+  const res = await fetch(`${API}/${MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: String(mime).split(';')[0], data: audio } }, { text: prompt }] }],
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: VOICE_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 20000 },
+    }),
+    signal: AbortSignal.timeout(90000),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(googleSays(res.status, j));
+  const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  let out;
+  try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
+  return { transcript: String(out.transcript || '').replace(/[<>]/g, '').trim().slice(0, 12000), items: cleanItems(out.items) };
 }

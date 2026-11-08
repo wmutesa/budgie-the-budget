@@ -288,5 +288,7 @@ export const readDigest = (stream, id) => api(`/api/digests/${encodeURIComponent
 export const writeDigest = (stream, timeZone) => api('/api/digests', { method: 'POST', body: { stream, timeZone } });
 export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', body: { key } });
 // Gemini (the person's own key, kept server-side) breaks a recording into planner items.
+// Gemini hears a recording (base64 audio) and returns { transcript, items }.
+export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', body: payload });
 export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = []) => api('/api/gemini/breakdown', { method: 'POST', body: { text, today, weekday, timeZone, categories, hints } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

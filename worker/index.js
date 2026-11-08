@@ -8,7 +8,7 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
-import { geminiResearch, geminiSplit, checkKey, tidyKey, keyShapeOk } from './gemini.js';
+import { geminiResearch, geminiSplit, geminiVoice, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -435,6 +435,23 @@ async function routes(request, env, url) {
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
       return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160) }) });
+    } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
+  }
+  // Hear a recording with the person's own Gemini key: what was said, word for word, and every item in it.
+  if (path === '/api/gemini/voice' && method === 'POST') {
+    const data = await accountData(env, user.id);
+    const gkey = tidyKey(data?.digest?.geminiKey);
+    if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
+    if (data?.planner?.geminiAudio === false) return fail(403, 'Sending recordings to Gemini is turned off.');
+    const key = `gemini-voice:${user.id}`;
+    if (await tooManyAttempts(env, key, 60)) return fail(429, 'Many recordings this hour. Budgie used the live text instead.');
+    await countFailure(env, key);
+    const { audio, mime, typed, today, weekday, timeZone, categories } = await body(request);
+    if (typeof audio !== 'string' || !audio || audio.length > 18 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That recording could not be read.');
+    if (!audioTypeOk(mime)) return fail(400, 'That kind of recording is not supported.');
+    const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
+    try {
+      return json(await geminiVoice(gkey, { audio, mime, typed: String(typed || '').slice(0, 6000), today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40) }));
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
   }
   if (path === '/api/gemini/check' && method === 'POST') {

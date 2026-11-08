@@ -65,6 +65,7 @@ window.webkitSpeechRecognition = FakeRec;
 // with data kept in memory so reloads and other pages see the same account.
 // tests/accounts.cjs tests the real server.
 const geminiCalls = [];
+const voiceCalls = [];
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Budgie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
@@ -117,6 +118,12 @@ async function fakeApi(page, account = fakeAccount) {
       { title: 'Swim', kind: 'routine', date: '', time: '07:00', minutes: 45, repeat: 'weekly', days: ['tue', 'thu'], course: '' },
       { title: 'Call grandma', kind: 'task', date: inDays(1), time: '', minutes: 0, repeat: '', days: [], course: '' },
       { title: 'Learn to play guitar', kind: 'goal', date: '', time: '', minutes: 0, repeat: '', days: [], course: '' },
+    ] } }); }
+    // Gemini hears a recording: what was said, and the items in it.
+    if (p === '/api/gemini/voice') { voiceCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
+      { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
+      { title: 'History quiz', kind: 'exam', date: inDays(10), time: '', minutes: 0, repeat: '', days: [], course: 'History' },
+      { title: 'Gym', kind: 'routine', date: '', time: '07:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' },
     ] } }); }
     if (p === '/api/recovery-codes') return route.fulfill({ json: { left: 8 } });
     if (p === '/api/passkeys') return route.fulfill({ json: { passkeys: [{ id: 'k1', label: 'Mac', created_at: Date.now(), last_used_at: Date.now() }] } });
@@ -432,6 +439,32 @@ async function run(url) {
   await voice.click('[data-test="review-keep-all"]');
   assert.equal(await voice.$('[data-test="capture-review"]'), null, 'Keep all ends the review');
   await voice.close();
+
+  // With a Gemini key, the recording itself goes to Gemini on Stop; what it hears is what gets added.
+  const hearAcct = { data: { ...JSON.parse(JSON.stringify(fakeAccount.data)), digest: { ...(fakeAccount.data.digest || {}), geminiKey: 'AIzaSyFakeKeyForTheTest_1234567890' } }, version: fakeAccount.version };
+  const hear = await context.newPage();
+  await fakeNetwork(hear, hearAcct);
+  await hear.addInitScript(FAKE_SPEECH + `;window.__speechPhrase = 'lab report three due friday at five for chemistry';
+    navigator.mediaDevices.getUserMedia = async () => new MediaStream();
+    window.MediaRecorder = class { constructor() { this.mimeType = 'audio/webm'; this.state = 'inactive'; }
+      start() { this.state = 'recording'; setTimeout(() => this.ondataavailable?.({ data: new Blob([new Uint8Array(4000)], { type: 'audio/webm' }) }), 50); }
+      stop() { this.state = 'inactive'; setTimeout(() => this.onstop?.(), 10); } };`);
+  await hear.goto(url, { waitUntil: 'load' });
+  await hear.click('[data-test="capture"]');
+  await hear.waitForFunction(() => /chemistry/.test(document.querySelector('[data-test="capture-text"]').value));
+  assert.match(await hear.textContent('[data-test="capture-sheet"]'), /Gemini listens to the recording/, 'the sheet says the recording goes to Gemini');
+  await hear.waitForTimeout(800);
+  await hear.click('[data-test="capture-mic"]');
+  await hear.waitForSelector('[data-test="capture-review"]');
+  assert.equal(voiceCalls.length, 1, 'the recording is sent to Gemini once');
+  assert.ok(voiceCalls[0].audio && /^audio\//.test(voiceCalls[0].mime), 'the audio itself goes, with its type');
+  assert.match(voiceCalls[0].typed || '', /lab report three/, 'the live text goes too, for spellings');
+  const heardItems = [];
+  for (let i = 0; i < 8 && await hear.$('[data-test="capture-review"]'); i++) { heardItems.push(`${await hear.inputValue('.cr-title')} | ${await hear.textContent('.cr-where')}`); await hear.click('[data-test="review-keep"]'); await hear.waitForTimeout(150); }
+  assert.ok(heardItems.some(x => /^Lab Report 3 \| Schedule · Assignment · .*5 PM · #Chemistry/.test(x)), `Gemini's spelling and details are used (${heardItems.join(' ;; ')})`);
+  assert.ok(heardItems.some(x => /^History quiz \| Schedule · Exam/.test(x)), 'what only Gemini heard is added too');
+  assert.ok(heardItems.some(x => /^Gym \| Schedule · Routine/.test(x)), 'the weekly gym is a routine');
+  await hear.close();
 
   // First-time guide, once per person, on an empty account.
   const fresh = { data: null, version: 0 };

@@ -5,6 +5,7 @@ import { routeAll, splitSpoken, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
 import { store } from '../lib/store';
+import { canRecord, startRecording, stopRecording, cancelRecording, toGeminiAudio } from '../lib/voicerec';
 import Icon from './Icon.vue';
 
 // The one way to add anything. Tap Add and talk: the words appear as you speak
@@ -24,7 +25,13 @@ const dict = useDictation({
   onText: t => { spoken.value = true; capture.text = join(base, t); },
   onFinal: t => { capture.text = join(base, t).trim(); },
 });
-const listening = computed(() => dict.listening.value);
+// With a Gemini key, the recording itself also goes to Gemini when you stop
+// (it hears better than the browser). Without speech recognition in the
+// browser (Firefox), recording alone still works: Gemini writes it down.
+const geminiAudio = computed(() => canRecord && !!store.digest?.geminiKey && store.planner?.geminiAudio !== false);
+const canSpeak = computed(() => canDictate || geminiAudio.value);
+const recOnly = ref(false);
+const listening = computed(() => dict.listening.value || recOnly.value);
 const box = ref(null);
 // Edit while you talk: what you typed stays, and new words land after it.
 function onEdit() {
@@ -32,25 +39,36 @@ function onEdit() {
   base = capture.text;
   dict.commit();
 }
-const listen = () => { base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text; dict.start(); };
+const listen = () => {
+  base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text;
+  if (geminiAudio.value) startRecording();
+  if (canDictate) dict.start(); else recOnly.value = true;
+};
+const stopAll = () => { if (dict.listening.value) dict.stop(); recOnly.value = false; cancelRecording(); };
 
 // Open: start listening straight away when the browser can.
-function openSheet({ voice = canDictate } = {}) {
+function openSheet({ voice = canSpeak.value } = {}) {
   capture.open = true; spoken.value = false; micNote.value = '';
   nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
 }
-function close() { if (listening.value) dict.stop(); capture.open = false; }
+function close() { if (listening.value) stopAll(); capture.open = false; }
 // How it will be split, shown as you go.
 // How it will be split (the rules; the AI may tidy the wording), shown as you go.
 const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
 async function sortIt() {
-  if (listening.value) {
+  if (dict.listening.value) {
     dict.stop();
     // Wait for the last words before breaking it down.
-    for (let i = 0; i < 30 && listening.value; i++) await new Promise(r => setTimeout(r, 50));
+    for (let i = 0; i < 30 && dict.listening.value; i++) await new Promise(r => setTimeout(r, 50));
   }
-  if (!capture.text.trim() || capture.sorting) return;
-  await sortAndPlace(capture.text, { spoken: spoken.value });
+  recOnly.value = false;
+  if (capture.sorting) return;
+  capture.sorting = true;
+  const blob = await stopRecording();
+  const audio = blob ? await toGeminiAudio(blob).catch(() => null) : null;
+  capture.sorting = false;
+  if (!capture.text.trim() && !audio) return;
+  await sortAndPlace(capture.text, { spoken: spoken.value, audio });
 }
 // The mic: Speak starts listening; Stop ends it and sorts what was said.
 const micTap = () => (listening.value ? sortIt() : (spoken.value = true, listen()));
@@ -61,7 +79,7 @@ const onKey = e => {
 };
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => window.removeEventListener('keydown', onKey));
-watch(() => capture.open, v => { if (!v && listening.value) dict.stop(); });
+watch(() => capture.open, v => { if (!v && listening.value) stopAll(); });
 defineExpose({ openSheet });
 const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call mom Sunday afternoon', 'I want to run a 10K by March'];
 </script>
@@ -77,8 +95,8 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
       <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
         <header class="cap-head">
           <div>
-            <h2>{{ capture.sorting ? (store.digest?.geminiKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : listening ? 'Listening…' : 'Add anything' }}</h2>
-            <p class="muted small">{{ listening ? 'Say everything on your mind, and fix any word as you go. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
+            <h2>{{ capture.sorting ? (store.digest?.geminiKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : recOnly ? 'Recording…' : listening ? 'Listening…' : 'Add anything' }}</h2>
+            <p class="muted small">{{ recOnly ? 'Recording. Say everything on your mind, then tap Stop: Gemini writes it down and splits it into tasks, routines, events and goals.' : listening ? `Say everything on your mind, and fix any word as you go. Tap Stop when you are done: ${geminiAudio ? 'Gemini listens to the recording and ' : 'Budgie '}splits it into tasks, routines, events and goals.` : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
           <button type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
         </header>
@@ -98,7 +116,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call 
         </div>
 
         <footer class="cap-foot">
-          <button v-if="canDictate" type="button" class="cap-mic" :class="{ on: listening }" :aria-pressed="listening" :disabled="capture.sorting" data-test="capture-mic" @click="micTap">
+          <button v-if="canSpeak" type="button" class="cap-mic" :class="{ on: listening }" :aria-pressed="listening" :disabled="capture.sorting" data-test="capture-mic" @click="micTap">
             <Icon :name="listening ? 'pause' : 'capture'" :size="16" />{{ listening ? 'Stop' : 'Speak' }}
           </button>
           <span class="muted small cap-keys">{{ listening ? 'Stop sorts it for you' : 'Ctrl or ⌘ + Enter' }}</span>
