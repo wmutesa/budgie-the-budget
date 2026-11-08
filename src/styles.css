@@ -3291,23 +3291,27 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 /* The notifications card is square, like the rest of Budgie's cards. */
 .bell-pop, .bell-item, .bell-main, .bell-new, .bell-link, .bell-tip { border-radius: 0 !important; }
 
-/* Overview: lavender only, in light tints. Every kind shares it; red is
-   kept for hover on delete, not at rest. */
-.td-col { --k: #c4b5fd !important; }
-.td-col .tk { --k: #c4b5fd !important; border-left-color: #e9e3fe !important; }
-.td-col .tk-kind { color: #8b7fd1 !important; font-weight: 500; }
-.td-col .td-list li > i { background: #d8cffd !important; }
+/* Overview: each kind keeps its own colour (green, amber, pink, violet…),
+   only as a light tint. Red is kept for hover on delete, not at rest. */
+.td-col .tk { border-left-color: color-mix(in srgb, var(--k) 30%, #fff) !important; }
+.td-col .tk-kind { color: color-mix(in srgb, var(--k) 70%, #a1a1aa) !important; font-weight: 500; }
+.td-col .td-list li > i { background: color-mix(in srgb, var(--k) 38%, #fff) !important; }
 .td-col .pln-ring { background: radial-gradient(#fff 62%, transparent 63%), conic-gradient(#c4b5fd calc(var(--p) * 1%), #f4f4f5 0); }
 .td-col .td-bar { background: #f8f8f9; }
-.td-col .td-bar i { background: #ddd6fe !important; }
+.td-col .td-bar i { opacity: .4; }
 .td-col .td-goal-del { color: #a1a1aa !important; }
 .td-col .td-goal-del:hover, .td-col .td-goal-del:focus-visible { color: #e11d48 !important; }
-.td-col .m-violet, .td-col .m-green, .td-col .m-pink, .td-col .m-blue, .td-col .m-amber { --hl: #ede9fe; }
-.td-col .tk-due.late, .td-col .tk.overdue .tk-due { color: #8b7fd1 !important; }
-/* The focus card is plain white: no gradient. */
-.pln-focus { background: #fff !important; }
-.td-col .pln-ideas > li { border-left-color: #e9e3fe !important; }
+.td-col .tk-due.late, .td-col .tk.overdue .tk-due { color: #f43f5e !important; opacity: .75; }
+/* The focus card: plain lavender, no gradient. */
+.pln-focus { background: #f5f3ff !important; border-color: #ede9fe !important; }
 
 /* Overlapping items: only the one that owns the spot under the cursor comes
    forward (see lib/lift.js); plain hover no longer raises a box over the rest. */
 .sch-box.lifted, .cal-item.box.lifted { z-index: 30 !important; }
+/* Plain tasks get a light teal of their own on Overview, so every kind has a colour. */
+.td-col .tk[data-kind="task"] { --k: #0d9488 !important; }
+/* Notifications: the icon is tinted by what it is about. */
+.bell-item .bell-ic { background: #eff6ff !important; color: #3b82f6 !important; }
+.bell-item.warn .bell-ic { background: #fffbeb !important; color: #d97706 !important; }
+.bell-item.good .bell-ic { background: #f0fdf4 !important; color: #16a34a !important; }
+.bell-item.urgent .bell-ic, .bell-item.bad .bell-ic { background: #fff1f2 !important; color: #e11d48 !important; }
