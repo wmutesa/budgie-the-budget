@@ -62,7 +62,8 @@ const SCREENS = [
     await p.locator('[data-test="sch-row"] [data-test="row-edit"]').first().click();
   }],
   ['day-pick', async p => { await p.keyboard.press('Escape'); await p.click('[data-test="sch-today"]'); }],
-  ['focus', async p => { await p.click('[data-test="nav-focus"]'); }],
+  ['lockin', async p => { await p.keyboard.press('Escape'); if (await p.$('[data-test="sch-pick"]')) await p.click('[data-test="sch-today"]'); if ((await p.getAttribute('[data-test="cal-day"]', 'aria-pressed')) !== 'true') await p.click('[data-test="cal-day"]'); if (await p.$('[aria-label="Show the list"]')) await p.click('[aria-label="Show the list"]'); await p.locator('[data-test="sch-row"] [data-test="row-lockin"]').first().click(); }],
+  ['lockin-off', async p => { await p.click('[data-test="timer-stop"]'); }],
   ['reports', async p => { await p.click('[data-test="nav-progress"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
   ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
   ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.locator('body').press('n'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
@@ -70,11 +71,14 @@ const SCREENS = [
   ['review-goal', async p => { await p.click('[data-test="review-keep"]'); await p.click('[data-test="review-keep"]'); await p.waitForTimeout(400); }],
   ['search', async p => { await p.click('[data-test="review-keep"]'); await p.fill('[data-test="search"]', 'lab'); }],
   ['bell', async p => { await p.fill('[data-test="search"]', ''); await p.keyboard.press('Escape'); await p.click('[data-test="bell"]'); }],
-  ['settings-profile', async p => { await p.click('[data-test="bell"]'); await p.click('[data-test="account"]'); await p.click('[data-test="acct-tab-profile"]'); }],
+  ['account-menu', async p => { await p.click('[data-test="bell"]'); await p.click('[data-test="account"]'); }],
+  ['settings-profile', async p => { await p.click('[data-test="menu-settings"]'); await p.click('[data-test="acct-tab-profile"]'); }],
   ['settings-ai', async p => { await p.click('[data-test="acct-tab-digests"]'); }],
   ['settings-security', async p => { await p.click('[data-test="acct-tab-security"]'); }],
+  ['settings-calendars', async p => { await p.click('[data-test="acct-tab-calendars"]'); }],
   ['settings-people', async p => { await p.click('[data-test="acct-tab-people"]'); }],
-  ['settings-data', async p => { await p.click('[data-test="acct-tab-data"]'); }],
+  ['privacy-data', async p => { await p.click('[data-test="account"]'); await p.click('[data-test="menu-privacy"]'); }],
+  ['privacy-sessions', async p => { await p.click('[data-test="acct-tab-sessions"]'); }],
 ];
 const WIDTHS = (process.env.WIDTHS || '360,390,600,768,1024,1280,1600').split(',').map(Number);
 
@@ -88,7 +92,7 @@ async function run(url) {
     await fakeApi(page);
     await page.goto(url, { waitUntil: 'load' });
     await page.click('[data-test="account"]');
-    await page.click('[data-test="acct-tab-data"]');
+    await page.click('[data-test="menu-privacy"]');
     await page.click('[data-test="sample-add"]');
     await page.waitForTimeout(1500);
     await page.close();
@@ -100,7 +104,7 @@ async function run(url) {
     await page.goto(url, { waitUntil: 'load' });
     await page.waitForSelector('[data-test="today"]');
     for (const [name, go] of SCREENS) {
-      try { await go(page); } catch (e) { problems.push(`${w}px ${name}: could not open (${e.message.split('\n')[0]})`); continue; }
+      try { await go(page); } catch (e) { problems.push(`${w}px ${name}: could not open (${e.message.split('\n').slice(0, 6).join(' | ')})`); continue; }
       await page.waitForTimeout(250);
       const s = await page.evaluate(spill);
       if (s.page > 0 || s.items.length) problems.push(`${w}px ${name}: page overflow ${s.page}px; ${s.items.join(' | ')}`);

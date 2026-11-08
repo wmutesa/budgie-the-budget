@@ -3,9 +3,13 @@ import { ref } from 'vue';
 import { store } from '../lib/store';
 import { FEED_KINDS, addFeed, syncFeed, removeFeed, feedTime } from '../lib/calendar';
 import Icon from './Icon.vue';
+import { go } from '../lib/nav';
 import { toast, loading, finish, fail } from '../lib/toast';
 import { addIcs, addAnything, isIcs } from '../lib/schedule';
 import { capture } from '../lib/capture';
+
+// show: 'add' (the Schedule's Calendars button: only adding) or 'both' (Settings: the list too).
+const props = defineProps({ show: { type: String, default: 'add' } });
 
 // More than one way in: a link that stays up to date, a file, public holidays,
 // or typing a timetable.
@@ -75,12 +79,12 @@ function remove(f) {
 
 <template>
   <section class="pln-card" id="calendars" data-test="calendars">
-    <div class="pln-card-head"><h3>Calendars</h3><button type="button" class="ibtn ghost" :aria-expanded="help" title="Where is my calendar link?" aria-label="Where is my calendar link?" @click="help = !help"><Icon name="help" /></button></div>
+    <div class="pln-card-head"><h3>{{ props.show === 'add' ? 'Add a calendar' : 'Your calendars' }}</h3><button type="button" class="ibtn ghost" :aria-expanded="help" title="Where is my calendar link?" aria-label="Where is my calendar link?" @click="help = !help"><Icon name="help" /></button></div>
     <ul v-if="help" class="pln-help">
       <li v-for="(k, id) in FEED_KINDS" :key="id"><b>{{ k.name }}:</b> {{ k.help }}</li>
       <li class="muted">The link is private, like a password to that calendar. Budgie keeps it in your account only.</li>
     </ul>
-    <ul v-if="store.feeds.length" class="pln-feeds">
+    <ul v-if="props.show !== 'add' && store.feeds.length" class="pln-feeds" data-test="feed-list">
       <li v-for="f in store.feeds" :key="f.id" :class="{ bad: f.error }">
         <span class="pln-feed-kind" :data-kind="f.kind">{{ FEED_KINDS[f.kind]?.name || 'Calendar' }}</span>
         <span class="pln-feed-name"><b>{{ f.name }}</b><span class="muted small">{{ f.error || `${f.count} event${f.count === 1 ? '' : 's'} · updated ${feedTime(f)}` }}</span></span>
@@ -106,5 +110,6 @@ function remove(f) {
       <button class="ibtn primary" :class="{ spin: busy }" :disabled="busy || !link.trim()" title="Import" aria-label="Import" data-test="feed-add"><Icon :name="busy ? 'refresh' : 'plus'" /></button>
     </form>
     <p v-if="message" class="pln-ok small">{{ message }}</p>
+    <p v-if="props.show === 'add' && store.feeds.length" class="small muted cal-where">{{ store.feeds.length }} calendar{{ store.feeds.length === 1 ? '' : 's' }} already in. Update or remove them in <button type="button" class="linkish" data-test="feeds-in-settings" @click="go('Settings', { anchor: '#calendars' })">Settings</button>.</p>
   </section>
 </template>

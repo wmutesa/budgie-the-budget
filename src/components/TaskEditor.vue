@@ -12,7 +12,8 @@ import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 
 // Every detail of one Planner item. Changes save as you type.
-const props = defineProps({ task: { type: Object, required: true } });
+// headTitle: the card's own heading is the title, so no separate Title field.
+const props = defineProps({ task: { type: Object, required: true }, headTitle: { type: Boolean, default: false } });
 const emit = defineEmits(['close']);
 const t = props.task;
 const projects = computed(() => [...new Set(store.tasks.map(x => x.project).filter(Boolean))].sort());
@@ -32,7 +33,7 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
 
 <template>
   <div class="tk-edit" data-test="task-edit">
-    <div class="tk-f wide"><span>Title</span><div class="emo-row"><input aria-label="Title" ref="titleIn" v-model="t.title" maxlength="160" data-test="task-title" /><EmojiPick v-model="t.title" :input="titleIn" /></div></div>
+    <div v-if="!headTitle" class="tk-f wide"><span>Title</span><div class="emo-row"><input aria-label="Title" ref="titleIn" v-model="t.title" maxlength="160" data-test="task-title" /><EmojiPick v-model="t.title" :input="titleIn" /></div></div>
     <div class="tk-f"><span>Date</span><DateField v-model="t.date" label="Date" placeholder="No date" /></div>
     <div class="tk-f"><span>Time</span><TimeField v-model="t.time" label="Time" /></div>
     <label class="tk-f"><span>Minutes</span><input v-model.number="t.mins" type="number" min="0" step="5" /></label>
@@ -58,7 +59,7 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
     <label class="tk-f wide"><span>Notes</span><textarea v-model="t.notes" rows="2" maxlength="1000" /></label>
     <div class="tk-f wide">
       <span class="tk-steps-head">Steps
-        <button type="button" class="ibtn ai" :disabled="splitting" title="Break it into steps with AI" data-test="breakdown" @click="split"><Icon name="sparkle" :size="14" />{{ splitting ? 'Thinking…' : 'Break down' }}</button>
+        <button type="button" class="ibtn ai tk-split" :class="{ spin: splitting }" :disabled="splitting" :title="splitting ? 'Thinking…' : 'Break it into steps'" :aria-label="splitting ? 'Thinking' : 'Break it into steps'" data-test="breakdown" @click="split"><Icon name="split" :size="15" /></button>
         <small v-if="splitBy" class="muted">by {{ splitBy }}</small>
       </span>
       <ul class="tk-subs">

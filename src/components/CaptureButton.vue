@@ -132,7 +132,7 @@ watch(() => [account.status, account.sync, account.note], ([status, sync, note])
 onMounted(() => diag('mounted', { canCapture, canDictate, secure: window.isSecureContext }));
 watch(() => capture.open, v => { if (!v && listening.value) stopAll(); });
 defineExpose({ openSheet });
-const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I want to run a 10K by March', 'Mark the lab report as done'];
+const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I want to run a 10K by March', 'Mark the lab report as done', 'Call mom tomorrow 📞'];
 </script>
 
 <template>
@@ -147,7 +147,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
       <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
         <header class="cap-head">
           <div>
-            <h2>{{ capture.sorting ? (hasKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : listening ? 'Listening…' : 'Add anything' }}</h2>
+            <h2>{{ capture.sorting ? (hasKey ? 'Sorting it out with Gemini…' : 'Sorting it out…') : listening ? 'Listening. Go on…' : 'Add anything' }}</h2>
             <p class="muted small">{{ listening ? 'Say everything on your mind. Your words appear here as you speak, and you can fix any of them. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
           <button v-if="!listening" type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>

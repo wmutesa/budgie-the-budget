@@ -10,10 +10,10 @@ const emit = defineEmits(['page', 'done']);
 
 const steps = [
   { title: `Welcome to Budgie${account.user?.name ? `, ${account.user.name.split(' ')[0]}` : ''}`,
-    body: 'Budgie plans your days, and keeps your goals moving. This quick tour shows where everything is. It takes about a minute.',
-    note: 'Budgie starts empty: everything comes from what you add. The quickest start is to tap Add and say a few things out loud.' },
-  { page: 'Overview', target: '.nb-pages', title: 'Four pages',
-    body: 'Overview is your day at a glance. Schedule shows your day, week and month, with your activity beside it. Focus shows what matters now, with a timer. Progress shows what got done and where your time went.' },
+    body: 'Budgie plans your days and keeps your goals moving, so your brain can do the fun parts. This tour takes about a minute. Shorter than a coffee line.',
+    note: 'Budgie starts empty, like a fresh notebook. The quickest start: tap Add and say a few things out loud.' },
+  { page: 'Overview', target: '.nb-pages', title: 'Three pages, zero clutter',
+    body: 'Overview is your day at a glance. Schedule shows your day, week and month, with your activity beside it. Progress shows what got done and where your time went. Every activity has a timer icon: tap it to Lock In.' },
   { page: 'Overview', target: '#today', title: 'Your day in a sentence',
     body: 'Budgie writes what is on today, what is next, deadlines this week and your streaks. It updates as you tick things off.' },
   { page: 'Overview', target: '[data-test="capture"]', title: 'Add anything',
@@ -25,10 +25,10 @@ const steps = [
   { target: '[data-test="account"]', title: 'Keep your passkey safe', passkeys: true,
     body: 'You sign in with a passkey instead of a password. Read how it works and the few things that can go wrong. You can find this note again in the account menu.' },
   { target: '[data-test="account"]', title: 'Your account',
-    body: 'Your data syncs to your account and follows you to every device. Open this menu to add a device, change your colour, take this tour again or sign out.' },
+    body: 'Your data follows you to every device. Tap your avatar for Settings (profile, AI, calendars, devices), Privacy (your data, sessions) or to sign out.' },
   { title: 'You are all set',
-    body: 'Start by adding what is on your mind today. Budgie learns your routine as you go.',
-    note: 'Tip: you can reopen this guide any time from the account menu.' },
+    body: 'Start by adding what is on your mind today. Budgie learns your routine as you go. No pressure. Well, a little.',
+    note: 'Tip: the tour lives in the avatar menu, in case you miss it already.' },
 ];
 
 const i = ref(0);

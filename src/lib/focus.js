@@ -16,7 +16,8 @@ import { toast } from './toast';
 
 // `spent` counts the seconds actually focused, for Reports. `ended` is true from
 // the moment the time is up until the session is closed.
-export const focus = reactive({ task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false, mini: false, held: [] });
+// `min`: Lock In is minimised to the pill in the top bar.
+export const focus = reactive({ task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false, mini: false, min: false, held: [] });
 
 // ---------- what gets through while you focus ----------
 // 'all': everything; 'starting': only events and classes about to start; 'none': nothing.
@@ -71,7 +72,7 @@ export function startFocus(t, mins = 25) {
   if (focus.task) logSession();
   stopAlarm();
   askToNotify();
-  Object.assign(focus, { task: t, total: mins * 60, left: mins * 60, running: true, spent: 0, ended: false });
+  Object.assign(focus, { task: t, total: mins * 60, left: mins * 60, running: true, spent: 0, ended: false, min: false });
   endsAt = Date.now() + mins * 60 * 1000;
   lastTick = Date.now();
   run();
@@ -99,7 +100,7 @@ export function stopFocus() {
   releaseHeld();
   stopAlarm();
   closeMini();
-  Object.assign(focus, { task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false });
+  Object.assign(focus, { task: null, total: 25 * 60, left: 25 * 60, running: false, spent: 0, ended: false, min: false });
 }
 export const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -161,7 +162,7 @@ function flashTitle() {
   flasher = setInterval(() => {
     if (typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus()) { clearInterval(flasher); flasher = null; setTitle(); return; }
     on = !on;
-    document.title = on ? '✓ Time is up' : `${focus.task?.title || 'Focus'} · Budgie`;
+    document.title = on ? '✓ Time is up' : `${focus.task?.title || 'Lock In'} · Budgie`;
   }, 1000);
 }
 function stopAlarm() { clearInterval(flasher); flasher = null; try { note?.close(); } catch { /* gone */ } note = null; }

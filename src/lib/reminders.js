@@ -1,7 +1,7 @@
 // Reminders on this device: while Budgie is open, a notification shortly
 // before anything with a time. Turned on in your profile; nothing is sent
 // through a server, so reminders only arrive while a Budgie tab is open.
-// During a focus session, what gets through follows the Focus page's choice;
+// During Lock In, what gets through follows your choice in Settings;
 // the rest is held and summed up when the session ends.
 import { store } from './store';
 import { occurrences, today, toMins, timeLabel } from './tasks';

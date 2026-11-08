@@ -154,7 +154,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Focus', 'Progress'], 'the four pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Progress'], 'the three pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -305,39 +305,34 @@ async function run(url) {
   assert.equal(await page.$('[data-test="cal-pop"], [data-test="sch-over"]'), null, 'a week item is shown in the list; no card opens by itself');
   await page.click('[data-test="cal-month"]');
   assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
-  await page.click('[data-test="nav-focus"]');
-  // Close earlier notifications so none covers the page.
+  // Lock In: every activity has a timer icon; the timer takes over the page until it is minimised.
+  await page.click('[data-test="cal-day"]');
   while (await page.locator('[data-test="toast"] .toast-x').count()) await page.locator('[data-test="toast"] .toast-x').first().click();
-  assert.match(await page.textContent('.pln-top'), /Essay 2/, 'the top three include the deadline');
-  await page.click('.pln-top li:has-text("Essay 2") [data-test="top-focus"]');
-  assert.match(await page.textContent('[data-test="timer"]'), /Essay 2[\s\S]*2[45]:\d\d/, 'a focus timer starts');
+  const lockRow = page.locator('[data-test="sch-row"]').filter({ has: page.locator('[data-test="row-lockin"]') }).first();
+  const lockName = (await lockRow.locator('.sch-row-t').textContent()).trim();
+  await lockRow.hover();
+  await lockRow.locator('[data-test="row-lockin"]').click();
+  assert.ok(await page.$('.lk[data-test="timer"]'), 'Lock In opens over the whole page');
+  assert.equal(await page.$('[data-test="nav-focus"]'), null, 'there is no Focus page any more');
+  assert.ok((await page.textContent('[data-test="timer"]')).includes(lockName) && /2[45]:\d\d/.test(await page.textContent('[data-test="timer"]')), 'a Lock In timer starts for that activity');
   // The tab shows the countdown, its icon becomes a ring, and pause and +5 work.
-  assert.match(await page.title(), /^⏱ 2[45]:\d\d · .*Essay 2/, `the tab title counts down (${await page.title()})`);
-  // In focus: a pill in the top bar shows the time left; you choose what gets through, and the bell goes quiet.
-  assert.match(await page.textContent('[data-test="nb-focus"]'), /2[45]:\d\d/, 'the top bar shows the focus countdown');
-  assert.equal(await page.$('[data-test="focus-allow"]'), null, 'the Focus page has no While you focus section');
-  assert.equal(await page.$('[data-test="bell-count"]'), null, 'the bell count stays quiet during focus');
+  assert.match(await page.title(), /^⏱ 2[45]:\d\d · /, `the tab title counts down (${await page.title()})`);
+  assert.match(await page.textContent('[data-test="nb-focus"]'), /2[45]:\d\d/, 'the top bar shows the countdown');
+  assert.equal(await page.$('[data-test="bell-count"]'), null, 'the bell count stays quiet while locked in');
   assert.match(await page.getAttribute('link[rel="icon"]', 'href'), /^data:image\/png/, 'the tab icon shows the time left');
   await page.click('[data-test="timer-toggle"]');
   assert.match(await page.title(), /^⏸ /, 'a paused session shows in the title');
   await page.click('[data-test="timer-more"]');
-  assert.match(await page.textContent('[data-test="timer"] .pln-clock'), /^(29|30):\d\d$/, 'five more minutes are added');
-  // The side bar is about focus now: time focused, a quick start, today's sessions. No suggestions here.
-  assert.ok(await page.$('[data-test="focus-side"]'), 'the Focus side bar is your focus');
-  assert.equal(await page.$('.fcs-side .pln-ideas'), null, 'no Suggested for you on the Focus page');
-  assert.match(await page.textContent('[data-test="focus-side"]'), /today[\s\S]*last 7 days[\s\S]*Start a session[\s\S]*Today's sessions/, 'it shows time focused, a quick start and today\'s sessions');
-  // It stays below the top bar while the page scrolls, and scrolls inside itself.
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.waitForTimeout(200);
-  { const nav = await page.locator('.nav-bar').boundingBox(); const card = await page.locator('.fcs-side .pln-card').boundingBox(); const vh = page.viewportSize().height;
-    assert.ok(Math.abs(card.y - (nav.y + nav.height)) < 2 && card.y + card.height <= vh + 1, `the side bar stays in view below the top bar (${JSON.stringify({ nav, card, vh })})`);
-    assert.equal(await page.locator('.fcs-side .pln-card').evaluate(e => getComputedStyle(e).overflowY), 'auto', 'a long side bar scrolls inside itself'); }
-  await page.evaluate(() => window.scrollTo(0, 0));
-  // Quick start: pick something and a length; finishing logs the session.
-  await page.selectOption('[data-test="focus-pick"]', { label: 'Essay 2' }).catch(() => {});
-  await page.click('[data-test="focus-len-15"]');
-  await page.click('[data-test="focus-start"]');
-  assert.match(await page.textContent('[data-test="timer"] .pln-clock'), /^1[45]:\d\d$/, 'a 15-minute session starts');
+  assert.match(await page.textContent('[data-test="timer"] .lk-lcd-text'), /^(29|30):\d\d$/, 'five more minutes are added');
+  await page.click('[data-test="lock-len-15"]');
+  assert.match(await page.textContent('[data-test="timer"] .lk-lcd-text'), /^1[45]:\d\d$/, 'a 15-minute session starts over');
+  // Minimised, it lives in the top bar; the pill brings it back.
+  await page.click('[data-test="timer-min"]');
+  assert.equal(await page.$('.lk[data-test="timer"]'), null, 'minimising hides the overlay');
+  await page.click('[data-test="nb-focus"]');
+  assert.ok(await page.$('.lk[data-test="timer"]'), 'the pill reopens Lock In');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('.lk[data-test="timer"]'), null, 'Escape minimises Lock In');
   await page.click('[data-test="nav-schedule"]');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="cal-day"]');
@@ -417,12 +412,15 @@ async function run(url) {
   await page.click('[data-test="sch-today"]');
   await page.click('.sch-pick-today');
 
-  // Your details live in your profile; the AI page has no digest settings while digests are on hold.
+  // Your details live in Settings (from the avatar menu); the AI page has no digest settings while digests are on hold.
   await page.click('[data-test="account"]');
+  assert.deepEqual(await page.$$eval('[data-test="account-menu"] [role="menuitem"]', b => b.map(x => x.textContent.trim())), ['Settings', 'Privacy', 'Take the tour', 'Sign out'], 'the avatar opens Settings, Privacy, the tour and Sign out');
+  await page.click('[data-test="menu-settings"]');
+  assert.ok(await page.$('[data-test="settings-page"]'), 'Settings is a page of its own');
   await page.waitForSelector('[data-test="profile-you"]');
   if (process.env.SHOTS) {
     await page.screenshot({ path: `${process.env.SHOTS}/settings-profile.png` });
-    for (const id of ['security', 'data']) { await page.click(`[data-test="acct-tab-${id}"]`); await page.waitForTimeout(150); await page.screenshot({ path: `${process.env.SHOTS}/settings-${id}.png` }); }
+    for (const id of ['security', 'calendars']) { await page.click(`[data-test="acct-tab-${id}"]`); await page.waitForTimeout(150); await page.screenshot({ path: `${process.env.SHOTS}/settings-${id}.png` }); }
     await page.click('[data-test="acct-tab-profile"]');
   }
   await page.fill('[data-test="you-name"]', 'Sam');
@@ -435,8 +433,14 @@ async function run(url) {
   await page.click('[data-test="you-key-check"]');
   assert.match(await page.textContent('[data-test="you-key-result"]'), /broken down by Gemini/, 'the key is checked with Google');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/settings.png` });
-  await page.keyboard.press('Escape');
-  await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
+  // Calendars added earlier are listed in Settings; the Schedule's Calendars button only adds.
+  await page.click('[data-test="acct-tab-calendars"]');
+  assert.ok(await page.locator('[data-test="feed-list"] li').count() >= 1, 'Settings lists the calendars you added');
+  await page.click(tab('Schedule'));
+  await page.click('[data-test="calendars-open"]');
+  assert.equal(await page.$('[data-test="calendars"] [data-test="feed-list"]'), null, 'the Calendars button is only for adding');
+  assert.match(await page.textContent('[data-test="calendars"]'), /already in[\s\S]*Settings/, 'it points to Settings for the ones already added');
+  await page.click('[data-test="calendars-open"]');
   await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'stats problem set due tuesday at five for statistics and the bio midterm on friday swim tuesdays and thursdays at seven call grandma tomorrow and I want to learn guitar');
   await page.click('[data-test="capture-sort"]');
@@ -458,10 +462,9 @@ async function run(url) {
   has(/^Learn To Play Guitar \| Overview · Goals/, 'the goal is a goal');
   // Back to the built-in rules for the rest of the test.
   await page.click('[data-test="account"]');
+  await page.click('[data-test="menu-settings"]');
   await page.click('[data-test="acct-tab-digests"]');
   await page.fill('[data-test="you-key"]', '');
-  await page.keyboard.press('Escape');
-  await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
 
 
   // Today: the day, goals and the latest digest together.
@@ -483,7 +486,7 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to your schedule[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-schedule action');
   await page.press('[data-test="search"]', 'Enter');
   // It opens on its day, in the list with its editor open.
-  await page.waitForSelector('[data-test="sch-over"]:has-text("Dentist")', { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector('[data-test="sch-over"] [data-test="over-title"]')?.value === 'Dentist', null, { timeout: 5000 });
   await page.keyboard.press('Escape');
   await page.click('.sch-title');
   const unreadCount = async () => Number((await page.textContent('[data-test="bell-count"]').catch(() => '0')).replace('+', '')) || 0;
@@ -611,7 +614,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Four pages[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
+  assert.match(seen, /Three pages, zero clutter[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Overview'));
@@ -619,21 +622,17 @@ async function run(url) {
   await guide.waitForFunction(() => document.querySelector('.acct-dot.saved'));
   await guide.waitForTimeout(1500);
   assert.equal(fresh.data?.guide?.done, true, 'finishing the guide is saved to the account');
+  // Privacy: download a copy of your data.
   await guide.click('[data-test="account"]');
-  const sheet = await guide.locator('.acct-sheet').boundingBox();
-  const vp = guide.viewportSize();
-  assert.ok(sheet.width <= 990 && Math.abs(sheet.x - (vp.width - sheet.width) / 2) < 2 && Math.abs(sheet.y - (vp.height - sheet.height) / 2) < 2, `the profile window is centred (${JSON.stringify(sheet)})`);
-  // Every tab fits in the window: nothing to scroll.
-  for (const t of ['profile', 'digests', 'security', 'data']) {
-    await guide.click(`[data-test="acct-tab-${t}"]`);
-    const over = await guide.$eval('.acct-page', e => e.scrollHeight - e.clientHeight);
-    assert.ok(over <= 1, `the ${t} tab fits without scrolling (${over}px over)`);
-  }
-  await guide.click('[data-test="acct-tab-profile"]');
-  await guide.click('[data-test="acct-tab-data"]');
+  await guide.click('[data-test="menu-privacy"]');
+  assert.deepEqual(await guide.$$eval('[data-test="privacy-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Your data', 'Sessions', 'Delete account'], 'Privacy has your data, sessions and deleting the account');
   const [dl] = await Promise.all([guide.waitForEvent('download'), guide.click('[data-test="download-data"]')]);
-  await guide.click('[data-test="acct-tab-profile"]');
   assert.match(dl.suggestedFilename(), /^budgie-data-.*\.json$/, 'you can download a copy of your data');
+  // Settings: square, with only the avatar round.
+  await guide.click('[data-test="account"]');
+  await guide.click('[data-test="menu-settings"]');
+  assert.equal(await guide.$eval('[data-test="settings-page"] .set-nav button.on', e => getComputedStyle(e).borderRadius), '0px', 'Settings is square');
+  assert.equal(await guide.$eval('[data-test="account"]', e => getComputedStyle(e).borderRadius), '50%', 'the avatar stays round');
   // Avatar colour: picked at random, changed with the picker.
   await guide.click('[data-test="avatar"]');
   await guide.click('[data-test="avatar-swatch"] >> nth=3');
@@ -654,7 +653,8 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Schedule', 'Focus', 'Progress']) {
+  for (const p of ['Overview', 'Schedule', 'Progress', 'Settings', 'Privacy']) {
+    if (p === 'Settings' || p === 'Privacy') { await mobile.click('[data-test="account"]'); await mobile.click(`[data-test="menu-${p.toLowerCase()}"]`); } else
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -669,7 +669,7 @@ async function run(url) {
   await fakeNetwork(full);
   await full.goto(url, { waitUntil: 'load' });
   await full.click('[data-test="account"]');
-  await full.click('[data-test="acct-tab-data"]');
+  await full.click('[data-test="menu-privacy"]');
   await full.click('[data-test="sample-add"]');
   const filled = await full.textContent('[data-test="toast"]:has-text("Sample data")');
   await full.keyboard.press('Escape');
@@ -692,7 +692,7 @@ async function run(url) {
   console.log('with sample data:', n, 'tasks;', Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', '));
   for (const [k, v] of Object.entries(timings)) assert.ok(v < 2500, `${k} stays quick with sample data (${v} ms)`);
   await full.click('[data-test="account"]');
-  await full.click('[data-test="acct-tab-data"]');
+  await full.click('[data-test="menu-privacy"]');
   await full.click('[data-test="sample-remove"]');
   await full.waitForSelector('[data-test="sample-add"]');
   await full.close();

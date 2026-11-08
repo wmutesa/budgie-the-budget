@@ -21,11 +21,13 @@ import Icon from './Icon.vue';
 // Inside the Schedule (embedded) it shows week and month; a day opens the
 // Schedule's own day time line.
 // `fill`: the height to grow to (the Schedule's activity list), 0 for its own size.
-const props = defineProps({ filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false }, fill: { type: Number, default: 0 }, listHidden: { type: Boolean, default: false } });
+const props = defineProps({ at: { type: String, default: '' }, filter: { type: Function, default: () => true }, embedded: { type: Boolean, default: false }, fill: { type: Number, default: 0 }, listHidden: { type: Boolean, default: false } });
 const emit = defineEmits(['focus', 'day', 'range', 'list', 'pick']);
 const MODES = [['day', 'Day'], ['week', 'Week'], ['month', 'Month']];
 const mode = computed({ get: () => (['day', 'week', 'month'].includes(store.planner.cal) ? store.planner.cal : 'week'), set: v => { store.planner.cal = v; } });
-const anchor = ref(today());
+const anchor = ref(props.at || today());
+// In the Schedule, the header above picks the week or month (the same header in every view).
+watch(() => props.at, v => { if (v) anchor.value = v; });
 // Pixels per hour: 48, or taller to fill `fill`.
 const root = ref(null);
 const monthEl = ref(null);
@@ -239,7 +241,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
 
 <template>
   <div ref="root" class="cal" data-test="calendar">
-    <div class="cal-bar">
+    <div v-if="!embedded" class="cal-bar">
       <button v-if="listHidden" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="emit('list')"><Icon name="list" :size="16" /></button>
       <span class="cal-nav">
         <button type="button" class="ibtn ghost" :title="`Previous ${mode}`" :aria-label="`Previous ${mode}`" @click="step(-1)"><Icon name="left" /></button>
@@ -328,7 +330,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
             <button type="button" class="ibtn" :class="{ primary: !curDone }" :title="curDone ? 'Undo' : 'Mark done'" :aria-label="curDone ? 'Undo' : 'Mark done'" data-test="cal-done" @click="act.done"><Icon :name="curDone ? 'refresh' : 'check'" /></button>
             <button type="button" class="ibtn" title="Edit" aria-label="Edit" data-test="cal-edit" @click="pop.editing = !pop.editing"><Icon name="edit" /></button>
             <button type="button" class="ibtn ai" :disabled="splitting" title="Break into steps with AI" aria-label="Break into steps" data-test="cal-breakdown" @click="split"><Icon name="sparkle" /></button>
-            <button v-if="!curDone" type="button" class="ibtn" title="Focus for 25 minutes" aria-label="Focus" @click="act.focus"><Icon name="play" /></button>
+            <button v-if="!curDone" type="button" class="ibtn" title="Lock In: a timer for just this" aria-label="Lock In" data-test="cal-lockin" @click="act.focus"><Icon name="timer" /></button>
             <button v-if="!cur.task.repeat" type="button" class="ibtn" title="Move to the next day" aria-label="Move to the next day" @click="act.tomorrow"><Icon name="right" /></button>
             <button v-else type="button" class="ibtn" title="Skip this day" aria-label="Skip this day" @click="act.skip"><Icon name="x" /></button>
             <button type="button" class="ibtn" title="Duplicate" aria-label="Duplicate" @click="act.copy"><Icon name="copy" /></button>

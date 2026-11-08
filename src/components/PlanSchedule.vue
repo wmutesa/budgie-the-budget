@@ -7,6 +7,10 @@ import { catKey, catLabel, catColor } from '../lib/cats';
 import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
 import TaskEditor from './TaskEditor.vue';
+import EmojiPick from './EmojiPick.vue';
+import DateField from './DateField.vue';
+import TimeField from './TimeField.vue';
+import { startFocus } from '../lib/focus';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
 import { toast } from '../lib/toast';
@@ -23,8 +27,23 @@ let tick = null;
 onMounted(() => { tick = setInterval(() => { clock.value = new Date(); }, 30000); nextTick(scrollToStart); window.addEventListener('resize', measure); });
 onUnmounted(() => { clearInterval(tick); ro?.disconnect(); window.removeEventListener('resize', measure); });
 const isToday = computed(() => day.value === today());
-const dateLabel = computed(() => fromIso(day.value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
-const step = n => { day.value = addDays(day.value, n); };
+const dayLabelShort = computed(() => fromIso(day.value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }));
+// The same header in every view: the day, the week or the month, with arrows.
+const weekStartOf = iso => addDays(iso, -((fromIso(iso).getDay() + 6) % 7));
+const dateLabel = computed(() => {
+  if (range.value === 'month') return fromIso(day.value).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  if (range.value === 'week') {
+    const a = fromIso(weekStartOf(day.value)); const b = fromIso(addDays(weekStartOf(day.value), 6));
+    return `${a.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${b.toLocaleDateString('en-US', a.getMonth() === b.getMonth() ? { day: 'numeric' } : { month: 'short', day: 'numeric' })}`;
+  }
+  return dayLabelShort.value;
+});
+const step = n => {
+  if (range.value === 'week') { day.value = addDays(day.value, 7 * n); return; }
+  if (range.value === 'month') { const d = fromIso(day.value); d.setDate(1); d.setMonth(d.getMonth() + n); day.value = isoDay(d); return; }
+  day.value = addDays(day.value, n);
+};
+const unit = computed(() => ({ day: 'day', week: 'week', month: 'month' }[range.value]));
 // The activity list starts open on wide screens and folded on phones.
 const wide = ref(typeof window === 'undefined' || window.innerWidth >= 900);
 const listOpen = computed({ get: () => store.planner.schList ?? wide.value, set: v => { store.planner.schList = v; } });
@@ -76,7 +95,7 @@ const dayCats = computed(() => groupCats(items.value));
 const colorOf = key => dayCats.value.find(c => c.key === key)?.color || '#52525b';
 const progress = computed(() => { const all = spanItems.value.length; const done = spanItems.value.filter(x => x.done).length; return { all, done, pct: all ? Math.round((done / all) * 100) : 0 }; });
 const listTitle = computed(() => {
-  if (range.value === 'day') return isToday.value ? 'Today' : dateLabel.value;
+  if (range.value === 'day') return isToday.value ? 'Today' : dayLabelShort.value;
   const [a] = span.value; const t = today();
   if (range.value === 'month') return fromIso(a).toLocaleDateString('en-US', { month: 'long' });
   return a <= t && t <= span.value[1] ? 'This week' : `Week of ${fromIso(a).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
@@ -173,13 +192,15 @@ function planDay() {
 
 // Jump the time line to now.
 // The calendar is full height, so Now scrolls the page to the red line.
-function toNow() { if (!isToday.value) day.value = today(); nextTick(() => grid.value?.querySelector('.sch-now')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })); }
+function toNow() { if (!isToday.value) day.value = today(); if (range.value !== 'day') return; nextTick(() => grid.value?.querySelector('.sch-now')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })); }
 // ---------- editing ----------
 const tickX = x => toggleDone(x.task, x.date);
 // Clicking a thing on the calendar shows it in the activity list beside it:
 // the list opens (and its category, over a week or month), and its row is
 // scrolled into view and highlighted briefly.
 const flashKey = ref('');
+// The date and time row under one activity (the calendar icon on its row).
+const whenKey = ref('');
 let flashTimer = null;
 function pick(x, then) {
   listOpen.value = true;
@@ -213,14 +234,25 @@ function placeOver(x, scroll) {
   const top = Math.max(12, Math.min(r ? r.top : 80, window.innerHeight - 160));
   return { x, style: { left: `${left}px`, top: `${top}px`, width: `${w}px`, maxHeight: `${window.innerHeight - top - 12}px` }, onCalendar: Boolean(on) };
 }
+const overTitle = ref(null);
+// Keep a floating card fully on screen, using its real size once it has drawn.
+function keepOnScreen(el, holder) {
+  if (!el || !holder?.value) return;
+  const r = el.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight, m = 12;
+  const top = Math.max(m, Math.min(r.top, vh - Math.min(r.height, vh - 2 * m) - m));
+  const left = Math.max(m, Math.min(r.left, vw - r.width - m));
+  if (Math.abs(top - r.top) > 1 || Math.abs(left - r.left) > 1) holder.value = { ...holder.value, style: { ...holder.value.style, top: `${top}px`, left: `${left}px`, maxHeight: `${vh - top - m}px` } };
+}
 function editOver(x) {
   if (over.value?.x.key === x.key) { over.value = null; return; }
   over.value = placeOver(x, true);
+  nextTick(() => keepOnScreen(overEl.value, over));
 }
 const closeOver = () => { over.value = null; };
 // The card follows its item when the page scrolls.
 let raf = 0;
-const onScroll = () => { if (!over.value || raf) return; raf = requestAnimationFrame(() => { raf = 0; if (over.value) over.value = placeOver(over.value.x, false); }); };
+const onScroll = () => { if (!over.value || raf) return; raf = requestAnimationFrame(() => { raf = 0; if (over.value) { over.value = placeOver(over.value.x, false); nextTick(() => keepOnScreen(overEl.value, over)); } }); };
 // Esc closes the card, unless it is closing a date or time picker inside it.
 const escOver = e => { if (e.key === 'Escape' && over.value && !document.querySelector('.pk-pop')) closeOver(); };
 onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); document.addEventListener('keydown', escOver); });
@@ -282,7 +314,7 @@ function newHere(e, col) {
   const top = Math.max(12, Math.min(e.clientY + 10, window.innerHeight - 140));
   fresh.value = { date: day.value, time: fromMins(Math.min(23 * 60 + 30, Math.max(0, mins))), col, style: { left: `${left}px`, top: `${top}px`, width: `${w}px` } };
   freshText.value = '';
-  nextTick(() => freshEl.value?.querySelector('input')?.focus());
+  nextTick(() => { keepOnScreen(freshEl.value, fresh); freshEl.value?.querySelector('input')?.focus(); });
 }
 const KIND_OF_LABEL = Object.fromEntries(Object.entries(KINDS).map(([k, v]) => [v.label, k]));
 function addFresh() {
@@ -306,7 +338,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
   <div class="sch" :class="{ 'no-list': !listOpen }" data-test="schedule">
     <div class="sch-bar">
       <h2 class="sch-title">Schedule</h2>
-      <div v-if="range === 'day'" class="sch-date">
+      <button v-if="!listOpen && range !== 'day'" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="listOpen = true"><Icon name="list" :size="16" /></button>
+      <div class="sch-date">
         <button type="button" class="sch-day" title="Pick a day" :aria-expanded="pickOpen" data-test="sch-today" @click="openPick"><Icon name="calendar" :size="15" />{{ dateLabel }}</button>
         <div v-if="pickOpen" ref="pickEl" class="sch-pick" role="dialog" aria-label="Pick a day" data-test="sch-pick" @keydown.esc="pickOpen = false">
           <div class="sch-pick-head">
@@ -320,15 +353,15 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
           </div>
           <button type="button" class="sch-pick-today" @click="pickDay(today())">Today</button>
         </div>
-        <button type="button" class="sch-step" title="Previous day" aria-label="Previous day" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
-        <button type="button" class="sch-step" title="Next day" aria-label="Next day" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
+        <button type="button" class="sch-step" :title="`Previous ${unit}`" :aria-label="`Previous ${unit}`" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
+        <button type="button" class="sch-step" :title="`Next ${unit}`" :aria-label="`Next ${unit}`" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
       </div>
-      <button v-if="range === 'day'" type="button" class="sch-now-btn" title="Jump to now" data-test="sch-now" @click="toNow"><Icon name="clock" :size="14" />Now</button>
+      <button type="button" class="sch-now-btn" :title="range === 'day' ? 'Jump to now' : `Back to this ${unit}`" data-test="sch-now" @click="toNow"><Icon name="clock" :size="14" />{{ range === 'day' ? 'Now' : 'Today' }}</button>
       <div class="sch-modes" role="group" aria-label="Range">
         <button v-for="[id, label] in [['day', 'Day'], ['week', 'Week'], ['month', 'Month']]" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`cal-${id}`" @click="range = id; id === 'day' && nextTick(scrollToStart)">{{ label }}</button>
       </div>
-      <button type="button" class="sch-cal-btn" :aria-expanded="calOpen" data-test="calendars-open" @click="calOpen = !calOpen"><Icon name="calendar" :size="15" />Calendars<b v-if="store.feeds.length">{{ store.feeds.length }}</b></button>
-      <div v-if="calOpen" ref="calPopEl" class="sch-cal-pop"><PlanCalendars /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
+      <button type="button" class="sch-cal-btn" :aria-expanded="calOpen" data-test="calendars-open" @click="calOpen = !calOpen"><Icon name="calendar" :size="15" />Calendars</button>
+      <div v-if="calOpen" ref="calPopEl" class="sch-cal-pop"><PlanCalendars show="add" /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
     </div>
 
     <div class="sch-body">
@@ -352,17 +385,26 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
                 <span class="sch-tags"><span v-if="range !== 'day'" class="sch-tag">{{ x.summary ? 'Repeats' : rowDate(x) }}</span><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
               </span>
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
-              <button type="button" class="sch-icon" :aria-expanded="over?.x.key === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" data-test="row-edit" @click="editOver(x)"><Icon name="edit" :size="15" /></button>
+              <span class="sch-row-acts">
+                <button v-if="!x.summary && !x.done" type="button" class="sch-icon" :aria-label="`Lock in on ${x.task.title}`" title="Lock In: a timer for just this" data-test="row-lockin" @click="startFocus(x.task)"><Icon name="timer" :size="15" /></button>
+                <button type="button" class="sch-icon" :aria-expanded="whenKey === x.key" :aria-label="`Date and time of ${x.task.title}`" title="Date and time" data-test="row-when" @click="whenKey = whenKey === x.key ? '' : x.key"><Icon name="when" :size="15" /></button>
+                <button type="button" class="sch-icon" :aria-expanded="over?.x.key === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" data-test="row-edit" @click="editOver(x)"><Icon name="edit" :size="15" /></button>
+              </span>
+              <div v-if="whenKey === x.key" class="sch-when" data-test="row-when-pop">
+                <DateField v-model="x.task.date" label="Date" placeholder="No date" />
+                <TimeField v-model="x.task.time" label="Time" />
+                <button type="button" class="sch-icon" title="Done" aria-label="Done" @click="whenKey = ''"><Icon name="check" :size="15" /></button>
+              </div>
             </li>
           </ul>
         </div>
         <div v-if="!cats.length" class="sch-empty">
           <p><b>Nothing planned{{ range === 'day' ? (isToday ? ' today' : '') : range === 'week' ? ' this week' : ' this month' }}.</b></p>
-          <p class="muted small">Tap <b>Add</b> and say what is coming up.</p>
+          <p class="muted small">Suspiciously calm. Tap <b>Add</b> and say what is coming up.</p>
         </div>
       </section>
 
-      <PlanCalendar v-if="range !== 'day'" embedded @pick="pick" class="sch-cal" :fill="listH" :class="{ 'with-list': listOpen }" @day="openDayFromCal" @focus="go('Focus')" @range="r => (calRange = r)" @list="listOpen = true" :list-hidden="!listOpen" />
+      <PlanCalendar v-if="range !== 'day'" :at="day" embedded @pick="pick" class="sch-cal" :fill="listH" :class="{ 'with-list': listOpen }" @day="openDayFromCal" @range="r => (calRange = r)" @list="listOpen = true" :list-hidden="!listOpen" />
       <section v-else class="sch-time" aria-label="Time line">
         <div ref="headEl" class="sch-cols-head" :style="{ '--n': columns.length }">
           <span class="sch-axis-h"><button v-if="!listOpen" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="listOpen = true"><Icon name="list" :size="16" /></button><template v-else>{{ isToday ? 'Today' : fromIso(day).toLocaleDateString('en-US', { weekday: 'short' }) }}</template></span>
@@ -402,10 +444,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
       <div v-if="over" ref="overEl" class="sch-over" :class="{ beside: !over.onCalendar }" :style="over.style" role="dialog" :aria-label="`Edit ${over.x.task.title}`" data-test="sch-over" @keydown.esc="closeOver">
         <div class="sch-over-head" :style="{ '--c': catColor(over.x.task) }">
           <i />
-          <b>{{ over.x.task.title }}</b>
+          <input ref="overTitle" v-model="over.x.task.title" class="sch-over-title" aria-label="Title" maxlength="160" data-test="over-title" />
+          <EmojiPick v-model="over.x.task.title" :input="overTitle" />
           <button type="button" class="sch-icon" title="Close" aria-label="Close" @click="closeOver"><Icon name="x" :size="16" /></button>
         </div>
-        <TaskEditor :task="over.x.task" @close="closeOver" />
+        <TaskEditor :task="over.x.task" head-title @close="closeOver" />
       </div>
     </Teleport>
   </div>

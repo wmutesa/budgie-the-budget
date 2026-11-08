@@ -10,8 +10,9 @@ const PLACES = [
   ['Overview', 'Overview', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Schedule', 'Schedule', 'Your day, week and month, with your activity', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule|calendar|week|month|day view|timeline/],
   ['Progress', 'Progress', 'Focus hours, what got done, by category', /report|analytic|stats|insight|progress|hours/],
-  ['Focus', 'Focus', 'Top three, a focus timer and suggestions', /focus|timer|pomodoro|top three|suggest/],
-  ['Schedule', 'Import a calendar', 'Canvas, Google, Apple or Outlook', /canvas|google|outlook|apple|ical|import/, null, '#calendars'],
+  ['Settings', 'Settings', 'Profile, AI, calendars, devices and people', /setting|profile|account|device|passkey|people|invite|gemini|key/],
+  ['Privacy', 'Privacy', 'Your data, sessions and deleting your account', /privacy|data|download|export|delete|session|sign out/],
+  ['Settings', 'Your calendars', 'Canvas, Google, Apple or Outlook, and holidays', /canvas|google|outlook|apple|ical|import|calendars|holiday/, null, '#calendars'],
 ];
 
 const has = (hay, q) => String(hay || '').toLowerCase().includes(q);

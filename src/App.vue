@@ -8,7 +8,8 @@ import RecoveryCodes from './components/RecoveryCodes.vue';
 import SignInBackdrop from './components/SignInBackdrop.vue';
 import TodayView from './components/TodayView.vue';
 import PlannerView from './components/PlannerView.vue';
-import FocusView from './components/FocusView.vue';
+import AccountPage from './components/AccountPage.vue';
+import LockIn from './components/LockIn.vue';
 import ReportsView from './components/ReportsView.vue';
 import CaptureButton from './components/CaptureButton.vue';
 import CaptureReview from './components/CaptureReview.vue';
@@ -25,10 +26,12 @@ import { focus, mmss } from './lib/focus';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
-// Four pages: Overview (your day and goals), Schedule (day, week and month,
-// with your activity), Focus (what matters now) and Progress (what got done). The Add button adds anything from anywhere.
+// Three pages: Overview (your day and goals), Schedule (day, week and month,
+// with your activity) and Progress (what got done). Settings and Privacy open
+// from the avatar. The Add button adds anything from anywhere; Lock In (the
+// timer) starts from any activity.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Focus: 'target', Progress: 'trend' };
+const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Progress: 'trend' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -106,8 +109,8 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </nav>
         <GlobalSearch />
         <div class="nb-actions">
-          <!-- In focus: a pill with the time left, like a status icon in a menu bar -->
-          <button v-if="focus.task" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Focusing on ${focus.task.title}`" :aria-label="focus.ended ? 'Focus session ended: open Focus' : `In focus, ${mmss(focus.left)} left: open Focus`" data-test="nb-focus" @click="go('Focus')"><Icon name="target" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
+          <!-- Lock In, minimised: a pill with the time left, like a status icon in a menu bar -->
+          <button v-if="focus.task" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Locked in on ${focus.task.title}`" :aria-label="focus.ended ? 'Lock In ended: open it' : `Locked in, ${mmss(focus.left)} left: open Lock In`" data-test="nb-focus" @click="focus.min = false"><Icon name="timer" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
           <CaptureButton v-if="account.status === 'signed-in'" />
           <NoticeBell />
           <AccountMenu @tour="touring = true" />
@@ -120,8 +123,11 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
       <template v-else-if="active === 'Schedule'">
         <PlannerView />
       </template>
-      <template v-else-if="active === 'Focus'">
-        <FocusView />
+      <template v-else-if="active === 'Settings'">
+        <AccountPage kind="settings" />
+      </template>
+      <template v-else-if="active === 'Privacy'">
+        <AccountPage kind="privacy" />
       </template>
       <template v-else-if="active === 'Progress'">
         <ReportsView />
@@ -129,6 +135,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
     </main>
 
     <Toasts />
+    <LockIn v-if="account.status === 'signed-in'" />
     <CaptureReview v-if="account.status === 'signed-in'" />
     <GuideTour v-if="touring" :page="active" @page="p => (active = p)" @done="endTour" />
   </div>

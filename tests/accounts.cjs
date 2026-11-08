@@ -113,6 +113,7 @@ async function main() {
 
     // The owner invites someone.
     await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="menu-settings"]');
     await owner.page.click('[data-test="acct-tab-people"]');
     await owner.page.fill('.acct-invite .field', 'Alex');
     await owner.page.click('.acct-invite button');
@@ -192,19 +193,20 @@ async function main() {
     const reuse = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[0] }) });
     assert.equal(reuse.status, 401, 'a recovery code works once');
     await lost.page.click('[data-test="account"]');
+    await lost.page.click('[data-test="menu-settings"]');
     await lost.page.click('[data-test="acct-tab-security"]');
     await lost.page.waitForSelector('[data-test="codes-left"]:has-text("7 unused codes")');
     await lost.page.click('[data-test="new-codes"]');
-    await lost.page.waitForSelector('.acct-sheet .rc-list code');
+    await lost.page.waitForSelector('[data-test="settings-page"] .rc-list code');
     const old = await fetch(`${base}/api/recover`, { method: 'POST', headers: { Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: codes[1] }) });
     assert.equal(old.status, 401, 'making new codes cancels the old ones');
     await lost.context.close();
 
     // The owner removes Alex, whose session stops working.
-    await owner.page.click('.acct-sheet .icon-x');
     await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="menu-settings"]');
     await owner.page.click('[data-test="acct-tab-people"]');
-    const alexRow = owner.page.locator('.acct-sheet .acct-list li', { hasText: 'Alex' }).getByRole('button', { name: 'Remove' });
+    const alexRow = owner.page.locator('[data-test="settings-page"] .acct-list li', { hasText: 'Alex' }).getByRole('button', { name: 'Remove' });
     await alexRow.waitFor();
     // Click until the server sees the removal (a click during a re-render can miss).
     let removed = false;
@@ -214,7 +216,7 @@ async function main() {
       removed = await seen;
     }
     assert.ok(removed, 'the owner can remove a person');
-    await owner.page.waitForFunction(() => !document.querySelector('.acct-sheet').textContent.includes('Alex'));
+    await owner.page.waitForFunction(() => !document.querySelector('[data-test="settings-page"]').textContent.includes('Alex'));
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
 
     // The owner cannot delete their own account; a member can delete theirs.
@@ -235,7 +237,8 @@ async function main() {
 
     const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
     assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');
-    await owner.page.click('[data-test="account"]').catch(() => {});
+    await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="menu-settings"]');
     await owner.page.click('[data-test="acct-tab-people"]');
     await owner.page.waitForSelector('.acct-invite .field');
     await owner.page.fill('.acct-invite .field', 'Sam');
@@ -250,8 +253,12 @@ async function main() {
     await sam.page.waitForSelector('[data-test="guide-skip"]');
     await sam.page.click('[data-test="guide-skip"]');
     await sam.page.click('[data-test="account"]');
-    await sam.page.click('[data-test="acct-tab-data"]');
+    await sam.page.click('[data-test="menu-settings"]');
+    await sam.page.waitForSelector('[data-test="acct-tab-profile"]');
     assert.equal(await sam.page.$('[data-test="acct-tab-people"]'), null, 'members do not see People');
+    await sam.page.click('[data-test="account"]');
+    await sam.page.click('[data-test="menu-privacy"]');
+    await sam.page.click('[data-test="acct-tab-delete"]');
     sam.page.removeAllListeners('dialog');
     sam.page.once('dialog', d => d.accept('DELETE'));
     await sam.page.click('[data-test="delete-account"]');
