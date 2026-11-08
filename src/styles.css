@@ -3674,3 +3674,5 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .lk .lk-chip.on { outline-color: #fff; }
 .lk .lk-key:focus-visible { outline-color: #fff; }
 .lk-stage > .lk-title, .lk-stage > .lk-line, .lk-stage > .lk-kicker, .lk-stage > .lk-foot { border-radius: 8px !important; }
+/* The phrase being said, faded until it is final */
+.cap-partial { margin: 6px 0 0; font-size: 14px; color: #a1a1aa; font-style: italic; overflow-wrap: anywhere; }

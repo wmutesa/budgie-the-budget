@@ -291,7 +291,8 @@ export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', 
 // Gemini hears a recording (base64 audio) and returns { transcript, items }.
 export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', body: payload });
 // Live words: one short piece of a recording, written down by Budgie's server.
-export const liveWords = (audio, prompt) => api('/api/voice/live', { method: 'POST', body: { audio, prompt } }).then(r => r.text || '');
+// terms: the person's own words (categories, course codes, task names), to help the speech model spell them.
+export const liveWords = (audio, prompt, terms = [], partial = false) => api('/api/voice/live', { method: 'POST', body: { audio, prompt, terms, partial } }).then(r => r.text || '');
 export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = []) => api('/api/gemini/breakdown', { method: 'POST', body: { text, today, weekday, timeZone, categories, hints, existing } });
 // Budgie's own server AI: the same breakdown, for everyone, without a key.
 export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = []) => api('/api/voice/breakdown', { method: 'POST', body: { text, today, weekday, timeZone, categories, hints, existing } });

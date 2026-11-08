@@ -17,6 +17,19 @@ import { diag, from, flush } from '../lib/diag';
 // listens. Only Stop, on the card, ends it: Budgie then breaks what you said
 // into separate things and puts each one in place. Typed text is added line by line.
 const micNote = ref('');
+// The words so far in the phrase you are saying, faded until you pause.
+const partial = ref('');
+// Keyterms (as ElevenLabs calls them): your categories, course codes and open task names,
+// so the speech model spells them your way. At most 50, each short.
+function keyterms() {
+  const out = new Set();
+  for (const p of Object.keys(store.projects || {})) out.add(p);
+  for (const t of store.tasks || []) { if (t.project) out.add(t.project); }
+  for (const t of (store.tasks || []).filter(x => !x.done).slice(0, 80)) { const m = t.title.match(/\b[A-Z]{2,5}\s?\d{2,4}[A-Z]?\b/g); if (m) m.forEach(x => out.add(x)); }
+  for (const t of (store.tasks || []).filter(x => !x.done && !x.repeat).slice(0, 40)) out.add(t.title);
+  if (store.me?.name) out.add(store.me.name);
+  return [...out].map(x => String(x).replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(x => x.length > 1).slice(0, 50);
+}
 const spoken = ref(false);
 const level = ref(0);
 // New words go after what is there, with a space only when both sides have text.
@@ -29,7 +42,8 @@ const geminiAudio = computed(() => canCapture && hasKey.value && store.planner?.
 const recLive = ref(false);
 let liveFailed = false;
 const live = createLive({
-  send: liveWords,
+  send: (audio, prompt, isPartial) => liveWords(audio, prompt, keyterms(), Boolean(isPartial)),
+  onPartial: t => { partial.value = t; },
   onLevel: v => { level.value = v; },
   onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, spokenMarks(t)); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {
@@ -70,6 +84,7 @@ async function listen() {
   base = capture.text;
   dict.start();
 }
+watch(listening, v => { if (!v) partial.value = ''; });
 const stopAll = () => { if (recLive.value) live.cancel(); recLive.value = false; if (dict.listening.value) dict.stop(); };
 
 // Open: start listening straight away when the browser can. Called from the tap,
@@ -156,6 +171,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
         <div class="cap-pad" :class="{ live: listening }">
           <textarea ref="box" v-model="capture.text" rows="4" placeholder="“Essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March”" aria-label="What to add" data-test="capture-text" @input="onEdit" @keydown.meta.enter.prevent="sortIt" @keydown.ctrl.enter.prevent="sortIt" />
           <div class="cap-wave" aria-hidden="true" :style="{ '--lv': level }"><i v-for="n in 5" :key="n" /></div>
+          <p v-if="listening && partial" class="cap-partial" aria-live="polite" data-test="capture-partial">{{ partial }}…</p>
         </div>
 
         <p v-if="micNote" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ micNote }}</p>

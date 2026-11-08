@@ -68,6 +68,7 @@ const geminiCalls = [];
 const voiceCalls = [];
 // Live words: each piece of audio the page sends gets the next scripted phrase ('' once they run out; 503 means unavailable).
 const liveScript = [];
+let partialCalls = 0; // quick guesses while talking (they do not use up the script)
 // Budgie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
 let budgieItems = null;
 const budgieCalls = [];
@@ -127,7 +128,7 @@ async function fakeApi(page, account = fakeAccount) {
     ] } }); }
     // Gemini hears a recording: what was said, and the items in it.
     if (p === '/api/voice/breakdown') { budgieCalls.push(JSON.parse(req.postData() || '{}')); return budgieItems ? route.fulfill({ json: { items: budgieItems } }) : route.fulfill({ status: 503, json: { error: 'busy' } }); }
-    if (p === '/api/voice/live') { liveCalls++; const body = JSON.parse(req.postData() || '{}'); if (!/^UklGR/.test(body.audio || '')) return route.fulfill({ status: 400, json: { error: 'not wav' } }); const t = liveScript.length ? liveScript.shift() : ''; return t === 503 ? route.fulfill({ status: 503, json: { error: 'Live words are not available right now.' } }) : route.fulfill({ json: { text: t } }); }
+    if (p === '/api/voice/live') { const body = JSON.parse(req.postData() || '{}'); if (body.partial) { partialCalls++; return route.fulfill({ json: { text: typeof liveScript[0] === 'string' ? liveScript[0].split(' ').slice(0, 2).join(' ') : '' } }); } liveCalls++; if (!/^UklGR/.test(body.audio || '')) return route.fulfill({ status: 400, json: { error: 'not wav' } }); const t = liveScript.length ? liveScript.shift() : ''; return t === 503 ? route.fulfill({ status: 503, json: { error: 'Live words are not available right now.' } }) : route.fulfill({ json: { text: t } }); }
     if (p === '/api/gemini/voice') { voiceCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
       { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
       { title: 'History quiz', kind: 'exam', date: inDays(10), time: '', minutes: 0, repeat: '', days: [], course: 'History' },

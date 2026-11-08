@@ -474,7 +474,9 @@ async function routes(request, env, url) {
     const key = `voice-live:${user.id}`;
     if (await tooManyAttempts(env, key, 2000)) return fail(429, 'A lot of talking this hour. Live words pause; Stop still works.');
     await countFailure(env, key);
-    const { audio, prompt } = await body(request);
+    const { audio, prompt, terms } = await body(request);
+    // Keyterms (the person's categories, course codes and task names) help the model spell them their way.
+    const words = (Array.isArray(terms) ? terms : []).filter(x => typeof x === 'string').slice(0, 50).map(x => x.replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(Boolean);
     if (typeof audio !== 'string' || !audio || audio.length > 3 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That piece of audio could not be read.');
     const before = String(prompt || '').replace(/[<>\n]/g, ' ').slice(-200);
     // Whisper sometimes "hears" these in silence.
@@ -482,7 +484,10 @@ async function routes(request, env, url) {
     let lastErr = '';
     if (env.AI) {
       try {
-        const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio, vad_filter: true, ...(before ? { initial_prompt: before } : {}) });
+        // Whisper reads its prompt as earlier text: the glossary first, then what was just said (about 200 tokens in all).
+        const glossary = words.length ? `${words.join(', ')}. ` : '';
+        const initial = `${glossary}${before}`.slice(-700).trim();
+        const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio, vad_filter: true, ...(initial ? { initial_prompt: initial } : {}) });
         const text = String(out?.text || '').trim();
         return json({ text: ghost(text) ? '' : text, via: 'whisper' });
       } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
@@ -490,7 +495,7 @@ async function routes(request, env, url) {
     const data = await accountData(env, user.id);
     const gkey = tidyKey(data?.digest?.geminiKey);
     if (keyShapeOk(gkey)) {
-      try { const text = await geminiWords(gkey, { audio, prompt: before }); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
+      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
     return fail(503, lastErr ? `Live words are not available right now (${lastErr}).` : 'Live words are not available right now.');
   }

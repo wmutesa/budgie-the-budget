@@ -16,9 +16,10 @@ const RATE = 16000;
 const QUIET = 0.012;      // a normal microphone: below this counts as silence
 const FLOOR_X = 3.5;      // or: this many times the room's own noise, for quiet microphones (Safari on a Mac)
 const MIN_VOICE = 0.0006; // never below this
-const PAUSE = 0.55;       // seconds of silence that end a phrase
+const PAUSE = 0.8;        // seconds of silence that end a phrase (long enough not to cut words in half)
 const MIN_PIECE = 1.2;    // seconds before a phrase may be cut
-const MAX_PIECE = 9;      // seconds: cut even without a pause
+const MAX_PIECE = 12;     // seconds: cut even without a pause
+const PARTIAL_EVERY = 2.2; // seconds of talking between live guesses at the words so far
 
 let ctx = null;
 const Ctx = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
@@ -38,8 +39,10 @@ function freshContext() {
   return ctx;
 }
 
-// send(wavBase64, prompt) → text; onText(newWords); onLevel(0..1); onError(message, code)
-export function createLive({ send, onText, onLevel, onError }) {
+// send(wavBase64, prompt, partial) → text; onText(newWords); onPartial(guessSoFar); onLevel(0..1); onError(message, code)
+// Like ElevenLabs' Scribe: a quick guess at the phrase while you talk (partial),
+// then the final words once you pause (committed).
+export function createLive({ send, onText, onPartial, onLevel, onError }) {
   let stream = null, src = null, proc = null;
   let all = [];            // every 16 kHz sample so far, in blocks
   let piece = [];          // samples of the phrase being spoken
@@ -61,7 +64,15 @@ export function createLive({ send, onText, onLevel, onError }) {
     return out;
   };
 
+  // A guess at the phrase so far, shown faded until the phrase is final.
+  function partial() {
+    sincePartial = 0; partialBusy = true;
+    const n = pieceNo;
+    const audio = b64(wav(normalize(join(piece))));
+    Promise.resolve(send(audio, said.slice(-200), true)).then(t => { if (n === pieceNo && live) onPartial?.(String(t || '').trim()); }).catch(() => {}).finally(() => { partialBusy = false; });
+  }
   function cut() {
+    pieceNo++; sincePartial = 0;
     const blocks = piece; const hadVoice = loud;
     piece = []; pieceLen = 0; quietFor = 0; loud = false;
     if (!hadVoice || !send) return; // silence: nothing to write down
@@ -73,8 +84,10 @@ export function createLive({ send, onText, onLevel, onError }) {
         const text = String(await send(audio, said.slice(-200)) || '').trim();
         failures = 0;
         diag('piece-text', { chars: text.length });
+        onPartial?.('');
         if (text) { said = `${said} ${text}`.trim(); onText?.(text); }
       } catch (e) {
+        onPartial?.('');
         failures++;
         diag('piece-failed', { status: e?.status, msg: String(e?.message || '').slice(0, 200) });
         if (failures === 1 || e?.status === 503) onError?.(e?.message || 'Live words could not be written down.', e?.status === 503 ? 'unavailable' : 'failed');
@@ -83,7 +96,8 @@ export function createLive({ send, onText, onLevel, onError }) {
   }
 
   let ticks = 0, peak = 0, heardAny = false, rebuilt = false, silentTold = false, watchdog = null;
-  let floor = 1, sentAny = false; // the quietest level heard (the room), and whether any phrase was sent
+  let floor = 1, sentAny = false;
+  let sincePartial = 0, partialBusy = false, pieceNo = 0; // the quietest level heard (the room), and whether any phrase was sent
   const voiceAt = () => Math.max(MIN_VOICE, Math.min(QUIET, floor * FLOOR_X));
   function wire() {
     try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }
@@ -103,7 +117,9 @@ export function createLive({ send, onText, onLevel, onError }) {
       const secs = block.length / RATE;
       pieceLen += secs; total += secs;
       if (level >= voiceAt()) { loud = true; quietFor = 0; } else quietFor += secs;
+      sincePartial += secs;
       if ((pieceLen >= MIN_PIECE && quietFor >= PAUSE && loud) || pieceLen >= MAX_PIECE) cut();
+      else if (loud && sincePartial >= PARTIAL_EVERY && !partialBusy && send && onPartial) partial();
       else if (!loud && pieceLen >= 3) { piece = []; pieceLen = 0; quietFor = 0; } // long silence: drop it
       if (total >= MAX_SECONDS) stop();
     };

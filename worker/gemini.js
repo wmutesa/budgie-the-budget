@@ -219,12 +219,12 @@ ${categories.length ? `The person already uses these categories; when an item be
 // ---------- live text: one short piece of a recording ----------
 // Used for live words while someone talks, when Cloudflare's own speech model
 // is not available. Only the words, nothing else.
-export async function geminiWords(key, { audio, prompt = '' }) {
+export async function geminiWords(key, { audio, prompt = '', terms = [] }) {
   const res = await fetch(`${API}/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'audio/wav', data: audio } }, { text: `Write down exactly what is said in this short recording, in the language spoken, with normal punctuation. Reply with only those words. If nothing is said, reply with nothing.${prompt ? ` It follows: "${prompt.slice(-200)}"` : ''}` }] }],
+      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'audio/wav', data: audio } }, { text: `Write down exactly what is said in this short recording, in the language spoken, with normal punctuation. Reply with only those words. If nothing is said, reply with nothing.${terms.length ? ` Words they often use, spelled their way: ${terms.join(', ')}.` : ''}${prompt ? ` It follows: "${prompt.slice(-200)}"` : ''}` }] }],
       generationConfig: { temperature: 0, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 400 },
     }),
     signal: AbortSignal.timeout(20000),
