@@ -165,6 +165,59 @@ const compare = computed(() => [
   ['On time', cur.value.onTime, prev.value.onTime, v => (v == null ? '–' : `${v}%`)],
 ].map(([name, now, before, f]) => ({ name, now: f(now), before: hasPrev.value ? f(before) : '–', change: hasPrev.value && now != null && before != null ? delta(now, before) : null })));
 
+// ---------- the main chart: straight segments, a soft fill, a hover marker ----------
+const metric = ref('done');
+const series = computed(() => daily.value.map(x => (metric.value === 'done' ? x.done : x.focus)));
+const fmt = v => (metric.value === 'done' ? `${Math.round(v)}` : hours(v));
+// A top that splits into four even steps: whole numbers for counts, half hours for focus.
+const yMax = computed(() => { const m = Math.max(1, ...series.value); const q = metric.value === 'done' ? 4 : 120; return Math.ceil(m / q) * q; });
+const yTicks = computed(() => [1, 0.75, 0.5, 0.25, 0].map(f => yMax.value * f));
+const nPts = computed(() => Math.max(1, series.value.length - 1));
+const pts = computed(() => series.value.map((v, i) => [(i / nPts.value) * 100, 100 - (v / yMax.value) * 100]));
+const linePath = computed(() => pts.value.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' '));
+const areaPath = computed(() => (pts.value.length ? `${linePath.value} L100,100 L0,100 Z` : ''));
+const xTicks = computed(() => daily.value.map((x, i) => [i, days.value <= 7 ? WEEK[wd(fromIso(x.d))] : short(x.d)]).filter(([i]) => i % dayLabelEvery.value === 0));
+const hover = ref(-1);
+const plot = ref(null);
+function onMove(e) {
+  const r = plot.value.getBoundingClientRect();
+  const x = ((e.touches ? e.touches[0].clientX : e.clientX) - r.left) / r.width;
+  hover.value = Math.max(0, Math.min(series.value.length - 1, Math.round(x * nPts.value)));
+}
+function onKey(e) {
+  if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+  e.preventDefault();
+  const i = hover.value < 0 ? series.value.length - 1 : hover.value + (e.key === 'ArrowRight' ? 1 : -1);
+  hover.value = Math.max(0, Math.min(series.value.length - 1, i));
+}
+const hp = computed(() => (hover.value >= 0 ? pts.value[hover.value] : null));
+const total = computed(() => (metric.value === 'done' ? cur.value.done.length : cur.value.focus));
+const totalDelta = computed(() => (metric.value === 'done' ? delta(cur.value.done.length, prev.value.done.length) : delta(cur.value.focus, prev.value.focus)));
+
+// ---------- the verdict, with how sure Budgie is ----------
+const verdict = computed(() => {
+  const s = stats.value; const c = cur.value;
+  const label = c.rate >= 75 && s.consistency >= 70 ? 'On track' : c.rate >= 55 ? 'Steady, with gaps' : 'Overloaded';
+  const why = label === 'On track' ? 'You finish most of what you plan, most days.' : label === 'Steady, with gaps' ? 'Good follow-through, but some days pass with nothing done.' : 'More is planned than gets done. A lighter plan would help.';
+  // More days of data means a surer read.
+  const sure = Math.round(Math.min(95, 40 + Math.min(1, cur.value.occ.length / 120) * 35 + Math.min(1, s.active / 20) * 20));
+  return { label, why, sure };
+});
+// What is helping, and what is holding you back.
+const drivers = computed(() => {
+  const s = stats.value; const out = [];
+  if (strongest.value) out.push({ up: true, text: `${strongest.value.label} follow-through, ${strongest.value.rate}%` });
+  if (s.r != null && s.r >= 0.2) out.push({ up: true, text: 'Focus sessions lift your output' });
+  if (s.slopeWeek >= 0.5) out.push({ up: true, text: `Rising: +${s.slopeWeek} a day each week` });
+  if (cur.value.onTime != null && cur.value.onTime >= 75) out.push({ up: true, text: `Deadlines met, ${cur.value.onTime}%` });
+  if (streaks.value[0]) out.push({ up: true, text: `${streaks.value[0].n}-day streak on ${streaks.value[0].t.title}` });
+  if (slipping.value && slipping.value.rate < 60 && slipping.value !== strongest.value) out.push({ up: false, text: `${slipping.value.label} slipping, ${slipping.value.rate}%` });
+  if (s.consistency < 60) out.push({ up: false, text: `Only ${s.consistency}% of days have something done` });
+  if (s.slopeWeek <= -0.5) out.push({ up: false, text: `Falling: ${s.slopeWeek} a day each week` });
+  if (cur.value.onTime != null && cur.value.onTime < 75) out.push({ up: false, text: `Late on ${100 - cur.value.onTime}% of dated tasks` });
+  return out.slice(0, 6);
+});
+
 // ---------- download ----------
 function download() {
   const rows = [['Date', 'Planned', 'Done', 'Focus minutes'], ...daily.value.map(x => [x.d, x.planned, x.done, x.focus]), [], ['Category', 'Planned', 'Done', 'Completion %', 'Focus minutes'], ...byCat.value.map(c => [c.label, c.planned, c.done, c.rate, c.focus])];
@@ -178,124 +231,133 @@ function download() {
 </script>
 
 <template>
-  <article class="rep span-12" data-test="reports">
-    <header class="rep-head">
-      <div>
-        <p class="label">Report · {{ short(from) }} – {{ short(to) }}</p>
-        <h1>How your {{ rangeName }} went</h1>
-      </div>
-      <div class="rep-head-acts">
-        <div class="seg rep-seg" role="group" aria-label="Range">
-          <button v-for="[id, label] in RANGES" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`rep-${id}`" @click="range = id">{{ label }}</button>
+  <div class="rep span-12" data-test="reports">
+    <!-- Header and the key facts -->
+    <section class="rep-box rep-top">
+      <div class="rep-top-row">
+        <div>
+          <p class="rep-crumb">REPORTS / <b>{{ rangeName.toUpperCase() }}</b></p>
+          <h1>How your {{ rangeName }} went</h1>
         </div>
-        <button type="button" class="ibtn" title="Download the data as a spreadsheet (CSV)" aria-label="Download the data as a spreadsheet" data-test="rep-download" @click="download"><Icon name="download" /></button>
+        <button type="button" class="rep-btn" title="Download the data as a spreadsheet (CSV)" data-test="rep-download" @click="download"><Icon name="download" :size="15" />Download</button>
       </div>
-    </header>
-
-    <!-- Summary -->
-    <section class="rep-sec">
-      <h2><span>1</span>Summary</h2>
-      <p class="rep-abstract" data-test="rep-summary">{{ summary }}</p>
-      <dl class="rep-keys">
-        <div data-test="rep-stat"><dt>Done</dt><dd>{{ cur.done.length }}<small> of {{ cur.occ.length }}</small></dd></div>
-        <div data-test="rep-stat"><dt>Per day</dt><dd>{{ stats.mean }}<small> avg</small></dd></div>
+      <dl class="rep-facts">
+        <div data-test="rep-stat"><dt>Done</dt><dd>{{ cur.done.length }} of {{ cur.occ.length }}</dd></div>
+        <div data-test="rep-stat"><dt>Completion</dt><dd>{{ cur.rate }}%</dd></div>
+        <div data-test="rep-stat"><dt>Per day</dt><dd>{{ stats.mean }} avg</dd></div>
         <div data-test="rep-stat"><dt>Focus</dt><dd>{{ hours(cur.focus) }}</dd></div>
-        <div data-test="rep-stat"><dt>On time</dt><dd>{{ cur.onTime == null ? '–' : `${cur.onTime}%` }}</dd></div>
+        <div><dt>On time</dt><dd>{{ cur.onTime == null ? '–' : `${cur.onTime}%` }}</dd></div>
+        <div><dt>Best day</dt><dd>{{ best?.done ? short(best.d) : '–' }}</dd></div>
       </dl>
     </section>
 
-    <!-- The data -->
-    <section class="rep-sec">
-      <h2><span>2</span>The data</h2>
-      <p class="rep-p">This report looks at {{ plural(days, 'day') }}, from {{ longDay(from) }} to {{ longDay(to) }}. It counts every task, event, class and routine that was planned in that time ({{ cur.occ.length }} in all), which of them were ticked, and {{ plural(cur.sessions.length, 'focus session') }}. It is compared with the {{ plural(days, 'day') }} before ({{ short(prevFrom) }} – {{ short(prevTo) }}).<template v-if="!hasPrev"> There is nothing recorded in that earlier period yet, so comparisons read "new".</template></p>
-    </section>
-
-    <!-- Findings -->
-    <section class="rep-sec">
-      <h2><span>3</span>Findings</h2>
-      <ol class="rep-findings" data-test="rep-says">
-        <li v-for="(f, i) in findings" :key="i"><b>{{ /[?.!]$/.test(f.head) ? f.head : `${f.head}.` }}</b> {{ f.text }}</li>
-      </ol>
-
-      <figure class="rep-fig">
-        <div class="rep-days" :style="{ '--n': daily.length }" role="img" :aria-label="`Things done each day; average ${stats.mean}`">
-          <span class="rep-avg" :style="{ bottom: `calc(${(stats.mean / maxDaily) * 100}% * (1 - 22 / 150) + 22px)` }"><em>avg {{ stats.mean }}</em></span>
-          <div v-for="(x, i) in daily" :key="x.d" class="rep-day" :class="{ today: x.d === to, best: best && x.d === best.d && x.done }" :title="`${longDay(x.d)}: ${x.done} of ${x.planned} done, ${hours(x.focus)} focus`">
-            <span class="rep-bar"><i :style="{ height: `${(x.done / maxDaily) * 100}%` }" /></span>
-            <span class="rep-dl">{{ i % dayLabelEvery === 0 ? (days <= 7 ? WEEK[wd(fromIso(x.d))] : short(x.d)) : '' }}</span>
+    <div class="rep-layout">
+      <div class="rep-main">
+        <!-- The main chart -->
+        <section class="rep-box rep-chart-box">
+          <div class="rep-chart-head">
+            <div>
+              <p class="muted">{{ metric === 'done' ? 'Things done' : 'Focus time' }}</p>
+              <p class="rep-total">{{ metric === 'done' ? total : hours(total) }}
+                <span v-if="totalDelta != null" class="rep-chg" :class="totalDelta >= 0 ? 'up' : 'down'">{{ pct(totalDelta) }}</span>
+              </p>
+            </div>
+            <p class="rep-index muted">Daily average <b>{{ metric === 'done' ? stats.mean : hours(cur.focus / days) }}</b></p>
           </div>
-        </div>
-        <figcaption><b>Figure 1.</b> Things done each day. The dashed line is the average ({{ stats.mean }}); the darker bar is the best day<template v-if="best?.done"> ({{ longDay(best.d) }}, {{ best.done }})</template>.</figcaption>
-      </figure>
-
-      <div class="rep-two">
-        <table class="rep-table">
-          <caption><b>Table 1.</b> Things done per day</caption>
-          <tbody>
-            <tr><th scope="row">Average (mean)</th><td>{{ stats.mean }}</td></tr>
-            <tr><th scope="row">Typical day (median)</th><td>{{ stats.median }}</td></tr>
-            <tr><th scope="row">Spread (standard deviation)</th><td>{{ stats.sd }}</td></tr>
-            <tr><th scope="row">Lightest – busiest</th><td>{{ stats.min }} – {{ stats.max }}</td></tr>
-            <tr><th scope="row">Days with something done</th><td>{{ stats.active }} of {{ days }} ({{ stats.consistency }}%)</td></tr>
-            <tr v-if="days >= 7"><th scope="row">Trend per week</th><td>{{ stats.slopeWeek >= 0 ? '+' : '' }}{{ stats.slopeWeek }} a day</td></tr>
-            <tr v-if="stats.r != null"><th scope="row">Focus and output (r)</th><td>{{ stats.r }} · {{ strength(stats.r) }}</td></tr>
-          </tbody>
-        </table>
-        <table class="rep-table">
-          <caption><b>Table 2.</b> Compared with the period before</caption>
-          <thead><tr><th>Measure</th><th>Before</th><th>Now</th><th>Change</th></tr></thead>
-          <tbody>
-            <tr v-for="r in compare" :key="r.name"><th scope="row">{{ r.name }}</th><td class="muted">{{ r.before }}</td><td><b>{{ r.now }}</b></td><td><span class="rep-chg" :class="r.change == null ? 'new' : r.change >= 0 ? 'up' : 'down'">{{ pct(r.change) }}</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <table class="rep-table rep-cats">
-        <caption><b>Table 3.</b> Where the effort went</caption>
-        <thead><tr><th>Category</th><th>Done</th><th>Share</th><th>Follow-through</th><th>Focus</th></tr></thead>
-        <tbody>
-          <tr v-for="c in topCats" :key="c.key" :style="{ '--c': c.color }"><th scope="row"><i />{{ c.label }}</th><td>{{ c.done }} of {{ c.planned }}</td><td>{{ c.share }}%</td><td><span class="rep-meter"><i :style="{ width: `${c.rate}%` }" /></span>{{ c.rate }}%</td><td class="muted">{{ c.focus ? hours(c.focus) : '–' }}</td></tr>
-        </tbody>
-      </table>
-      <p v-if="byCat.length > topCats.length" class="muted small">The other {{ byCat.length - topCats.length }} categories are in the downloaded data.</p>
-
-      <div class="rep-two">
-        <figure class="rep-fig">
-          <div class="rep-heat" role="img" :aria-label="peak ? `Most active ${peak.name} at ${slotLabel(peak.h)}` : 'No activity yet'">
-            <template v-for="r in heat" :key="r.h">
-              <span class="rep-heat-y">{{ slotLabel(r.h) }}</span>
-              <i v-for="c in r.cells" :key="c.name" :class="{ empty: !c.n, top: peak && c.n === peak.n && r.h === peak.h && c.name === peak.name }" :style="c.n ? { background: heatShade(c.n) } : {}" :title="`${c.name} ${slotLabel(r.h)}: ${c.n}`" />
-            </template>
-            <span />
-            <span v-for="w in WEEK" :key="w" class="rep-heat-x">{{ w }}</span>
+          <div class="rep-chart">
+            <div class="rep-y" aria-hidden="true"><span v-for="t in yTicks" :key="t">{{ fmt(t) }}</span></div>
+            <div ref="plot" class="rep-plot" tabindex="0" role="img" :aria-label="`${metric === 'done' ? 'Things done' : 'Focus'} each day: ${daily.map((x, i) => `${short(x.d)} ${fmt(series[i])}`).join(', ')}`" @mousemove="onMove" @touchmove.passive="onMove" @mouseleave="hover = -1" @blur="hover = -1" @keydown="onKey">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <defs><linearGradient id="rep-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity=".28" /><stop offset="100%" stop-color="#a78bfa" stop-opacity="0" /></linearGradient></defs>
+                <line v-for="y in [0, 25, 50, 75, 100]" :key="y" x1="0" x2="100" :y1="y" :y2="y" class="rep-grid" vector-effect="non-scaling-stroke" />
+                <path :d="areaPath" fill="url(#rep-fill)" />
+                <path :d="linePath" class="rep-line" vector-effect="non-scaling-stroke" />
+                <line v-if="hp" :x1="hp[0]" :x2="hp[0]" y1="0" y2="100" class="rep-cross" vector-effect="non-scaling-stroke" />
+              </svg>
+              <template v-if="hp">
+                <i class="rep-dot" :style="{ left: `${hp[0]}%`, top: `${hp[1]}%` }" />
+                <span class="rep-tip" :class="{ flip: hp[0] > 70 }" :style="{ left: `${hp[0]}%`, top: `${hp[1]}%` }">{{ fromIso(daily[hover].d).toLocaleDateString('en-US', { weekday: 'long' }) }} <b>{{ fmt(series[hover]) }}</b></span>
+              </template>
+            </div>
+            <div class="rep-x" aria-hidden="true"><span v-for="[i, t] in xTicks" :key="i" :style="{ left: `${(i / nPts) * 100}%` }">{{ t }}</span></div>
           </div>
-          <figcaption><b>Figure 2.</b> When things get done and focused on, by weekday and two-hour slot. Darker means more; the ringed cell is the peak.</figcaption>
-        </figure>
-        <div class="rep-notes">
-          <h3>Focus</h3>
-          <p v-if="cur.sessions.length" class="rep-p">{{ plural(cur.sessions.length, 'session') }}, about {{ hours(avgSession) }} each<template v-if="longest">; the longest was {{ hours(longest.mins) }} on <i>{{ longest.title }}</i></template>.</p>
-          <p v-else class="rep-p muted">No focus sessions in this period.</p>
-          <h3>Size of what you finish</h3>
-          <p class="rep-p"><template v-for="(s, i) in bySize" :key="s.name">{{ s.name }} ({{ s.sub }}): <b>{{ Math.round((s.done / sizedTotal) * 100) }}%</b>{{ i < 2 ? '; ' : '.' }}</template></p>
-          <h3>Goals and streaks</h3>
-          <p v-if="goals.length" class="rep-p"><template v-for="(x, i) in goals.slice(0, 4)" :key="x.g.id"><i>{{ x.g.title }}</i>: {{ x.doneAll }} of {{ x.all }} steps{{ x.doneNow ? ` (${x.doneNow} this ${rangeName})` : '' }}{{ i < Math.min(goals.length, 4) - 1 ? '; ' : '.' }}</template></p>
-          <p v-if="streaks.length" class="rep-p">Longest streaks: <template v-for="(x, i) in streaks" :key="x.t.id">{{ x.t.title }} ({{ x.n }} days){{ i < streaks.length - 1 ? ', ' : '.' }}</template></p>
-          <p v-if="!goals.length && !streaks.length" class="rep-p muted">No goals or streaks yet.</p>
+          <div class="rep-chart-foot">
+            <div class="rep-tabs" role="group" aria-label="Range">
+              <button v-for="[id, label] in RANGES" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`rep-${id}`" @click="range = id">{{ label }}</button>
+            </div>
+            <div class="rep-tabs" role="group" aria-label="Show">
+              <button type="button" :class="{ on: metric === 'done' }" :aria-pressed="metric === 'done'" data-test="rep-metric-done" @click="metric = 'done'">Done</button>
+              <button type="button" :class="{ on: metric === 'focus' }" :aria-pressed="metric === 'focus'" data-test="rep-metric-focus" @click="metric = 'focus'">Focus</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="rep-pair">
+          <!-- In a few words -->
+          <section class="rep-box">
+            <h2>In a few words</h2>
+            <p class="rep-p" data-test="rep-summary">{{ summary }}</p>
+            <div class="rep-grid4">
+              <div><span>Typical day</span><b>{{ stats.median }}</b></div>
+              <div><span>Spread</span><b>± {{ stats.sd }}</b></div>
+              <div><span>Days active</span><b>{{ stats.active }}/{{ days }}</b></div>
+              <div><span>Trend</span><b :class="stats.slopeWeek >= 0 ? 'rep-up' : 'rep-down'">{{ stats.slopeWeek >= 0 ? '+' : '' }}{{ stats.slopeWeek }}/wk</b></div>
+            </div>
+          </section>
+          <!-- Where it went -->
+          <section class="rep-box">
+            <h2>Where the effort went</h2>
+            <ul class="rep-list">
+              <li v-for="c in topCats.slice(0, 5)" :key="c.key" :style="{ '--c': c.color }"><i /><span>{{ c.label }}</span><b>{{ c.done }}</b><span class="rep-pct">{{ c.share }}%</span></li>
+            </ul>
+            <p v-if="!topCats.length" class="muted small">Nothing done in this range yet.</p>
+          </section>
         </div>
       </div>
-    </section>
 
-    <!-- What it means -->
-    <section class="rep-sec">
-      <h2><span>4</span>What it means</h2>
-      <p v-for="(m, i) in meaning" :key="i" class="rep-p">{{ m }}</p>
-      <p class="rep-p muted small">A note on these numbers: they only count what is in Budgie. Things done but never added, or ticked late, are not seen. With fewer than two weeks of data, treat the patterns as hints.</p>
-    </section>
-
-    <!-- Next -->
-    <section v-if="nextSteps.length" class="rep-sec rep-next">
-      <h2><span>5</span>Try next</h2>
-      <ol><li v-for="(t, i) in nextSteps" :key="i">{{ t }}</li></ol>
-    </section>
-  </article>
+      <!-- The side: short sections of facts -->
+      <aside class="rep-side">
+        <section class="rep-sec" data-test="rep-says">
+          <h3><Icon name="trend" :size="14" />HOW IT WENT</h3>
+          <dl class="rep-kv">
+            <div><dt>Completion</dt><dd>{{ cur.rate }}%</dd></div>
+            <div><dt>Days active</dt><dd>{{ stats.consistency }}%</dd></div>
+            <div><dt>Busiest day</dt><dd>{{ weekdays[0]?.n ? weekdays[0].name : '–' }}</dd></div>
+            <div><dt>Lightest day</dt><dd>{{ weekdays[6]?.name || '–' }}</dd></div>
+            <div><dt>Peak time</dt><dd>{{ peak ? `${peak.name} ${slotLabel(peak.h)}` : '–' }}</dd></div>
+            <div><dt>Compared with before</dt><dd>{{ pct(delta(cur.done.length, prev.done.length)) }}</dd></div>
+          </dl>
+        </section>
+        <section class="rep-sec">
+          <h3><Icon name="target" :size="14" />VERDICT</h3>
+          <div class="rep-verdict">
+            <p class="rep-verdict-t">{{ verdict.label }}</p>
+            <p class="muted small">{{ verdict.why }}</p>
+            <div class="rep-sure"><span>How sure</span><b>{{ verdict.sure }}%</b></div>
+            <span class="rep-meter"><i :style="{ width: `${verdict.sure}%` }" /></span>
+          </div>
+        </section>
+        <section class="rep-sec">
+          <h3><Icon name="clock" :size="14" />FOCUS</h3>
+          <dl class="rep-kv">
+            <div><dt>Sessions</dt><dd>{{ cur.sessions.length }}</dd></div>
+            <div><dt>Average session</dt><dd>{{ cur.sessions.length ? hours(avgSession) : '–' }}</dd></div>
+            <div><dt>Longest</dt><dd>{{ longest ? hours(longest.mins) : '–' }}</dd></div>
+            <div><dt>Focus and output</dt><dd>{{ stats.r == null ? '–' : `${strength(stats.r)} (r ${stats.r})` }}</dd></div>
+          </dl>
+        </section>
+        <section class="rep-sec">
+          <h3><Icon name="steps" :size="14" />KEY DRIVERS</h3>
+          <ul class="rep-drivers">
+            <li v-for="(d, i) in drivers" :key="i" :class="{ down: !d.up }"><b>{{ d.up ? '+' : '−' }}</b>{{ d.text }}</li>
+            <li v-if="!drivers.length" class="muted">Not enough data yet.</li>
+          </ul>
+        </section>
+        <section v-if="nextSteps.length" class="rep-sec">
+          <h3><Icon name="sparkle" :size="14" />TRY NEXT</h3>
+          <ol class="rep-next"><li v-for="(t, i) in nextSteps.slice(0, 3)" :key="i">{{ t }}</li></ol>
+        </section>
+      </aside>
+    </div>
+  </div>
 </template>
