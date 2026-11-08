@@ -3135,3 +3135,9 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .pln-timer.ended .label, .pln-timer.ended .pln-clock { color: #15803d !important; }
 .pln-timer.ended .pln-timer-bar i { background: #86efac; }
 @media (prefers-reduced-motion: reduce) { .pln-timer-bar i { transition: none; } }
+/* Day time line: all 24 hours, in a window as tall as the active hours */
+.sch-grid.win { height: var(--win) !important; max-height: none !important; overflow-y: auto !important; overscroll-behavior: contain; scroll-behavior: auto !important; scrollbar-width: thin; }
+/* Week grid: all 24 hours, in a window as tall as the active hours */
+.cal-grid.win { height: var(--win) !important; max-height: none !important; overflow-y: auto !important; overscroll-behavior: contain; scroll-behavior: auto !important; scrollbar-width: thin; }
+.rep-box .rep-sub { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; font: 600 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; color: #52525b; }
+.rep-box .rep-sub .ico { color: #8b5cf6; }

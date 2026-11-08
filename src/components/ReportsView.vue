@@ -303,6 +303,10 @@ function download() {
               <div><span>Days active</span><b>{{ stats.active }}/{{ days }}</b></div>
               <div><span>Trend</span><b :class="stats.slopeWeek >= 0 ? 'rep-up' : 'rep-down'">{{ stats.slopeWeek >= 0 ? '+' : '' }}{{ stats.slopeWeek }}/wk</b></div>
             </div>
+            <template v-if="nextSteps.length">
+              <h3 class="rep-sub"><Icon name="sparkle" :size="14" />TRY NEXT</h3>
+              <ol class="rep-next" data-test="rep-next"><li v-for="(t, i) in nextSteps.slice(0, 3)" :key="i">{{ t }}</li></ol>
+            </template>
           </section>
           <!-- Where it went -->
           <section class="rep-box">
@@ -352,10 +356,6 @@ function download() {
             <li v-for="(d, i) in drivers" :key="i" :class="{ down: !d.up }"><b>{{ d.up ? '+' : '−' }}</b>{{ d.text }}</li>
             <li v-if="!drivers.length" class="muted">Not enough data yet.</li>
           </ul>
-        </section>
-        <section v-if="nextSteps.length" class="rep-sec">
-          <h3><Icon name="sparkle" :size="14" />TRY NEXT</h3>
-          <ol class="rep-next"><li v-for="(t, i) in nextSteps.slice(0, 3)" :key="i">{{ t }}</li></ol>
         </section>
       </aside>
     </div>

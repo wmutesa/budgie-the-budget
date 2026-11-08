@@ -105,11 +105,13 @@ watch(listEl, (el, old) => {
   measure();
 });
 watch([listOpen, range], () => nextTick(measure));
+// A new day opens on its own active hours.
+watch(day, () => nextTick(scrollToStart));
 
 // ---------- the time line ----------
 const BASE = 64;
 // Taller hours when the list is taller than the day; 34px is the grid's top and bottom padding.
-const HOUR = computed(() => Math.max(BASE, Math.floor((listH.value - headH.value - 34) / Math.max(1, hours.value.length - 1))));
+const HOUR = computed(() => Math.max(BASE, Math.floor((listH.value - headH.value - 34) / Math.max(1, endH.value - startH.value))));
 const timedAll = computed(() => items.value.filter(x => x.task.time).map(x => { const s = toMins(x.task.time); return { ...x, s, e: s + Math.max(15, x.task.mins || 30), cat: catKey(x.task) }; }));
 // Up to four columns; the rest share "Other".
 const columns = computed(() => {
@@ -123,7 +125,9 @@ const columns = computed(() => {
 const colFor = x => (columns.value.some(c => c.key === x.cat) ? x.cat : columns.value[columns.value.length - 1].key);
 const startH = computed(() => Math.min(8, ...timedAll.value.map(x => Math.floor(x.s / 60))));
 const endH = computed(() => Math.max(21, ...timedAll.value.map(x => Math.ceil(x.e / 60))));
-const hours = computed(() => Array.from({ length: endH.value - startH.value + 1 }, (_, i) => startH.value + i));
+// All 24 hours are there; the window shows startH to endH (the hours with activities) and scrolls for the rest.
+const hours = computed(() => Array.from({ length: 25 }, (_, i) => i));
+const winHeight = computed(() => (endH.value - startH.value) * HOUR.value + 34);
 // Side-by-side lanes when items in one column overlap.
 function laid(key) {
   const list = timedAll.value.filter(x => colFor(x) === key).sort((a, b) => a.s - b.s || b.e - a.e).map(x => ({ ...x }));
@@ -139,19 +143,21 @@ function laid(key) {
   return list;
 }
 const boxStyle = x => ({
-  top: `${((x.s - startH.value * 60) / 60) * HOUR.value + 2}px`,
+  top: `${(x.s / 60) * HOUR.value + 2}px`,
   height: `${Math.max(26, ((x.e - x.s) / 60) * HOUR.value - 4)}px`,
   left: `calc(${(x.lane / x.lanes) * 100}% + 6px)`, width: `calc(${100 / x.lanes}% - 12px)`,
   '--c': catColor(x.task),
 });
 const hhmm = m => fromMins(m);
-const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR.value);
+const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes()) / 60) * HOUR.value);
 const grid = ref(null);
 function scrollToStart() {
   if (!grid.value) return;
-  const first = timedAll.value.length ? Math.min(...timedAll.value.map(x => x.s)) : 8 * 60;
-  const target = isToday.value ? Math.min(nowTop.value - HOUR.value, ((first - startH.value * 60) / 60) * HOUR.value) : ((first - startH.value * 60) / 60) * HOUR.value;
-  grid.value.scrollTop = Math.max(0, target - 12);
+  // Open on the active hours.
+  let target = startH.value * HOUR.value;
+  // Today, follow now only once it is past the active hours (late evening); before them, the plan comes first.
+  if (isToday.value) { const n = nowTop.value; if (n > target + winHeight.value - 34) target = Math.max(0, n - HOUR.value); }
+  grid.value.scrollTop = target;
 }
 const dur = m => { const n = m || 0; return n ? `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}` : ''; };
 
@@ -228,9 +234,9 @@ const tickX = x => toggleDone(x.task, x.date);
           <span class="sch-axis-h"><button v-if="!listOpen" type="button" class="sch-icon" title="Show the list" aria-label="Show the list" @click="listOpen = true"><Icon name="list" :size="16" /></button><template v-else>{{ isToday ? 'Today' : fromIso(day).toLocaleDateString('en-US', { weekday: 'short' }) }}</template></span>
           <span v-for="col in columns" :key="col.key" class="sch-col-h" :style="{ '--c': col.color }">{{ col.label }}<i /></span>
         </div>
-        <div ref="grid" class="sch-grid" :style="{ '--n': columns.length, '--h': `${HOUR}px` }">
+        <div ref="grid" class="sch-grid win" :style="{ '--n': columns.length, '--h': `${HOUR}px`, '--win': `${winHeight}px` }">
           <div class="sch-axis">
-            <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
+            <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${h * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
             <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, narrow: x.lanes > 1, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" @click="editing = x">

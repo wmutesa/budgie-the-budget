@@ -281,6 +281,10 @@ async function run(url) {
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-day"]');
+  // The day covers all 24 hours, in a window that opens on the hours with activities.
+  { const g = await page.locator('.sch-grid').evaluate(el => ({ labels: el.querySelectorAll('.sch-axis span').length, scrolls: el.scrollHeight > el.clientHeight + 10, top: el.scrollTop }));
+    assert.equal(g.labels, 25, 'the day time line has every hour, midnight to midnight');
+    assert.ok(g.scrolls && g.top > 0, `the time line opens on the active hours and scrolls for the rest (${JSON.stringify(g)})`); }
   const boxes = await page.locator('[data-test="sch-box"]').count();
   assert.ok(boxes >= 1, 'timed items sit on the time line');
   await page.click('[data-test="plan-day"]');

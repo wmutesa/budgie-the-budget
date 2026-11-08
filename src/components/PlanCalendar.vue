@@ -29,7 +29,7 @@ const anchor = ref(today());
 const root = ref(null);
 const monthEl = ref(null);
 const over = ref(0);
-const HOUR = computed(() => (props.fill && mode.value !== 'month' ? Math.max(48, Math.floor((props.fill - over.value - 2) / hours.value.length)) : 48));
+const HOUR = computed(() => (props.fill && mode.value !== 'month' ? Math.max(48, Math.floor((props.fill - over.value - 2) / Math.max(1, endH.value - startH.value))) : 48));
 const monthFill = computed(() => (props.fill && mode.value === 'month' ? Math.max(0, props.fill - over.value) : 0));
 const clock = ref(new Date());
 let tick = null;
@@ -81,17 +81,25 @@ function timed(d) {
   return list;
 }
 const boxStyle = x => ({
-  top: `${((x.s - startH.value * 60) / 60) * HOUR.value}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR.value - 2)}px`,
+  top: `${(x.s / 60) * HOUR.value}px`, height: `${Math.max(18, ((x.e - x.s) / 60) * HOUR.value - 2)}px`,
   left: `calc(${(x.lane / x.lanes) * 100}% + 2px)`, width: `calc(${100 / x.lanes}% - 4px)`, '--k': catColor(x.task),
 });
-const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes() - startH.value * 60) / 60) * HOUR.value);
+const nowTop = computed(() => ((clock.value.getHours() * 60 + clock.value.getMinutes()) / 60) * HOUR.value);
 // Full size, no inner scrolling: show 7 AM to 10 PM, widened to fit anything earlier or later.
 const startH = computed(() => Math.min(7, ...items.value.filter(x => x.task.time).map(x => Math.floor(toMins(x.task.time) / 60))));
 const endH = computed(() => Math.max(22, ...items.value.filter(x => x.task.time).map(x => Math.min(24, Math.ceil((toMins(x.task.time) + (x.task.mins || 45)) / 60)))));
-const hours = computed(() => Array.from({ length: endH.value - startH.value }, (_, i) => startH.value + i));
-const hourLabel = h => (h === startH.value ? '' : timeLabel(fromMins(h * 60)).replace(':00', ''));
+// All 24 hours are there; the window shows startH to endH (the hours with activities) and scrolls for the rest.
+const hours = computed(() => Array.from({ length: 24 }, (_, i) => i));
+const winHeight = computed(() => (endH.value - startH.value) * HOUR.value + 2);
+const hourLabel = h => (h === 0 ? '' : timeLabel(fromMins(h * 60)).replace(':00', ''));
 const grid = ref(null);
-function scrollToNow() { if (grid.value) grid.value.scrollTop = Math.max(0, nowTop.value - HOUR.value * 2.5); }
+// Open on the active hours; in the week with today, follow now once it is past them.
+function scrollToNow() {
+  if (!grid.value) return;
+  let target = startH.value * HOUR.value;
+  if (days.value.includes(today())) { const n = nowTop.value; if (n > target + winHeight.value - 2) target = Math.max(0, n - HOUR.value * 2); }
+  grid.value.scrollTop = target;
+}
 // Everything around the hours or the month cells, so the rest can fill `fill`.
 function measureOver() {
   if (!props.fill || !root.value) return;
@@ -135,7 +143,7 @@ function newAt(e, date, timedClick) {
   let time = '';
   if (timedClick) {
     const r = e.currentTarget.getBoundingClientRect();
-    const mins = Math.floor((((e.clientY - r.top) / HOUR.value) * 60 + startH.value * 60) / 30) * 30;
+    const mins = Math.floor((((e.clientY - r.top) / HOUR.value) * 60) / 30) * 30;
     time = fromMins(Math.min(23 * 60 + 30, Math.max(0, mins)));
   }
   pop.value = { kind: 'new', date, time };
@@ -195,7 +203,7 @@ function dropOn(e, date, timedDrop) {
   if (timedDrop) {
     const r = e.currentTarget.getBoundingClientRect();
     const grab = Number(e.dataTransfer.getData('grab') || 0);
-    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR.value) * 60 + startH.value * 60) / 15) * 15)));
+    t.time = fromMins(Math.min(23 * 60 + 45, Math.max(0, Math.round((((e.clientY - r.top - grab) / HOUR.value) * 60) / 15) * 15)));
   } else if (!timedDrop && mode.value !== 'month') t.time = '';
   if (!t.repeat) t.date = date;
   setTimeout(() => { dragging.value = null; }, 0);
@@ -221,6 +229,8 @@ onMounted(() => {
 });
 onUnmounted(() => { clearInterval(tick); document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', outside); });
 watch(mode, () => { pop.value = null; nextTick(() => { scrollToNow(); measureOver(); }); });
+// Another week opens on its own active hours.
+watch(anchor, () => nextTick(scrollToNow));
 watch(() => props.fill, () => nextTick(measureOver));
 const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString('en-US', { weekday: 'short' }), num: x.getDate() }; };
 </script>
@@ -260,7 +270,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           <span>{{ dayHead(d).name }}</span><b>{{ dayHead(d).num }}</b>
         </button>
       </div>
-      <div ref="grid" class="cal-grid" :style="{ '--cols': days.length, '--hour': `${HOUR}px` }" data-test="cal-grid">
+      <div ref="grid" class="cal-grid win" :style="{ '--cols': days.length, '--hour': `${HOUR}px`, '--win': `${winHeight}px` }" data-test="cal-grid">
         <div class="cal-hours">
           <span v-for="h in hours" :key="h" :style="{ height: `${HOUR}px` }">{{ hourLabel(h) }}</span>
         </div>
