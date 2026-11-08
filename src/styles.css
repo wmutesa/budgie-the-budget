@@ -3169,3 +3169,38 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .sch-pick-head .sch-step { border: 1px solid #ececf0 !important; border-radius: 50% !important; display: grid; place-items: center; padding: 0; }
 .sch-pick-today { border: 0 !important; border-radius: 999px !important; }
 .sch-pick-d { display: grid !important; place-items: center; text-align: center; }
+/* Day time line: full height, no scrolling inside; "Any time" row for things without a time */
+.sch-grid { overflow: visible !important; height: auto !important; max-height: none !important; }
+.sch-any { display: grid; grid-template-columns: 64px repeat(var(--n), minmax(170px, 1fr)); border-bottom: 1px solid #e4e4e7; background: #fcfcfd; }
+.sch-any-h { padding: 8px 6px; font-size: 11px; font-weight: 600; color: #71717a; text-align: right; border-right: 1px solid #f0f0f2; }
+.sch-any-col { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; padding: 6px; border-right: 1px solid #f0f0f2; min-width: 0; }
+.sch-any-col:last-child { border-right: 0; }
+.sch-chip { max-width: 100%; padding: 3px 9px; border: 1px solid color-mix(in srgb, var(--c) 26%, #fff) !important; border-radius: 999px !important; background: color-mix(in srgb, var(--c) 8%, #fff); font: 500 12px var(--sans); color: #18181b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.sch-chip:hover { background: color-mix(in srgb, var(--c) 16%, #fff); }
+.sch-chip.done { text-decoration: line-through; color: #a1a1aa; }
+@media (max-width: 640px) { .sch-any { grid-template-columns: 48px repeat(var(--n), minmax(140px, 1fr)); } }
+/* Week: each day's date with its untimed things under it; full height, no scrolling inside */
+.cal-grid { overflow: visible !important; height: auto !important; max-height: none !important; }
+.cal-dhw { display: grid; align-content: start; min-width: 0; border-left: 1px solid var(--line); }
+.cal-dhw .cal-dh { border-left: 0 !important; width: 100%; }
+.cal-any { display: grid; gap: 2px; padding: 0 4px 6px; min-width: 0; }
+.cal-any .cal-item.chip { font-size: 11px; padding: 2px 6px; }
+.cal-any .cal-more { justify-self: start; font-size: 11px; }
+/* Week cards: when several share a slot, keep the words readable */
+.cal-item.box.narrow { padding: 3px 5px !important; }
+.cal-item.box.narrow .cal-box-time { display: none; }
+.cal-item.box.narrow b { white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; font-size: 10.5px !important; line-height: 1.2; word-break: break-word; }
+.cal-item.box.tiny { padding: 2px 3px !important; }
+.cal-item.box.tiny b { font-size: 9.5px !important; -webkit-line-clamp: 6; }
+.cal-item.box.short:not(.narrow) { grid-auto-flow: column; align-items: center; }
+/* Reports chart: one solid baseline, nothing below it */
+.rep-base { stroke: #d4d4d8; stroke-width: 1.5; }
+/* Week cards cascade when they overlap: a white ring sets each apart; hover or focus brings one to the front */
+.cal-item.box.stacked { box-shadow: 0 0 0 1.5px #fff, 0 2px 6px -3px rgba(24, 24, 27, .25) !important; }
+.cal-item.box:hover, .cal-item.box:focus-visible { z-index: 30 !important; }
+.cal-item.box b { white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; display: block; }
+.cal-item.box:not(.short) b { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: normal; }
+/* Done calendar cards stay solid (no see-through stacking); their words are greyed and struck */
+.cal-item.box.done, .cal-item.chip.done { opacity: 1 !important; background: #fafafa !important; border-color: #ececf0 !important; }
+.cal-item.box.done b, .cal-item.box.done .cal-box-time, .cal-item.chip.done { color: #a1a1aa !important; }
+.cal-item.box.done b { text-decoration: line-through; }

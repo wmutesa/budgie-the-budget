@@ -268,14 +268,21 @@ function download() {
             <div class="rep-y" aria-hidden="true"><span v-for="t in yTicks" :key="t">{{ fmt(t) }}</span></div>
             <div ref="plot" class="rep-plot" tabindex="0" role="img" :aria-label="`${metric === 'done' ? 'Things done' : 'Focus'} each day: ${daily.map((x, i) => `${short(x.d)} ${fmt(series[i])}`).join(', ')}`" @mousemove="onMove" @touchmove.passive="onMove" @mouseleave="hover = -1" @blur="hover = -1" @keydown="onKey">
               <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-                <defs><linearGradient id="rep-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity=".28" /><stop offset="100%" stop-color="#a78bfa" stop-opacity="0" /></linearGradient></defs>
-                <line v-for="y in [0, 25, 50, 75, 100]" :key="y" x1="0" x2="100" :y1="y" :y2="y" class="rep-grid" vector-effect="non-scaling-stroke" />
-                <path :d="areaPath" fill="url(#rep-fill)" />
-                <path :d="linePath" class="rep-line" vector-effect="non-scaling-stroke" />
+                <defs>
+                  <linearGradient id="rep-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity=".28" /><stop offset="100%" stop-color="#a78bfa" stop-opacity="0" /></linearGradient>
+                  <!-- Nothing is drawn below the baseline. -->
+                  <clipPath id="rep-clip"><rect x="-1" y="-5" width="102" height="105" /></clipPath>
+                </defs>
+                <line v-for="y in [0, 25, 50, 75]" :key="y" x1="0" x2="100" :y1="y" :y2="y" class="rep-grid" vector-effect="non-scaling-stroke" />
+                <g clip-path="url(#rep-clip)">
+                  <path :d="areaPath" fill="url(#rep-fill)" />
+                  <path :d="linePath" class="rep-line" vector-effect="non-scaling-stroke" />
+                </g>
+                <line x1="0" x2="100" y1="100" y2="100" class="rep-base" vector-effect="non-scaling-stroke" />
                 <line v-if="hp" :x1="hp[0]" :x2="hp[0]" y1="0" y2="100" class="rep-cross" vector-effect="non-scaling-stroke" />
               </svg>
               <template v-if="hp">
-                <i class="rep-dot" :style="{ left: `${hp[0]}%`, top: `${hp[1]}%` }" />
+                <i class="rep-dot" :style="{ left: `${hp[0]}%`, top: `min(${hp[1]}%, calc(100% - 7px))` }" />
                 <span class="rep-tip" :class="{ flip: hp[0] > 70 }" :style="{ left: `${hp[0]}%`, top: `${hp[1]}%` }">{{ fromIso(daily[hover].d).toLocaleDateString('en-US', { weekday: 'long' }) }} <b>{{ fmt(series[hover]) }}</b></span>
               </template>
             </div>

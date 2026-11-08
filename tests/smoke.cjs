@@ -282,10 +282,13 @@ async function run(url) {
   await page.click('[data-test="nav-schedule"]');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="cal-day"]');
-  // The day covers all 24 hours, in a window that opens on the hours with activities.
-  { const g = await page.locator('.sch-grid').evaluate(el => ({ labels: el.querySelectorAll('.sch-axis span').length, scrolls: el.scrollHeight > el.clientHeight + 10, top: el.scrollTop }));
-    assert.equal(g.labels, 25, 'the day time line has every hour, midnight to midnight');
-    assert.ok(g.scrolls && g.top > 0, `the time line opens on the active hours and scrolls for the rest (${JSON.stringify(g)})`); }
+  // The time line is full height (no scrolling inside), spans the planned hours, and shows
+  // untimed things in an Any time row, so the list and the calendar hold the same things.
+  { const g = await page.locator('.sch-grid').evaluate(el => ({ scrolls: el.scrollHeight > el.clientHeight + 2 }));
+    assert.equal(g.scrolls, false, 'the time line does not scroll inside');
+    const listed = await page.$$eval('[data-test="sch-row"]', rs => rs.map(r => r.querySelector('.sch-row-t')?.textContent.trim()));
+    const shown = await page.$$eval('[data-test="sch-box"] .sch-box-title, [data-test="sch-chip"]', bs => bs.map(b => b.textContent.trim()));
+    assert.deepEqual(listed.filter(t => !shown.includes(t)), [], 'everything in the activity list is also on the calendar'); }
   const boxes = await page.locator('[data-test="sch-box"]').count();
   assert.ok(boxes >= 1, 'timed items sit on the time line');
   await page.click('[data-test="plan-day"]');
