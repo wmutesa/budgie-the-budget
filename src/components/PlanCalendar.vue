@@ -286,7 +286,6 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
           </button>
         </div>
       </div>
-      <p class="muted small cal-tip">Click an item for its actions, drag it to move it, or click a day to open it. Keys: ← → T D W M.</p>
     </div>
 
     <!-- The card for a slot or an item -->
