@@ -3232,3 +3232,37 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .sch-row.flash { animation: sch-flash 1.8s ease-out; border-radius: 10px; }
 @keyframes sch-flash { 0%, 35% { background: #ede9fe; box-shadow: 0 0 0 2px #c4b5fd; } 100% { background: transparent; box-shadow: 0 0 0 2px transparent; } }
 @media (prefers-reduced-motion: reduce) { .sch-row.flash { animation: none; background: #f5f3ff; } }
+
+/* ---------- Notifications dropdown: a clean card of short, clickable rows ---------- */
+.bell-pop { width: min(380px, calc(100vw - 24px)) !important; padding: 6px !important; border: 1px solid #ececf0 !important; border-radius: 18px !important; box-shadow: 0 24px 56px -22px rgba(24, 24, 27, .32), 0 2px 6px rgba(24, 24, 27, .04) !important; background: #fff; }
+.bell-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 10px 8px !important; border-bottom: 0 !important; }
+.bell-title { display: inline-flex; align-items: center; gap: 8px; font: 600 14px var(--sans) !important; letter-spacing: 0 !important; text-transform: none !important; color: #18181b !important; }
+.bell-new { padding: 2px 8px; border-radius: 999px; background: #ede9fe; color: #5b21b6; font-size: 11px; font-weight: 600; }
+.bell-link { border: 0; background: none; padding: 2px 4px; font: 500 12px var(--sans); color: #6d28d9; cursor: pointer; border-radius: 6px; }
+.bell-link:hover { background: #f5f3ff; }
+.bell-list { display: grid; gap: 2px; max-height: min(440px, 62vh) !important; padding: 0 !important; }
+.bell-item { position: relative; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 12px !important; background: transparent; display: block !important; }
+.bell-item:hover { background: #faf8ff !important; }
+.bell-main { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 34px 10px 10px; border: 0; border-radius: 12px; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.bell-main:focus-visible { outline: 2px solid #c4b5fd; outline-offset: -2px; }
+.bell-ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #f5f3ff; color: #7c3aed; flex: none; }
+.bell-item.warn .bell-ic { background: #fff7ed; color: #c2410c; }
+.bell-item.good .bell-ic { background: #f0fdf4; color: #15803d; }
+.bell-text { display: grid; gap: 2px; min-width: 0; }
+.bell-text b { font-size: 13px; font-weight: 600 !important; color: #18181b; }
+.bell-item.unread .bell-text b { font-weight: 700 !important; }
+.bell-body { font-size: 12px; line-height: 1.4; color: #71717a; white-space: normal !important; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.bell-dot { width: 8px !important; height: 8px !important; margin: 5px 0 0 !important; border-radius: 50%; background: #8b5cf6 !important; box-shadow: none !important; }
+.bell-x { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #a1a1aa; display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.bell-item:hover .bell-x, .bell-x:focus-visible { opacity: 1; }
+.bell-x:hover { background: #ede9fe; color: #4c1d95; }
+.bell-item:hover .bell-dot { opacity: 0; }
+@media (hover: none) { .bell-x { opacity: 1; } .bell-dot { display: none; } }
+.bell-empty { display: flex !important; gap: 10px; align-items: flex-start; padding: 8px 10px 12px !important; }
+.bell-empty > span:last-child { display: grid; gap: 2px; font-size: 12px; color: #71717a; }
+.bell-empty b { font-size: 13px; color: #18181b; }
+.bell-empty .bell-ic { background: #f0fdf4; color: #15803d; }
+.bell-ic, .bell-dot, .bell-x { border-radius: 50% !important; }
+.bell-new { border-radius: 999px !important; }
+.bell-main, .bell-item { border-radius: 12px !important; }
+.bell-link { border-radius: 6px !important; }

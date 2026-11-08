@@ -6,18 +6,11 @@ import { inFocus, focusAllow } from '../lib/focus';
 import Icon from './Icon.vue';
 
 // Budgie's suggestions behind a bell in the top bar: a count of unread ones, a
-// dropdown with every notification, and a tooltip with the full message.
+// dropdown of short cards: click one to go where it is about (the Schedule).
 // Opening the bell reads nothing: a notification counts as read once you rest
 // on it, focus it or act on it.
 const open = ref(false);
-// The tooltip sits beside the dropdown (outside the scrolling list, so it is never clipped).
-const tip = ref(null); // { text, top }
 const pop = ref(null);
-function showTip(c, e) {
-  const item = e.currentTarget.getBoundingClientRect();
-  const box = pop.value.getBoundingClientRect();
-  tip.value = { text: c.body, top: Math.max(0, item.top - box.top) };
-}
 const root = ref(null);
 const list = computed(() => cards.value);
 const seen = computed(() => new Set(store.seenNotices || []));
@@ -33,7 +26,8 @@ const stopRead = () => clearTimeout(dwell);
 const markAll = () => markRead(list.value.map(c => c.id));
 function toggle() { open.value = !open.value; if (!open.value) stopRead(); }
 const dismiss = c => { markRead([c.id]); store.dismissed.push(c.id); };
-const run = c => { markRead([c.id]); c.action.run(); store.dismissed.push(c.id); };
+// Clicking a notification takes you where it is about (the Schedule), marks it read and closes the list.
+const openIt = c => { markRead([c.id]); open.value = false; c.action?.run(); };
 const clearAll = () => { list.value.forEach(c => store.dismissed.push(c.id)); open.value = false; };
 const outside = e => { if (root.value && !root.value.contains(e.target)) open.value = false; };
 const onKey = e => { if (e.key === 'Escape') open.value = false; };
@@ -48,29 +42,25 @@ onUnmounted(() => { stopRead(); document.removeEventListener('mousedown', outsid
       <span v-if="unread && !quiet" class="bell-count" data-test="bell-count">{{ unread > 9 ? '9+' : unread }}</span>
     </button>
 
-    <div v-if="open" ref="pop" class="bell-pop" role="dialog" aria-label="Notifications" data-test="bell-pop" @mouseleave="tip = null">
+    <div v-if="open" ref="pop" class="bell-pop" role="dialog" aria-label="Notifications" data-test="bell-pop">
       <div class="bell-head">
-        <span class="bell-title"><span aria-hidden="true">✦</span> Budgie</span>
+        <span class="bell-title">Notifications<span v-if="unread" class="bell-new">{{ unread }} new</span></span>
         <span class="bell-head-acts">
-          <button v-if="unread" class="notice-link" type="button" data-test="bell-read-all" @click="markAll">Mark all read</button>
-          <button v-if="list.length" class="notice-link" type="button" @click="clearAll">Clear all</button>
+          <button v-if="unread" class="bell-link" type="button" data-test="bell-read-all" @click="markAll">Mark all read</button>
+          <button v-if="list.length" class="bell-link" type="button" @click="clearAll">Clear all</button>
         </span>
       </div>
       <ul v-if="list.length" class="bell-list">
-        <li v-for="c in list" :key="c.id" class="bell-item" :class="[c.tone, { unread: isUnread(c) }]" tabindex="0" data-test="bell-item" :aria-description="c.body" @mouseenter="e => { showTip(c, e); readSoon(c); }" @mouseleave="stopRead" @focus="e => { showTip(c, e); markRead([c.id]); }" @blur="tip = null">
-          <i class="bell-dot" :class="{ off: !isUnread(c) }" :aria-label="isUnread(c) ? 'Unread' : undefined" />
-          <div class="bell-text">
-            <b>{{ c.title }}</b>
-            <span class="bell-body">{{ c.body }}</span>
-            <div class="bell-acts">
-              <button v-if="c.action" class="btn primary small" type="button" @click="run(c)">{{ c.action.label }}</button>
-              <button class="ibtn ghost" type="button" title="Dismiss" :aria-label="`Dismiss: ${c.title}`" @click="dismiss(c)"><Icon name="x" :size="14" /></button>
-            </div>
-          </div>
+        <li v-for="c in list" :key="c.id" class="bell-item" :class="[c.tone, { unread: isUnread(c) }]" data-test="bell-item" @mouseenter="readSoon(c)" @mouseleave="stopRead">
+          <button type="button" class="bell-main" :title="c.body" :aria-label="`${c.title}. ${c.body}${c.action ? ` Opens ${c.action.label.replace(/^Open /, '')}.` : ''}`" @focus="markRead([c.id])" @click="openIt(c)">
+            <span class="bell-ic" aria-hidden="true"><Icon :name="c.tone === 'warn' ? 'clock' : c.tone === 'good' ? 'check' : 'calendar'" :size="14" /></span>
+            <span class="bell-text"><b>{{ c.title }}</b><span class="bell-body">{{ c.body }}</span></span>
+            <i v-if="isUnread(c)" class="bell-dot" aria-label="Unread" />
+          </button>
+          <button class="bell-x" type="button" title="Dismiss" :aria-label="`Dismiss: ${c.title}`" @click="dismiss(c)"><Icon name="x" :size="12" /></button>
         </li>
       </ul>
-      <span v-if="tip" class="bell-tip" role="tooltip" data-test="bell-tip" :style="{ top: tip.top + 'px' }">{{ tip.text }}</span>
-      <p v-else-if="!list.length" class="bell-empty">You are all caught up. Budgie will let you know when something needs a look.</p>
+      <div v-else class="bell-empty"><span class="bell-ic" aria-hidden="true"><Icon name="check" :size="14" /></span><span><b>You are all caught up</b><span>Budgie will let you know when something needs a look.</span></span></div>
     </div>
   </span>
 </template>

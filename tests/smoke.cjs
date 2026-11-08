@@ -414,10 +414,17 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
   assert.equal(await unreadCount(), unread0, 'opening the bell does not mark anything read');
   if (unread0 && unread0 <= 9) {
-    await page.locator('[data-test="bell-item"].unread').first().focus();
+    await page.locator('[data-test="bell-item"].unread .bell-main').first().focus();
     assert.equal(await unreadCount(), unread0 - 1, 'reading one notification lowers the count by one');
   }
+  assert.equal(await page.$('[data-test="bell-pop"] .btn'), null, 'no Open Schedule buttons on the cards');
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/bell.png` });
+  // Clicking a notification takes you to the Schedule and closes the list.
+  await page.click(tab('Overview'));
   await page.click('[data-test="bell"]');
+  await page.locator('[data-test="bell-item"] .bell-main').first().click();
+  await page.waitForSelector('[data-test="schedule"]');
+  assert.equal(await page.$('[data-test="bell-pop"]'), null, 'the list closes');
 
   // Voice: tap Add and it listens at once; tap again and it sorts, then the review starts.
   const voice = await context.newPage();
