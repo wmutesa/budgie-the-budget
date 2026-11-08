@@ -72,7 +72,7 @@ export function useDictation({ onText, onFinal, onError, onCancel, continuous = 
     rec.onerror = e => {
       if (e.error === 'no-speech' || e.error === 'aborted') return;
       wanted = false;
-      onError?.(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Allow the microphone to dictate.' : e.error === 'language-not-supported' ? 'This browser cannot listen in that accent yet. Pick another one.' : 'Dictation stopped. Try again.');
+      onError?.(e.error === 'not-allowed' ? 'Allow the microphone to see your words as you talk.' : e.error === 'service-not-allowed' ? 'Live text needs Dictation turned on (on a Mac: System Settings, Keyboard, Dictation).' : e.error === 'language-not-supported' ? 'This browser cannot listen in that language yet.' : e.error === 'audio-capture' ? 'The microphone is busy or missing.' : 'Live text stopped.', e.error);
     };
     rec.onend = () => {
       finalText += rec?._fin || '';

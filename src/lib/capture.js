@@ -58,7 +58,24 @@ function settle(made) {
 // Open things by name, so "mark the lab report as done" can find one.
 const myOpen = () => store.tasks.filter(t => !t.pending && (!t.done || t.repeat)).slice(-80).map(t => t.title);
 const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
+// What Gemini heard in a recording, kept so it is not sent twice when the text is left as written.
+export const lastHeard = { transcript: '', items: null };
+export async function hear(audio) {
+  const d = new Date();
+  const heard = await geminiHear({ audio: audio.data, mime: audio.mime, typed: '', today: isoDay(d), weekday: d.toLocaleDateString('en-US', { weekday: 'long' }), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, categories: myCategories(), existing: myOpen() });
+  lastHeard.transcript = String(heard?.transcript || '').trim(); lastHeard.items = heard?.items || null;
+  return lastHeard.transcript;
+}
 export async function breakDown(text, audio = null) {
+  // Gemini already heard this recording and the words were left as it wrote them: use its items.
+  if (!audio && lastHeard.items && text.trim() === lastHeard.transcript) {
+    const heard = { transcript: lastHeard.transcript, items: lastHeard.items };
+    lastHeard.items = null;
+    const cmds = heard.items.map(fromItem).filter(Boolean);
+    const ok = heard.items.filter(x => x.action === 'add' || !x.action).filter(x => said(text)(x.title));
+    if (ok.length || cmds.length) { capture.via = 'Gemini (recording)'; capture.heard = heard.transcript; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
+  }
+  lastHeard.items = null;
   // The recording first: Gemini hears it, writes down what was said and lists every item.
   if (audio && store.digest?.geminiKey && store.planner?.geminiAudio !== false) {
     try {

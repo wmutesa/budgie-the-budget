@@ -429,6 +429,8 @@ async function run(url) {
   const unread0 = await unreadCount();
   await page.click('[data-test="bell"]');
   assert.match(await page.textContent('[data-test="bell-pop"]'), /on today|due tomorrow/, 'the bell mentions what is due');
+  assert.equal(await page.$eval('[data-test="bell-pop"]', e => getComputedStyle(e).borderTopLeftRadius), '0px', 'the notifications card is square');
+  if (process.env.SHOTS) await page.locator('[data-test="bell-pop"]').screenshot({ path: `${process.env.SHOTS}/bell.png` });
   assert.equal(await unreadCount(), unread0, 'opening the bell does not mark anything read');
   if (unread0 && unread0 <= 9) {
     await page.locator('[data-test="bell-item"].unread .bell-main').first().focus();
@@ -454,8 +456,7 @@ async function run(url) {
   assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
   assert.match(await voice.textContent('[data-test="capture"]'), /Recording/, 'the Add button shows it is recording');
   assert.ok(await voice.$('[data-test="capture"] .cap-rec'), 'with a recording dot, not a pause sign');
-  await voice.waitForFunction(() => /^0:0[1-9]/.test(document.querySelector('[data-test="capture-live"] .cap-time')?.textContent || ''));
-  assert.equal(await voice.$('[data-test="capture-live"] .cap-stop'), null, 'the timer itself stops it: no separate stop icon');
+  assert.equal(await voice.$('[data-test="capture-live"] .cap-time'), null, 'no timer pill: that is the focus timer\'s place');
   // Edit while listening: the typed words stay; speech no longer writes over them.
   await voice.focus('[data-test="capture-text"]');
   await voice.keyboard.press('End');
@@ -498,6 +499,29 @@ async function run(url) {
   assert.ok(heardItems.some(x => /^History quiz \| Schedule · Exam/.test(x)), 'what only Gemini heard is added too');
   assert.ok(heardItems.some(x => /^Gym \| Schedule · Routine/.test(x)), 'the weekly gym is a routine');
   await hear.close();
+
+  // Live text fails (Safari with Dictation off): it keeps recording, Stop writes it down for checking, then Add sorts it once.
+  const deaf = await context.newPage();
+  await fakeNetwork(deaf, hearAcct);
+  await deaf.addInitScript(`window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { setTimeout(() => { this.onerror?.({ error: 'service-not-allowed' }); this.onend?.(); }, 30); } stop() {} abort() {} };
+    navigator.mediaDevices.getUserMedia = async () => new MediaStream();
+    window.MediaRecorder = class { constructor() { this.mimeType = 'audio/mp4'; this.state = 'inactive'; }
+      start() { this.state = 'recording'; setTimeout(() => this.ondataavailable?.({ data: new Blob([new Uint8Array(4000)], { type: 'audio/mp4' }) }), 50); }
+      stop() { this.state = 'inactive'; } };`); // never says it stopped: Budgie must not hang
+  await deaf.goto(url, { waitUntil: 'load' });
+  const calls0 = voiceCalls.length;
+  await deaf.click('[data-test="capture"]');
+  await deaf.waitForSelector('[data-test="capture-note"]:has-text("Still recording")');
+  assert.match(await deaf.textContent('[data-test="capture-note"]'), /Dictation turned on/, 'it says why there is no live text');
+  await deaf.waitForTimeout(800);
+  await deaf.click('[data-test="capture-mic"]');
+  await deaf.waitForFunction(() => /Lab Report 3 due Friday/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 8000 });
+  assert.match(await deaf.textContent('[data-test="capture-note"]'), /what Gemini heard/, 'Stop shows what was heard, to check and edit');
+  assert.equal(await deaf.$('[data-test="capture-review"]'), null, 'nothing is added before you check it');
+  await deaf.click('[data-test="capture-sort"]');
+  await deaf.waitForSelector('[data-test="capture-review"]');
+  assert.equal(voiceCalls.length, calls0 + 1, 'the recording went to Gemini once, not again on Add');
+  await deaf.close();
 
   // First-time guide, once per person, on an empty account.
   const fresh = { data: null, version: 0 };

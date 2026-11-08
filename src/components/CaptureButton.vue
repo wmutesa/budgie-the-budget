@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { capture, sortAndPlace } from '../lib/capture';
+import { capture, sortAndPlace, hear } from '../lib/capture';
 import { routeAll, splitSpoken, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
 import { store } from '../lib/store';
-import { canRecord, startRecording, stopRecording, cancelRecording, toGeminiAudio } from '../lib/voicerec';
+import { canRecord, isSafari, startRecording, stopRecording, cancelRecording, toGeminiAudio } from '../lib/voicerec';
 import Icon from './Icon.vue';
 
 // The one way to add anything. Tap Add and talk: the words appear as you speak
@@ -20,7 +20,16 @@ const join = (a, b) => { const t = (b || '').trimStart(); return !t ? a : !a || 
 const dict = useDictation({
   continuous: true,
   // A blocked microphone is a quiet note in the sheet, not an alarm: typing works too.
-  onError: m => { micNote.value = m; },
+  // When live text fails but Gemini can hear, keep recording: Gemini writes it down on Stop.
+  onError: (m, code) => {
+    if (geminiAudio.value && code !== 'not-allowed') {
+      micNote.value = `${m} Still recording: when you tap Stop, Gemini writes down what you said so you can check and edit it.`;
+      if (!recording) startRecording().then(ok => { recording = ok; });
+      recOnly.value = true;
+      return;
+    }
+    micNote.value = `${m} You can type instead.`;
+  },
   onCancel: () => { capture.text = base; },
   onText: t => { spoken.value = true; capture.text = join(base, t); },
   onFinal: t => { capture.text = join(base, t).trim(); },
@@ -33,24 +42,29 @@ const canSpeak = computed(() => canDictate || geminiAudio.value);
 const recOnly = ref(false);
 const listening = computed(() => dict.listening.value || recOnly.value);
 const box = ref(null);
-// How long you have been talking, shown on the top bar button.
-const secs = ref(0);
-let clockId = 0;
-watch(listening, on => { clearInterval(clockId); secs.value = 0; if (on) clockId = setInterval(() => { secs.value++; }, 1000); });
-onUnmounted(() => clearInterval(clockId));
-const elapsed = computed(() => `${Math.floor(secs.value / 60)}:${String(secs.value % 60).padStart(2, '0')}`);
 // Edit while you talk: what you typed stays, and new words land after it.
 function onEdit() {
   if (!listening.value) return;
   base = capture.text;
   dict.commit();
 }
+// Live words from the browser's dictation. With a Gemini key the recording also
+// goes to Gemini, except in Safari, which cannot do both at once: there the
+// live words are what Gemini reads. With no dictation, Budgie only records.
+let recording = false;
 const listen = () => {
   base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text;
-  if (geminiAudio.value) startRecording();
-  if (canDictate) dict.start(); else recOnly.value = true;
+  micNote.value = '';
+  recording = false;
+  if (canDictate) {
+    dict.start();
+    if (geminiAudio.value && !isSafari) startRecording().then(ok => { recording = ok; });
+  } else {
+    recOnly.value = true;
+    startRecording().then(ok => { recording = ok; if (!ok) { recOnly.value = false; micNote.value = 'Allow the microphone to talk to Budgie. You can type instead.'; } });
+  }
 };
-const stopAll = () => { if (dict.listening.value) dict.stop(); recOnly.value = false; cancelRecording(); };
+const stopAll = () => { if (dict.listening.value) dict.stop(); recOnly.value = false; recording = false; cancelRecording(); };
 
 // Open: start listening straight away when the browser can.
 function openSheet({ voice = canSpeak.value } = {}) {
@@ -62,19 +76,40 @@ function close() { if (listening.value) stopAll(); capture.open = false; }
 // How it will be split (the rules; the AI may tidy the wording), shown as you go.
 const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
 async function sortIt() {
-  if (dict.listening.value) {
-    dict.stop();
-    // Wait for the last words before breaking it down.
-    for (let i = 0; i < 30 && dict.listening.value; i++) await new Promise(r => setTimeout(r, 50));
-  }
-  recOnly.value = false;
   if (capture.sorting) return;
-  capture.sorting = true;
-  const blob = await stopRecording();
-  const audio = blob ? await toGeminiAudio(blob).catch(() => null) : null;
-  capture.sorting = false;
-  if (!capture.text.trim() && !audio) return;
-  await sortAndPlace(capture.text, { spoken: spoken.value, audio });
+  const wasListening = listening.value;
+  const heardLive = spoken.value && capture.text.trim() !== base.trim();
+  capture.sorting = true; // Stop shows at once that it is working
+  try {
+    if (dict.listening.value) {
+      dict.stop();
+      // Wait for the last words before breaking it down.
+      for (let i = 0; i < 30 && dict.listening.value; i++) await new Promise(r => setTimeout(r, 50));
+    }
+    recOnly.value = false;
+    const blob = recording ? await stopRecording() : null;
+    recording = false;
+    const audio = blob ? await toGeminiAudio(blob).catch(() => null) : null;
+    // No live words: Gemini writes the recording down first, so you can check and edit it.
+    if (wasListening && audio && !heardLive) {
+      let said = '';
+      try { said = await hear(audio); } catch (e) { micNote.value = `Gemini could not write it down (${e.message || 'no answer'}). Type it instead, or try again.`; return; }
+      if (!said) { micNote.value = 'Nothing was heard. Check the microphone is allowed for this site, then try again, or type instead.'; return; }
+      capture.text = join(capture.text.trim() ? `${capture.text.trim()}\n` : '', said);
+      micNote.value = 'Here is what Gemini heard. Fix any word, then tap Add.';
+      nextTick(() => box.value?.focus());
+      return;
+    }
+    if (!capture.text.trim() && !audio) {
+      if (wasListening) micNote.value = 'Nothing was heard. Check the microphone is allowed for this site, then try again, or type instead.';
+      return;
+    }
+    capture.sorting = false;
+    const n = await sortAndPlace(capture.text, { spoken: spoken.value, audio });
+    if (!n && capture.open) micNote.value = 'Nothing to add was found in that. Edit the words and tap Add again.';
+  } finally {
+    capture.sorting = false;
+  }
 }
 // The mic: Speak starts listening; Stop ends it and sorts what was said.
 const micTap = () => (listening.value ? sortIt() : (spoken.value = true, listen()));
@@ -92,11 +127,9 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
 
 <template>
   <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: tap to stop and sort' : 'Add anything (N)'" :title="listening ? 'Tap to stop recording' : 'Add anything (N)'" data-test="capture" @click="capture.open ? sortIt() : openSheet()">
-    <span v-if="listening" class="cap-live" aria-hidden="true" data-test="capture-live">
-      <i class="cap-rec" /><span class="cap-time">{{ elapsed }}</span><span class="cap-bars"><i v-for="n in 4" :key="n" /></span>
-    </span>
+    <span v-if="listening" class="cap-live" aria-hidden="true" data-test="capture-live"><i class="cap-rec" /></span>
     <span v-else class="cap-glyph"><Icon name="capture" :size="15" /></span>
-    <span class="cap-word">{{ listening ? `Recording ${elapsed}: tap to stop` : 'Add' }}</span>
+    <span class="cap-word">{{ listening ? 'Recording: tap to stop' : 'Add' }}</span>
   </button>
 
   <Teleport to="body">
@@ -115,7 +148,7 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
           <div class="cap-wave" aria-hidden="true"><i v-for="n in 5" :key="n" /></div>
         </div>
 
-        <p v-if="micNote" class="cap-note small" role="status"><Icon name="help" :size="14" />{{ micNote }} You can type instead.</p>
+        <p v-if="micNote" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ micNote }}</p>
         <ul v-if="rows.length" class="cap-rows" aria-label="How Budgie will sort it">
           <li v-for="r in rows" :key="r.id" :class="`to-${r.dest}`"><Icon :name="DESTS[r.dest].icon" :size="13" /><b>{{ DESTS[r.dest].label }}</b><span>{{ r.task.title }}</span></li>
         </ul>

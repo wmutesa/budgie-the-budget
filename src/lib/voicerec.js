@@ -5,6 +5,8 @@
 // (about 2 MB a minute). Nothing is recorded without a Gemini key, and the
 // recording is not kept.
 
+// Safari cannot record and show live text from the microphone at the same time.
+export const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|chromium|crios|fxios|edg|android).)*safari/i.test(navigator.userAgent);
 export const canRecord = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 export const MAX_SECONDS = 5 * 60; // Gemini takes about 20 MB in one request: five minutes of WAV fits
 
@@ -34,9 +36,13 @@ export function stopRecording() {
     if (!rec) return resolve(null);
     const r = rec;
     const done = () => { const blob = chunks.length ? new Blob(chunks, { type: r.mimeType || 'audio/webm' }) : null; cleanup(); resolve(blob && Date.now() - started > 600 ? blob : null); };
-    if (r.state === 'inactive') return done();
-    r.onstop = done;
-    try { r.stop(); } catch { done(); }
+    let over = false;
+    const once = () => { if (!over) { over = true; done(); } };
+    if (r.state === 'inactive') return once();
+    r.onstop = once;
+    // Some browsers never say they stopped: give up waiting after two seconds.
+    setTimeout(once, 2000);
+    try { r.stop(); } catch { once(); }
   });
 }
 export function cancelRecording() { try { rec?.stop(); } catch { /* fine */ } cleanup(); }
