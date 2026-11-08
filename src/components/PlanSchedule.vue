@@ -174,26 +174,56 @@ function planDay() {
 // The calendar is full height, so Now scrolls the page to the red line.
 function toNow() { if (!isToday.value) day.value = today(); nextTick(() => grid.value?.querySelector('.sch-now')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })); }
 // ---------- editing ----------
-const editRow = ref('');
 const tickX = x => toggleDone(x.task, x.date);
 // Clicking a thing on the calendar shows it in the activity list beside it:
-// the list opens (and its category, over a week or month), its editor opens
-// with its steps, and the row is scrolled into view and highlighted briefly.
+// the list opens (and its category, over a week or month), and its row is
+// scrolled into view and highlighted briefly.
 const flashKey = ref('');
 let flashTimer = null;
-function pick(x) {
+function pick(x, then) {
   listOpen.value = true;
   if (range.value !== 'day') { const s = new Set(openCats.value); s.add(catKey(x.task)); openCats.value = s; }
   nextTick(() => {
     const row = rows.value.find(r => r.key === x.key) || rows.value.find(r => r.task.id === x.task.id);
     if (!row) return;
-    editRow.value = row.key;
     flashKey.value = row.key;
     clearTimeout(flashTimer);
     flashTimer = setTimeout(() => { flashKey.value = ''; }, 1800);
-    nextTick(() => document.querySelector(`.sch-row[data-key="${row.key}"]`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+    nextTick(() => { document.querySelector(`.sch-row[data-key="${row.key}"]`)?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); then?.(row); });
   });
 }
+
+// ---------- the edit card ----------
+// The edit icon on a list row opens its editor as a card laid over the same
+// thing on the calendar, so it is edited where it sits. When it is not on the
+// calendar (another day, a folded view), the card opens beside the row.
+const over = ref(null); // { x: row, style }
+const overEl = ref(null);
+function placeOver(x, scroll) {
+  const cal = document.querySelector('.sch-body > .sch-time, .sch-body > .sch-cal');
+  const on = cal && (cal.querySelector(`[data-task-id="${x.task.id}"][data-date="${x.date}"]`) || cal.querySelector(`[data-task-id="${x.task.id}"]`));
+  const rowEl = document.querySelector(`.sch-row[data-key="${x.key}"]`);
+  const anchor = on || rowEl;
+  if (on && scroll) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const r = anchor?.getBoundingClientRect();
+  const w = Math.min(420, window.innerWidth - 24);
+  let left = r ? (on ? r.left : r.right + 10) : (window.innerWidth - w) / 2;
+  left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
+  const top = Math.max(12, Math.min(r ? r.top : 80, window.innerHeight - 160));
+  return { x, style: { left: `${left}px`, top: `${top}px`, width: `${w}px`, maxHeight: `${window.innerHeight - top - 12}px` }, onCalendar: Boolean(on) };
+}
+function editOver(x) {
+  if (over.value?.x.key === x.key) { over.value = null; return; }
+  over.value = placeOver(x, true);
+}
+const closeOver = () => { over.value = null; };
+// The card follows its item when the page scrolls.
+let raf = 0;
+const onScroll = () => { if (!over.value || raf) return; raf = requestAnimationFrame(() => { raf = 0; if (over.value) over.value = placeOver(over.value.x, false); }); };
+// Esc closes the card, unless it is closing a date or time picker inside it.
+const escOver = e => { if (e.key === 'Escape' && over.value && !document.querySelector('.pk-pop')) closeOver(); };
+onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); document.addEventListener('keydown', escOver); });
+onUnmounted(() => { window.removeEventListener('scroll', onScroll); document.removeEventListener('keydown', escOver); });
 
 // ---------- pick a day from a month calendar ----------
 const pickOpen = ref(false);
@@ -217,7 +247,8 @@ function openFromNav() {
   const x = items.value.find(o => o.task.id === nav.task);
   nav.task = '';
   if (!x) return;
-  pick(x);
+  // From search or a notification: show it, and open its card.
+  pick(x, row => setTimeout(() => editOver(row), 350));
 }
 onMounted(() => nextTick(openFromNav));
 watch(() => nav.task, () => nextTick(openFromNav));
@@ -230,7 +261,7 @@ function outside(e) {
   const t = e.target;
   if (!(t instanceof Element) || t.closest('.pk-pop')) return;
   if (calOpen.value && calPopEl.value && !calPopEl.value.contains(t) && !t.closest('[data-test="calendars-open"]')) calOpen.value = false;
-  if (editRow.value && t.closest('.sch-row')?.dataset.key !== editRow.value && !t.closest('.sch-box, .sch-chip, .cal-item')) editRow.value = '';
+  if (over.value && overEl.value && !overEl.value.contains(t) && !t.closest(`.sch-row[data-key="${over.value.x.key}"] [data-test="row-edit"]`)) over.value = null;
   if (pickOpen.value && pickEl.value && !pickEl.value.contains(t) && !t.closest('[data-test="sch-today"]')) pickOpen.value = false;
 }
 onMounted(() => document.addEventListener('mousedown', outside));
@@ -287,8 +318,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
                 <span class="sch-tags"><span v-if="range !== 'day'" class="sch-tag">{{ x.summary ? 'Repeats' : rowDate(x) }}</span><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
               </span>
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
-              <button type="button" class="sch-icon" :aria-expanded="editRow === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" @click="editRow = editRow === x.key ? '' : x.key"><Icon name="more" :size="16" /></button>
-              <TaskEditor v-if="editRow === x.key" :task="x.task" @close="editRow = ''" />
+              <button type="button" class="sch-icon" :aria-expanded="over?.x.key === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" data-test="row-edit" @click="editOver(x)"><Icon name="edit" :size="15" /></button>
             </li>
           </ul>
         </div>
@@ -307,7 +337,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
         <div v-if="untimed.length" ref="anyEl" class="sch-any" :style="{ '--n': columns.length }" data-test="sch-any">
           <span class="sch-any-h">Any time</span>
           <div v-for="col in columns" :key="col.key" class="sch-any-col">
-            <button v-for="x in anyFor(col.key)" :key="x.key" type="button" class="sch-chip" :class="{ done: x.done }" :style="{ '--c': catColor(x.task) }" :data-task-id="x.task.id" data-test="sch-chip" @click="pick(x)">{{ x.task.title }}</button>
+            <button v-for="x in anyFor(col.key)" :key="x.key" type="button" class="sch-chip" :class="{ done: x.done }" :style="{ '--c': catColor(x.task) }" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-chip" @click="pick(x)">{{ x.task.title }}</button>
           </div>
         </div>
         <div ref="grid" class="sch-grid" :style="{ '--n': columns.length, '--h': `${HOUR}px` }">
@@ -315,7 +345,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" :data-date="x.date" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
               <span class="sch-box-time">{{ hhmm(x.s) }} – {{ hhmm(x.e) }}<Icon name="more" :size="14" class="sch-box-more" /></span>
               <b class="sch-box-title">{{ x.task.title }}</b>
             </button>
@@ -325,5 +355,15 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
       </section>
     </div>
 
+    <Teleport to="body">
+      <div v-if="over" ref="overEl" class="sch-over" :class="{ beside: !over.onCalendar }" :style="over.style" role="dialog" :aria-label="`Edit ${over.x.task.title}`" data-test="sch-over" @keydown.esc="closeOver">
+        <div class="sch-over-head" :style="{ '--c': catColor(over.x.task) }">
+          <i />
+          <b>{{ over.x.task.title }}</b>
+          <button type="button" class="sch-icon" title="Close" aria-label="Close" @click="closeOver"><Icon name="x" :size="16" /></button>
+        </div>
+        <TaskEditor :task="over.x.task" @close="closeOver" />
+      </div>
+    </Teleport>
   </div>
 </template>

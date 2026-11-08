@@ -201,7 +201,8 @@ async function run(url) {
   assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Schedule shows today\'s activity by category');
   // A row in the activity list, found by what it says, and its editor.
   const row = text => page.locator('[data-test="sch-row"]', { hasText: text }).first();
-  const edit = async text => { await row(text).locator('button[aria-label^="Edit "]').click(); return row(text).locator('[data-test="task-edit"]'); };
+  // The edit icon on a row opens its editor as a card over the thing on the calendar.
+  const edit = async text => { await row(text).locator('[data-test="row-edit"]').click(); await page.waitForSelector('[data-test="sch-over"] [data-test="task-edit"]'); return page.locator('[data-test="sch-over"] [data-test="task-edit"]'); };
   // Deleting is one click in the editor, with Undo in a notification.
   const before = await page.locator('[data-test="sch-row"]').count();
   await (await edit('Haircut')).locator('[aria-label="Delete"]').click();
@@ -241,9 +242,9 @@ async function run(url) {
   assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
   await page.keyboard.press('Escape');
   assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
-  // A click outside the row closes its editor.
+  // A click outside the card closes it.
   await page.click('.sch-title');
-  assert.equal(await page.$('[data-test="sch-row"] [data-test="task-edit"]'), null, 'clicking outside closes the row editor');
+  assert.equal(await page.$('[data-test="sch-over"]'), null, 'clicking outside closes the edit card');
   await page.click('[data-test="sch-today"]');
   await page.click('.sch-pick-today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.
@@ -272,9 +273,8 @@ async function run(url) {
   assert.equal(await page.locator('.cal-dh').count(), 7, 'the week has seven days');
   const wk = page.locator('.cal-col.today [data-test="cal-item"]').first();
   await wk.click();
-  await page.waitForSelector('.sch-row [data-test="task-edit"]');
-  assert.equal(await page.$('[data-test="cal-pop"]'), null, 'a week item opens in the list, not a floating card');
-  await page.click('.sch-title');
+  await page.waitForSelector('.sch-row.flash');
+  assert.equal(await page.$('[data-test="cal-pop"], [data-test="sch-over"]'), null, 'a week item is shown in the list; no card opens by itself');
   await page.click('[data-test="cal-month"]');
   assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
   await page.click('[data-test="nav-focus"]');
@@ -317,19 +317,23 @@ async function run(url) {
   // Late in the day there may be no free time left; then Budgie says so instead.
   await page.waitForFunction(n => document.querySelectorAll('[data-test="sch-box"]').length > n || /no free time left/.test(document.querySelector('[data-test="toasts"]')?.textContent || ''), boxes);
   if (await page.locator('[data-test="sch-box"]').count() > boxes) assert.match(await page.textContent('[data-test="toasts"]'), /Day planned[\s\S]*Undo/, 'Plan my day gives untimed things a time, with Undo');
-  // The calendar shows no steps; clicking a box opens its row in the activity list, with its steps.
+  // The calendar shows no steps; clicking a box shows its row in the activity list, highlighted.
   assert.equal(await page.$('.sch-box-subs, .sch-box-note'), null, 'calendar boxes do not list steps or notes');
-  const boxTitle = (await page.locator('[data-test="sch-box"] .sch-box-title').first().textContent()).trim();
-  await page.locator('[data-test="sch-box"]').first().click({ position: { x: 12, y: 10 } });
-  await page.waitForSelector('.sch-row [data-test="task-edit"]');
-  assert.match(await page.textContent('.sch-row:has([data-test="task-edit"]) .sch-row-t'), new RegExp(boxTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the clicked item opens in the list');
-  assert.ok(await page.$('.sch-row.flash'), 'and is highlighted there');
-  assert.ok(await page.$('.sch-row [data-test="task-edit"] .tk-subs'), 'with its steps');
-  assert.equal(await page.$('.sch-sheet'), null, 'no separate edit card');
+  const box = page.locator('[data-test="sch-box"]').first();
+  const boxTitle = (await box.locator('.sch-box-title').textContent()).trim();
+  await box.click({ position: { x: 12, y: 10 } });
+  await page.waitForSelector('.sch-row.flash');
+  assert.equal((await page.textContent('.sch-row.flash .sch-row-t')).trim(), boxTitle, 'the clicked item is highlighted in the list');
+  assert.equal(await page.$('[data-test="sch-over"], .sch-row [data-test="task-edit"]'), null, 'no editor opens until you ask for it');
+  // Its edit icon opens the editor as a card laid over the item on the calendar, with its steps.
+  await page.locator('.sch-row.flash [data-test="row-edit"]').click();
+  await page.waitForSelector('[data-test="sch-over"] [data-test="task-edit"]');
+  { const b = await box.boundingBox(); const o = await page.locator('[data-test="sch-over"]').boundingBox();
+    assert.ok(Math.abs(o.y - b.y) < 8 && o.x <= b.x + 2 && o.x + o.width >= b.x + Math.min(b.width, o.width) - 2, `the card sits over the calendar item (${JSON.stringify({ b, o })})`); }
+  assert.ok(await page.$('[data-test="sch-over"] .tk-subs'), 'with its steps');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
-  // A click outside the row closes its editor.
-  await page.click('.sch-title');
-  assert.equal(await page.$('.sch-row [data-test="task-edit"]'), null, 'clicking outside closes the editor');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('[data-test="sch-over"]'), null, 'Esc closes the card');
   assert.equal(await page.$('[data-test="sch-quick"]'), null, 'nothing sits between the Schedule header and the calendar');
   // Week and month are part of the Schedule; a day opens the day time line.
   await page.click('[data-test="cal-week"]');
@@ -406,7 +410,8 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to your schedule[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-schedule action');
   await page.press('[data-test="search"]', 'Enter');
   // It opens on its day, in the list with its editor open.
-  await page.waitForSelector('.sch-row:has-text("Dentist") [data-test="task-edit"]', { timeout: 5000 });
+  await page.waitForSelector('[data-test="sch-over"]:has-text("Dentist")', { timeout: 5000 });
+  await page.keyboard.press('Escape');
   await page.click('.sch-title');
   const unreadCount = async () => Number((await page.textContent('[data-test="bell-count"]').catch(() => '0')).replace('+', '')) || 0;
   const unread0 = await unreadCount();

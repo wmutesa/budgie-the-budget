@@ -59,9 +59,9 @@ const SCREENS = [
   ['row-edit', async p => {
     await p.click('.sch-sheet [aria-label="Close"]').catch(() => {});
     if (await p.$('[aria-label="Show the list"]')) await p.click('[aria-label="Show the list"]');
-    await p.locator('[data-test="sch-row"] button[aria-label^="Edit "]').first().click();
+    await p.locator('[data-test="sch-row"] [data-test="row-edit"]').first().click();
   }],
-  ['day-pick', async p => { await p.locator('[data-test="sch-row"] [data-test="task-edit"] [aria-label="Close"]').first().click().catch(() => {}); await p.click('[data-test="sch-today"]'); }],
+  ['day-pick', async p => { await p.keyboard.press('Escape'); await p.click('[data-test="sch-today"]'); }],
   ['focus', async p => { await p.click('[data-test="nav-focus"]'); }],
   ['reports', async p => { await p.click('[data-test="nav-reports"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
   ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],

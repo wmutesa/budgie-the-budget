@@ -255,7 +255,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
       <span v-for="n in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="n" class="cal-mhead">{{ n }}</span>
       <div v-for="d in days" :key="d" class="cal-mcell" :class="{ other: fromIso(d).getMonth() !== monthOf, today: d === today() }" @click.self="newAt($event, d, false)" @dragover.prevent @drop="dropOn($event, d, false)">
         <button type="button" class="cal-mnum" :aria-label="`Open ${d}`" @click="openDay(d)">{{ fromIso(d).getDate() }}</button>
-        <button v-for="x in monthItems(d).slice(0, 3)" :key="x.key" type="button" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': catColor(x.task) }" draggable="true" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
+        <button v-for="x in monthItems(d).slice(0, 3)" :key="x.key" type="button" :data-task-id="x.task.id" :data-date="x.date" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': catColor(x.task) }" draggable="true" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
           <i />{{ x.task.time ? `${timeLabel(x.task.time).replace(':00', '').replace(' ', '').toLowerCase()} ` : '' }}{{ x.task.title }}
         </button>
         <button v-if="monthItems(d).length > 3" type="button" class="cal-more" @click="openDay(d)">{{ monthItems(d).length - 3 }} more</button>
@@ -272,7 +272,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
             <span>{{ dayHead(d).name }}</span><b>{{ dayHead(d).num }}</b>
           </button>
           <div v-if="anyOn(d).length" class="cal-any" data-test="cal-any">
-            <button v-for="x in anyOn(d).slice(0, 3)" :key="x.key" type="button" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': catColor(x.task) }" @click="openItem($event, x)"><i />{{ x.task.title }}</button>
+            <button v-for="x in anyOn(d).slice(0, 3)" :key="x.key" type="button" :data-task-id="x.task.id" :data-date="x.date" class="cal-item chip" :class="{ done: x.done }" :style="{ '--k': catColor(x.task) }" @click="openItem($event, x)"><i />{{ x.task.title }}</button>
             <button v-if="anyOn(d).length > 3" type="button" class="cal-more" @click="openDay(d)">+{{ anyOn(d).length - 3 }} more</button>
           </div>
         </div>
@@ -283,7 +283,7 @@ const dayHead = d => { const x = fromIso(d); return { name: x.toLocaleDateString
         </div>
         <div v-for="d in days" :key="d" class="cal-col" :class="{ today: d === today() }" :style="{ height: `${hours.length * HOUR}px` }" :data-date="d" @click.self="newAt($event, d, true)" @dragover.prevent @drop="dropOn($event, d, true)">
           <div v-if="d === today() && nowTop >= 0 && nowTop <= hours.length * HOUR" class="cal-now" :style="{ top: `${nowTop}px` }" aria-hidden="true" />
-          <button v-for="x in timed(d)" :key="x.key" type="button" class="cal-item box" :class="{ done: x.done, short: x.e - x.s < 40, stacked: x.lane > 0 }" :title="`${x.task.title} · ${timeLabel(x.task.time)}`" :style="boxStyle(x)" draggable="true" data-test="cal-item" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
+          <button v-for="x in timed(d)" :key="x.key" type="button" :data-task-id="x.task.id" :data-date="x.date" class="cal-item box" :class="{ done: x.done, short: x.e - x.s < 40, stacked: x.lane > 0 }" :title="`${x.task.title} · ${timeLabel(x.task.time)}`" :style="boxStyle(x)" draggable="true" data-test="cal-item" @dragstart="dragStart($event, x)" @click="openItem($event, x)">
             <span class="cal-box-time">{{ timeLabel(x.task.time) }}<template v-if="x.task.mins"> – {{ timeLabel(fromMins(x.s + x.task.mins)) }}</template></span><b>{{ x.task.title }}</b>
           </button>
         </div>
