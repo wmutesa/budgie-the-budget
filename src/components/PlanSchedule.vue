@@ -150,7 +150,8 @@ function laid(key) {
 const boxStyle = x => ({
   top: `${((x.s - startH.value * 60) / 60) * HOUR.value + 2}px`,
   height: `${Math.max(26, ((x.e - x.s) / 60) * HOUR.value - 4)}px`,
-  left: `calc(${(x.lane / x.lanes) * 100}% + 6px)`, width: `calc(${100 / x.lanes}% - 12px)`,
+  // Things at the same or close times cascade, like the week: each later one steps right and sits on top, nearly full width.
+  left: `calc(${x.lane * Math.min(18, 100 / (x.lanes + 1))}% + 6px)`, width: `calc(${100 - x.lane * Math.min(18, 100 / (x.lanes + 1))}% - 12px)`, zIndex: 2 + x.lane,
   '--c': catColor(x.task),
 });
 const hhmm = m => fromMins(m);
@@ -314,7 +315,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
             <span v-for="h in hours" :key="h" :class="{ now: isToday && clock.getHours() === h }" :style="{ top: `${(h - startH) * HOUR}px` }">{{ String(h).padStart(2, '0') }}:00</span>
           </div>
           <div v-for="col in columns" :key="col.key" class="sch-col" :style="{ height: `${(hours.length - 1) * HOUR}px` }" data-test="sch-col">
-            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, narrow: x.lanes > 1, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
+            <button v-for="x in laid(col.key)" :key="x.key" type="button" class="sch-box" :class="{ done: x.done, short: x.e - x.s < 45, long: x.e - x.s >= 90, stacked: x.lane > 0, pending: x.task.pending }" :style="boxStyle(x)" :data-task-id="x.task.id" data-test="sch-box" :title="`${x.task.title}: show in the list`" @click="pick(x)">
               <span class="sch-box-time">{{ hhmm(x.s) }} – {{ hhmm(x.e) }}<Icon name="more" :size="14" class="sch-box-more" /></span>
               <b class="sch-box-title">{{ x.task.title }}</b>
             </button>

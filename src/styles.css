@@ -3266,3 +3266,9 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .bell-new { border-radius: 999px !important; }
 .bell-main, .bell-item { border-radius: 12px !important; }
 .bell-link { border-radius: 6px !important; }
+/* Day: overlapping things cascade; a white ring sets each apart; hover brings one to the front */
+.sch-box.stacked { box-shadow: 0 0 0 1.5px #fff, 0 3px 10px -4px rgba(24, 24, 27, .25) !important; }
+.sch-box:hover, .sch-box:focus-visible { z-index: 30 !important; }
+.sch-box.done { opacity: 1 !important; background: #fafafa !important; border-color: #ececf0 !important; }
+.sch-box.done .sch-box-title, .sch-box.done .sch-box-time { color: #a1a1aa !important; }
+.sch-box.done .sch-box-title { text-decoration: line-through; }
