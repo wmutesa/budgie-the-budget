@@ -1,4 +1,7 @@
 <script setup>
+import EmojiPick from './EmojiPick.vue';
+import { ref as emoRef } from 'vue';
+const titleIn = emoRef(null);
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { capture, current, itemOf, placeOf, keep, drop, keepAll, later, switchTo, DESTS } from '../lib/capture';
 import Icon from './Icon.vue';
@@ -54,8 +57,10 @@ onUnmounted(() => { window.removeEventListener('resize', measure); window.remove
         <span class="cr-count">Review {{ capture.at + 1 }} of {{ capture.review.length }}</span>
         <button type="button" class="cr-link" data-test="review-later" @click="later">Later</button>
       </div>
-      <input v-if="x.to === 'goal'" v-model="item.title" class="cr-title" aria-label="Name" maxlength="160" />
-      <input v-else v-model="item.title" class="cr-title" aria-label="Name" maxlength="160" data-test="review-title" />
+      <div class="emo-row">
+        <input ref="titleIn" v-model="item.title" class="cr-title" aria-label="Name" maxlength="160" :data-test="x.to === 'goal' ? undefined : 'review-title'" />
+        <EmojiPick v-model="item.title" :input="titleIn" />
+      </div>
       <p class="cr-where"><Icon :name="x.to === 'goal' ? 'target' : x.to === 'routine' ? 'repeat' : 'calendar'" :size="14" />{{ place.where }}</p>
       <div class="cr-dests" role="radiogroup" aria-label="What is it">
         <button v-for="(d, id) in DESTS" :key="id" type="button" role="radio" :aria-checked="x.to === id" :class="[`to-${id}`, { on: x.to === id }]" :data-test="`review-${id}`" @click="switchTo(id)"><Icon :name="d.icon" :size="13" />{{ d.label }}</button>

@@ -137,7 +137,7 @@ await check('speech is split into separate things', () => {
 const { parseGoal, ruleMilestones } = await import('../../src/lib/goals.js');
 await check('goals: titles, dates and milestones', () => {
   const g = parseGoal('I want to run a 10K by March', NOW);
-  assert.equal(g.title, 'Run a 10K'); assert.equal(g.by, '2027-03-31');
+  assert.equal(g.title, 'Run A 10K'); assert.equal(g.by, '2027-03-31');
   assert.equal(parseGoal('goal: land a summer internship by summer', NOW).by, '2027-06-01');
   assert.equal(parseGoal('read 12 books this year', NOW).by, '2026-12-31');
   assert.ok(ruleMilestones({ title: 'Land a summer internship' }).some(m => /CV/.test(m)), 'internship goals get CV steps');
@@ -252,7 +252,7 @@ await check('fifty assignments said in one breath become fifty tasks', () => {
 });
 await check('a spoken list of things due splits into one item each', () => {
   const rows = breakDownRules('I have an essay due Friday, a lab report due Monday and a quiz on Wednesday');
-  assert.deepEqual(rows.map(r => r.task.title), ['Essay', 'Lab report', 'Quiz']);
+  assert.deepEqual(rows.map(r => r.task.title), ['Essay', 'Lab Report', 'Quiz']);
   assert.deepEqual(rows.map(r => r.task.kind), ['assignment', 'assignment', 'exam'], 'assignments and exams are recognised');
 });
 await check('it does not split what belongs together', () => {
@@ -273,12 +273,12 @@ await check("Gemini's items become planner items with their kind, date, time, re
   const rows = routeAll(items.map(itemLine).join('\n'));
   assert.equal(rows.length, 7, rows.map(r => r.text).join(' | '));
   const [lab, mid, gym, read, run, call, piano] = rows;
-  assert.deepEqual([lab.dest, lab.task.title, lab.task.date, lab.task.time, lab.task.mins, lab.task.project, lab.task.kind], ['task', 'Lab report', '2026-11-12', '17:00', 90, 'Chemistry', 'assignment']);
+  assert.deepEqual([lab.dest, lab.task.title, lab.task.date, lab.task.time, lab.task.mins, lab.task.project, lab.task.kind], ['task', 'Lab Report', '2026-11-12', '17:00', 90, 'Chemistry', 'assignment']);
   assert.deepEqual([mid.task.title, mid.task.date, mid.task.kind, mid.task.project], ['Midterm', '2026-11-16', 'exam', 'History']);
   assert.deepEqual([gym.dest, gym.task.repeat?.days, gym.task.time], ['routine', [1, 3, 5], '18:00']);
   assert.deepEqual([read.dest, read.task.repeat?.every], ['routine', 'day']);
   assert.equal(run.dest, 'goal');
-  assert.deepEqual([call.task.title, call.task.date], ['Call mom', '2026-11-15']);
+  assert.deepEqual([call.task.title, call.task.date], ['Call Mom', '2026-11-15']);
   assert.deepEqual([piano.dest, piano.task.repeat?.days, piano.task.project], ['routine', [4], 'Music'], 'one weekly day repeats too');
 });
 const { geminiSplit } = await import('../../worker/gemini.js');
@@ -299,7 +299,7 @@ await check('the Gemini answer is checked before it is used', async () => {
 await check('assignments keep their full names, their dates and the right category', () => {
   const rows = breakDownRules('for chemistry I have Lab Report 3 Titration Analysis due November 14th at 11:59 pm and Problem Set 7 due the 18th. For history the essay on the French Revolution is due Friday the 21st. Hashtag calculus homework 5.2 and 5.3 due next Monday. English 101 reading response on chapter 4 of The Great Gatsby due tomorrow at noon. Psych midterm on December 2nd. Biology quiz 4 on cell respiration this Thursday hashtag bio');
   const got = rows.map(r => [r.task.title, r.task.date.slice(5), r.task.time, r.task.project, r.task.kind]);
-  assert.deepEqual(got.map(g => g[0]), ['Lab Report 3 Titration Analysis', 'Problem Set 7', 'Essay on the French Revolution', 'Homework 5.2 and 5.3', 'English 101 reading response on chapter 4 of The Great Gatsby', 'Psych midterm', 'Biology quiz 4 on cell respiration']);
+  assert.deepEqual(got.map(g => g[0]), ['Lab Report 3 Titration Analysis', 'Problem Set 7', 'Essay On The French Revolution', 'Homework 5.2 And 5.3', 'English 101 Reading Response On Chapter 4 Of The Great Gatsby', 'Psych Midterm', 'Biology Quiz 4 On Cell Respiration']);
   assert.deepEqual(got.map(g => g[3]), ['Chemistry', 'Chemistry', 'History', 'Calculus', 'English 101', 'Psychology', 'Biology']);
   assert.deepEqual(got.map(g => g[4]), ['assignment', 'assignment', 'assignment', 'assignment', 'assignment', 'exam', 'exam']);
   assert.equal(got[0][1], '11-14'); assert.equal(got[0][2], '23:59');
@@ -309,7 +309,7 @@ await check('assignments keep their full names, their dates and the right catego
 });
 await check('course codes, numeric dates, two-word subjects and spoken hashtags', () => {
   const rows = breakDownRules('MATH 201 problem set 9 due 11/20 at 9 am and the MATH 201 midterm is on the 3rd. CS 61A Project 2: Linked Lists due in two weeks hashtag computer science. Spanish oral presentation due end of the month. I also have a stats lab writeup due Wednesday at 5 pm, a reading quiz in econ on Friday, and an art history paper due December 10th at midnight');
-  assert.deepEqual(rows.map(r => r.task.title), ['MATH 201 problem set 9', 'MATH 201 midterm', 'CS 61A Project 2: Linked Lists', 'Spanish oral presentation', 'Stats lab writeup', 'Reading quiz in econ', 'Art history paper']);
+  assert.deepEqual(rows.map(r => r.task.title), ['MATH 201 Problem Set 9', 'MATH 201 Midterm', 'CS 61A Project 2: Linked Lists', 'Spanish Oral Presentation', 'Stats Lab Writeup', 'Reading Quiz In Econ', 'Art History Paper']);
   assert.deepEqual(rows.map(r => r.task.project), ['MATH 201', 'MATH 201', 'Computer Science', 'Spanish', 'Statistics', 'Economics', 'Art History']);
   assert.deepEqual(rows.map(r => r.task.kind), ['assignment', 'exam', 'assignment', 'assignment', 'assignment', 'exam', 'assignment']);
   assert.equal(rows[0].task.date.slice(5), '11-20'); assert.equal(rows[0].task.time, '09:00');
@@ -352,7 +352,7 @@ await check('the on-device model\'s items: clear titles, its kinds kept, exact d
   assert.equal(ok.length, 5, 'an item that was never said is dropped');
   const rows = ok.map(x => withKind(route(localLine(x)), x.kind));
   assert.deepEqual(rows.map(r => r.dest), ['task', 'task', 'task', 'routine', 'goal']);
-  assert.deepEqual(rows.slice(0, 4).map(r => r.task.title), ['Lab Report 3', 'Quiz', 'Call mom', 'Gym']);
+  assert.deepEqual(rows.slice(0, 4).map(r => r.task.title), ['Lab Report 3', 'Quiz', 'Call Mom', 'Gym']);
   assert.deepEqual(rows.slice(0, 2).map(r => [r.task.kind, r.task.project]), [['assignment', 'Chemistry'], ['exam', 'Chemistry']]);
   assert.equal(new Date(`${rows[0].task.date}T12:00`).getDay(), 5, 'Friday is worked out by Budgie');
   assert.equal(rows[0].task.time, '17:00');
@@ -397,9 +397,9 @@ await check('said priority reaches the task, and stays out of the title', () => 
   const hi = p(itemLine({ title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 0, course: 'Chemistry', priority: 'high' }));
   assert.equal(hi.priority, 'high'); assert.equal(hi.title, 'Lab Report 3'); assert.equal(hi.project, 'Chemistry');
   const lo = p(localLine({ title: 'Take shirts to the dry cleaner', kind: 'task', when: '', time: '', course: '', priority: 'low' }));
-  assert.equal(lo.priority, 'low'); assert.equal(lo.title, 'Take shirts to the dry cleaner');
+  assert.equal(lo.priority, 'low'); assert.equal(lo.title, 'Take Shirts To The Dry Cleaner');
   const quick = p(itemLine({ title: 'Call Aunt Beate back', kind: 'task', date: '2026-11-08', time: '', minutes: 15, course: '' }));
-  assert.equal(quick.mins, 15); assert.equal(quick.title, 'Call Aunt Beate back');
+  assert.equal(quick.mins, 15); assert.equal(quick.title, 'Call Aunt Beate Back');
 });
 await check('voice commands change what is planned; everything else is added', async () => {
   const { readCommand, pullCommands, listToTag } = await import('../../src/lib/commands.js');
@@ -433,4 +433,42 @@ await check("Budgie's server AI: the same instructions, and its answer checked",
   assert.equal(str[0].title, 'Gym', 'JSON inside text is read too');
   await assert.rejects(cloudSplit({}, { text: 'x', today: '2026-11-08' }), /not set up/);
 });
+
+// ---------- titles: Title Case, emojis, spoken punctuation, what is not a task ----------
+{
+  const { titleCase, spokenMarks, isNotTask } = await import('../../src/lib/titles.js');
+  await check('titles: a capital at the start of every word', () => {
+    assert.equal(titleCase('call mom about the trip'), 'Call Mom About The Trip');
+    assert.equal(titleCase('follow-up with dr. lee'), 'Follow-Up With Dr. Lee');
+    assert.equal(titleCase("mom's birthday"), "Mom's Birthday");
+    assert.equal(titleCase('buy iPhone case for CS61A'), 'Buy iPhone Case For CS61A');
+    assert.equal(titleCase('read chapter 7 #biology'), 'Read Chapter 7 #biology');
+    assert.equal(p('lab report 3 due fri 5pm').title, 'Lab Report 3');
+    assert.equal(p('call mom tomorrow').title, 'Call Mom');
+  });
+  await check('titles: emojis are kept', () => {
+    assert.equal(titleCase('📚 read chapter 3'), '📚 Read Chapter 3');
+    assert.equal(p('🏋️ gym every monday 6pm').title, '🏋️ Gym');
+    assert.equal(p('essay 🔥 due fri').title, 'Essay 🔥');
+    assert.equal(spokenMarks('party for jo party emoji'), 'party for jo 🎉');
+    assert.equal(spokenMarks('study for the quiz emoji of a book'), 'study for the quiz 📚');
+  });
+  await check('spoken punctuation becomes the mark', () => {
+    assert.equal(spokenMarks('call mom comma dad and grandma period'), 'call mom, dad and grandma.');
+    assert.equal(spokenMarks('buy milk full stop gym at six'), 'buy milk. gym at six');
+    assert.equal(spokenMarks('is the quiz on friday question mark'), 'is the quiz on friday?');
+    assert.equal(spokenMarks('groceries colon eggs comma bread'), 'groceries: eggs, bread');
+    assert.equal(spokenMarks('essay new line quiz monday'), 'essay\nquiz monday');
+  });
+  await check('spoken punctuation: a class period stays a word', () => {
+    assert.equal(spokenMarks('math in third period'), 'math in third period');
+    assert.equal(spokenMarks('study in my free period'), 'study in my free period');
+    assert.equal(spokenMarks('cancel before the trial period ends'), 'cancel before the trial period ends');
+    assert.equal(spokenMarks('get a quote from the plumber'), 'get a quote from the plumber');
+  });
+  await check('what is not a task is left out', () => {
+    for (const x of ['okay', 'Um, so.', 'Thank you!', 'testing testing', 'Can you hear me?', "That's it.", 'okay okay', '[Music]', '🎉', '...']) assert.ok(isNotTask(x), x);
+    for (const x of ['Gym', 'Call mom', 'Essay due Friday', 'Test on Friday', 'Thank-you card for Jo', '📚 Read chapter 3']) assert.ok(!isNotTask(x), x);
+  });
+}
 console.log(`\n${n} checks passed`);

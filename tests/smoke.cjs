@@ -258,7 +258,7 @@ async function run(url) {
   const editor = await edit('Essay 2');
   await editor.locator('[data-test="breakdown"]').click();
   await page.waitForFunction(() => document.querySelectorAll('[data-test="task-edit"] .tk-subs li').length === 6);
-  await editor.locator('[data-test="task-goal"]').selectOption({ label: 'Run a 10K' });
+  await editor.locator('[data-test="task-goal"]').selectOption({ label: 'Run A 10K' });
   await editor.locator('[data-test="time-field"]').click();
   await page.waitForSelector('[data-test="time-pop"]');
   if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
@@ -451,11 +451,11 @@ async function run(url) {
     await page.waitForTimeout(150);
   }
   const has = (re, what) => assert.ok(reviewed.some(x => re.test(x)), `${what} (${reviewed.join(' ;; ')})`);
-  has(/^Stats problem set \| Schedule · Assignment · .* · 5 PM · #Statistics/, 'the assignment keeps its day, time and course');
-  has(/^Biology midterm \| Schedule · Exam · .*#Biology/, 'the exam is an exam');
+  has(/^Stats Problem Set \| Schedule · Assignment · .* · 5 PM · #Statistics/, 'the assignment keeps its day, time and course');
+  has(/^Biology Midterm \| Schedule · Exam · .*#Biology/, 'the exam is an exam');
   has(/^Swim \| Schedule · Routine/, 'the weekly swim is a routine');
-  has(/^Call grandma \| Schedule · Task · Tomorrow/, 'the call is tomorrow');
-  has(/^Learn to play guitar \| Overview · Goals/, 'the goal is a goal');
+  has(/^Call Grandma \| Schedule · Task · Tomorrow/, 'the call is tomorrow');
+  has(/^Learn To Play Guitar \| Overview · Goals/, 'the goal is a goal');
   // Back to the built-in rules for the rest of the test.
   await page.click('[data-test="account"]');
   await page.click('[data-test="acct-tab-digests"]');
@@ -469,7 +469,7 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
-  assert.ok(/Land a summer internship[\s\S]*0\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
+  assert.ok(/Land A Summer Internship[\s\S]*0\/6/.test(tg) && /Run A 10K/.test(tg), 'goals show progress');
   assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
 
@@ -568,7 +568,7 @@ async function run(url) {
   const heardItems = [];
   for (let i = 0; i < 8 && await hear.$('[data-test="capture-review"]'); i++) { heardItems.push(`${await hear.inputValue('.cr-title')} | ${await hear.textContent('.cr-where')}`); await hear.click('[data-test="review-keep"]'); await hear.waitForTimeout(150); }
   assert.ok(heardItems.some(x => /^Lab Report 3 \| Schedule · Assignment · .*5 PM · #Chemistry/.test(x)), `Gemini's spelling and details are used (${heardItems.join(' ;; ')})`);
-  assert.ok(heardItems.some(x => /^History quiz \| Schedule · Exam/.test(x)), 'what only Gemini heard is added too');
+  assert.ok(heardItems.some(x => /^History Quiz \| Schedule · Exam/.test(x)), 'what only Gemini heard is added too');
   assert.ok(heardItems.some(x => /^Gym \| Schedule · Routine/.test(x)), 'the weekly gym is a routine');
   await hear.close();
 

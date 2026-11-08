@@ -1,4 +1,7 @@
 <script setup>
+import EmojiPick from './EmojiPick.vue';
+import { ref as emoRef } from 'vue';
+const titleIn = emoRef(null);
 import { ref, computed } from 'vue';
 import { store, newId } from '../lib/store';
 import { KINDS, DAY_SHORT, removeTask, today } from '../lib/tasks';
@@ -29,7 +32,7 @@ async function split() { splitting.value = true; splitBy.value = await breakDown
 
 <template>
   <div class="tk-edit" data-test="task-edit">
-    <label class="tk-f wide"><span>Title</span><input v-model="t.title" maxlength="160" /></label>
+    <div class="tk-f wide"><span>Title</span><div class="emo-row"><input aria-label="Title" ref="titleIn" v-model="t.title" maxlength="160" data-test="task-title" /><EmojiPick v-model="t.title" :input="titleIn" /></div></div>
     <div class="tk-f"><span>Date</span><DateField v-model="t.date" label="Date" placeholder="No date" /></div>
     <div class="tk-f"><span>Time</span><TimeField v-model="t.time" label="Time" /></div>
     <label class="tk-f"><span>Minutes</span><input v-model.number="t.mins" type="number" min="0" step="5" /></label>

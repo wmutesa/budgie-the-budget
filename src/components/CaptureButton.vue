@@ -8,6 +8,7 @@ import { store } from '../lib/store';
 import { canCapture, prime, createLive } from '../lib/livevoice';
 import { liveWords, account } from '../lib/account';
 import Icon from './Icon.vue';
+import { spokenMarks } from '../lib/titles';
 import { diag, from, flush } from '../lib/diag';
 
 // The one way to add anything. Tap Add and talk: Budgie listens to the
@@ -30,7 +31,7 @@ let liveFailed = false;
 const live = createLive({
   send: liveWords,
   onLevel: v => { level.value = v; },
-  onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, t); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
+  onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, spokenMarks(t)); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {
     diag('live-error', { code, msg: m.slice(0, 160) });
     if (code === 'silent') { micNote.value = m; return; }
@@ -45,8 +46,8 @@ const live = createLive({
 const dict = useDictation({
   continuous: true,
   onError: m => { diag('dict-error', { msg: m.slice(0, 160) }); micNote.value = `${m} You can type instead.`; },
-  onText: t => { spoken.value = true; capture.text = join(base, t); },
-  onFinal: t => { capture.text = join(base, t).trim(); },
+  onText: t => { spoken.value = true; capture.text = join(base, spokenMarks(t)); },
+  onFinal: t => { capture.text = join(base, spokenMarks(t)).trim(); },
 });
 let base = '';
 const canSpeak = computed(() => canCapture || canDictate);
@@ -102,7 +103,7 @@ async function sortIt() {
       let said = '';
       try { said = await hear(audio); } catch (e) { micNote.value = `Gemini could not write it down (${e.message || 'no answer'}). Type it instead, or try again.`; return; }
       if (!said) { micNote.value = NOTHING; return; }
-      capture.text = join(capture.text.trim() ? `${capture.text.trim()}\n` : '', said);
+      capture.text = join(capture.text.trim() ? `${capture.text.trim()}\n` : '', spokenMarks(said));
       micNote.value = 'Here is what Gemini heard. Fix any word, then tap Add.';
       nextTick(() => box.value?.focus());
       return;

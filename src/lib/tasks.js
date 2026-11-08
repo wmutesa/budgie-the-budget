@@ -11,6 +11,7 @@
 //   subtasks: [{ id, title, done }], goalId: the life goal it moves forward,
 //   source: you | ai | routine | calendar | suggestion, feedId, uid, createdAt,
 // }
+import { titleCase } from './titles';
 import { store, newId } from './store';
 
 export const KINDS = {
@@ -265,7 +266,7 @@ export function parseTask(raw, now = new Date()) {
   title = title.replace(/\s+(due|by|on|at)\s+(?=[,.;]|$)/gi, ' ').replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').trim();
   title = title.replace(/\s+(?:is|are|was|were|will be|that's|which is)$/i, '').trim();
   if (!title) title = 'New task';
-  title = title.charAt(0).toUpperCase() + title.slice(1);
+  title = titleCase(title);
   // No #category said: a course code or a subject in the name gives one (the name itself stays whole).
   if (!out.project) {
     const code = ` ${raw} `.match(COURSE_CODE);

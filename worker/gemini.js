@@ -120,7 +120,9 @@ function guide(today, existing = []) {
 Length: minutes if a length was said ("for two hours" is 120). If they say it is quick ("won't take long", "real quick", "five minutes") use 15. Otherwise 0.
 A list, board or category they name ("to my Work list", "on the Chemistry board") is the course.
 A follow-up about the item just said ("move that to tomorrow", "make it high priority", "actually at 4") changes that item; it is not a new item.
-Keep the language they spoke in for titles.
+Keep the language they spoke in for titles. Write every title in Title Case: the first letter of every word a capital ("Call Mom About The Trip", "Lab Report 3"), keeping words that already have capitals inside ("iPhone", "CS61A"). Keep any emoji they typed or named ("heart emoji" is ❤️) in the title.
+Spoken punctuation is punctuation, not words: "comma", "full stop", "period" at the end of a phrase, "question mark", "colon", "new line" (a new line starts a new item). "Third period" or "free period" is a class, not punctuation.
+Leave out anything that is not something to do: greetings, thanks, filler ("okay", "um", "so yeah"), checking the microphone ("testing", "can you hear me"), sign-offs ("that's it", "that's all") and sounds a transcript notes ("[music]").
 ${existing.length ? `Their planner already has these open items:\n${existing.map(t => `- ${t}`).join('\n')}\nWhen they mark one done ("mark X as done", "I finished X", "X is done"), delete or cancel one, move one to another day, or change its priority, give action "done", "delete", "move" (with the new date) or "priority" (with the priority) and target set to that item exactly as listed. Anything else is action "add". Never use an action for something not in this list.\n` : 'Every item is action "add".\n'}Titles start with the action when one was said ("Call Aunt Beate back", "Take shirts to the dry cleaner", "Email Professor Kim about the extension") and drop "I have to", "I need to", "remind me to", "don't forget to".
 Examples (today is ${today}):
 Said: "I have to finish lab report 3 for chem by Friday at 5, super important, and call aunt Beate back tomorrow, that won't take long"

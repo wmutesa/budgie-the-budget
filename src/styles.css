@@ -3487,3 +3487,13 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .abnb .avp-pop { border-radius: 18px !important; }
 .abnb .avp-sw, .abnb .avp-custom, .abnb .avp-custom-dot, .abnb .avp-big { border-radius: 50% !important; }
 .abnb .avp-preview { border-radius: 12px !important; }
+
+/* Emoji button beside a title */
+.emo-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.emo-row > input { flex: 1; min-width: 0; }
+.emo { position: relative; flex: none; }
+.emo-btn { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--line, #e4e4e7); background: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.emo-btn:hover, .emo-btn[aria-expanded="true"] { background: #f4f4f5; }
+.emo-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 200; width: 248px; max-width: calc(100vw - 32px); display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 6px; background: #fff; border: 1px solid #e4e4e7; box-shadow: 0 16px 40px -16px rgba(9, 9, 11, .35); }
+.emo-pop button { aspect-ratio: 1; border: 0; background: none; font-size: 18px; line-height: 1; cursor: pointer; padding: 0; }
+.emo-pop button:hover, .emo-pop button:focus-visible { background: #f4f4f5; outline: none; }

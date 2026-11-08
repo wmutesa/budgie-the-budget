@@ -5,6 +5,7 @@
 import { store, newId } from './store';
 import { parseTask, makeTask, splitLines, dayLabel, timeLabel, today, KINDS, DAY_SHORT } from './tasks';
 import { parseGoal, makeGoal, planGoal, GOAL_WORDS } from './goals';
+import { isNotTask } from './titles';
 
 export const DESTS = {
   task: { label: 'Task', icon: 'planner' },
@@ -25,7 +26,8 @@ export function route(line) {
 }
 // Comma lists ("gym mwf 6pm, call mom sundays") become one line each when every part has a time or day.
 const splitCommas = line => { const parts = line.split(/,\s*/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => parseTask(x).date || parseTask(x).repeat || parseTask(x).time) ? parts : [line]; };
-export const routeAll = text => splitLines(text).flatMap(splitCommas).map(route);
+// Lines that are talk, not things to do ("okay", "thank you", "testing"), are left out.
+export const routeAll = text => splitLines(text).flatMap(splitCommas).filter(l => !isNotTask(l)).map(route);
 
 // Speech has no line breaks, and one recording can hold dozens of things.
 // Split at sentence ends; at spoken numbering ("first", "number two",

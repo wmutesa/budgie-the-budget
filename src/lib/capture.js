@@ -13,6 +13,7 @@ import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT
 import { placeFree } from './schedule';
 import { pullCommands, fromItem, runCommands } from './commands';
 import { go, nav } from './nav';
+import { isNotTask } from './titles';
 
 export const capture = reactive({
   open: false,       // the capture sheet
@@ -135,7 +136,7 @@ export async function sortAndPlace(text = capture.text, { spoken = false, audio 
   // Spoken or typed, one long run of words is broken into every separate thing.
   const { lines, kinds, cmds = [] } = await breakDown(text, audio);
   const changed = runCommands(cmds);
-  const rows = (kinds ? lines.map((l, i) => withKind(route(l), kinds[i])) : routeAll(lines.join('\n'))).filter(r => r.text);
+  const rows = (kinds ? lines.map((l, i) => withKind(route(l), kinds[i])) : routeAll(lines.join('\n'))).filter(r => r.text && !isNotTask(r.text) && !isNotTask(r.task?.title));
   if (!rows.length) { capture.sorting = false; if (changed) { capture.text = ''; capture.open = false; } return changed; }
   const out = await sendAll(rows);
   settle(out.made);

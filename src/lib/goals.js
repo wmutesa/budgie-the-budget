@@ -3,6 +3,7 @@
 // progress comes from what you actually tick off.
 //
 // A goal: { id, title, why, by: 'YYYY-MM-DD' or '', color, createdAt, milestones: [{ id, title, date, taskId }] }
+import { titleCase } from './titles';
 import { store, newId } from './store';
 import { makeTask, today, addDays, dayDiff, isoDay, isDone } from './tasks';
 import { ai, aiMilestones } from './ai';
@@ -38,7 +39,7 @@ export function parseGoal(raw, now = new Date()) {
     take(/\bby\s+(\d{4}-\d{2}-\d{2})\b/, m => m[1]);
   let title = text.replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').trim();
   title = title.charAt(0).toUpperCase() + title.slice(1);
-  return { title: title || 'New goal', by };
+  return { title: titleCase(title) || 'New goal', by };
 }
 
 // Does a line sound like a goal rather than a task?
