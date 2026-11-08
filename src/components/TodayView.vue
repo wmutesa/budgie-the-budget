@@ -1,4 +1,5 @@
 <script setup>
+import ReportsView from './ReportsView.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
@@ -50,8 +51,8 @@ const nextStep = computed(() => {
 </script>
 
 <template>
-  <div class="td-col td-main span-8">
-  <section class="card cell headline" id="today" data-test="today">
+  <div class="td-brief span-12">
+  <section class="card cell headline td-brief-card" id="today" data-test="today">
     <p class="label">{{ weekday }} brief</p>
     <p class="greet">Good <em>{{ part }}</em>.</p>
     <p v-if="empty" class="lede">Budgie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Schedule</b>.</p>
@@ -69,6 +70,10 @@ const nextStep = computed(() => {
       <button type="button" class="btn small" @click="go('Schedule')"><Icon name="calendar" :size="14" />Open Schedule</button>
     </p>
   </section>
+  </div>
+  <!-- Progress leads the Overview: how the week or month went, right under the brief -->
+  <ReportsView id="progress" class="td-progress" />
+  <div class="td-col td-main span-8">
   <section class="card cell" data-test="today-list">
     <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="go('Schedule')"><Icon name="calendar" /></button></div>
     <ul v-if="left.length" class="tk-list"><TaskRow v-for="x in shown" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
@@ -109,9 +114,4 @@ const nextStep = computed(() => {
     <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
   </section>
   </div>
-
-
-
-
-
 </template>

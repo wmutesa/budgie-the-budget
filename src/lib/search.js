@@ -9,7 +9,7 @@ import { go } from './nav';
 const PLACES = [
   ['Overview', 'Overview', 'Your day and goals', /today|home|overview|dashboard|brief/],
   ['Schedule', 'Schedule', 'Your day, week and month, with your activity', /plan|task|todo|to do|deadline|assignment|class|agenda|schedule|calendar|week|month|day view|timeline/],
-  ['Progress', 'Progress', 'Focus hours, what got done, by category', /report|analytic|stats|insight|progress|hours/],
+  ['Overview', 'Progress', 'Locked-in hours, what got done, by category', /report|analytic|stats|insight|progress|hours/, null, '#progress'],
   ['Settings', 'Settings', 'Profile, AI, calendars, devices and people', /setting|profile|account|device|passkey|people|invite|gemini|key/],
   ['Privacy', 'Privacy', 'Your data, sessions and deleting your account', /privacy|data|download|export|delete|session|sign out/],
   ['Settings', 'Your calendars', 'Canvas, Google, Apple or Outlook, and holidays', /canvas|google|outlook|apple|ical|import|calendars|holiday/, null, '#calendars'],
@@ -44,7 +44,7 @@ export function search(text, page) {
   const goals = store.goals.filter(g => has(g.title, q) || has(g.why, q)).slice(0, 4)
     .map(g => { const p = progress(g); return { id: `g-${g.id}`, icon: 'target', color: g.color, title: g.title, sub: `Goal · ${p.done} of ${p.all} done${g.by ? ` · by ${dayLabel(g.by)}` : ''}`, run: () => go('Overview') }; });
   if (goals.length) groups.push({ name: 'Goals', page: 'Overview', items: goals });
-  const feeds = store.feeds.filter(f => has(f.name, q)).map(f => ({ id: `f-${f.id}`, icon: 'calendar', title: f.name, sub: `Calendar · ${f.count} events`, run: () => go('Schedule', { anchor: '#calendars' }) }));
+  const feeds = store.feeds.filter(f => has(f.name, q)).map(f => ({ id: `f-${f.id}`, icon: 'calendar', title: f.name, sub: `Calendar · ${f.count} events`, run: () => go('Settings', { anchor: '#calendars' }) }));
   if (feeds.length) groups.push({ name: 'Calendars', page: 'Schedule', items: feeds });
   const places = PLACES.filter(([, title, , re]) => has(title, q) || re.test(q)).slice(0, 4)
     .map(([p, title, sub, , view, anchor]) => ({ id: `p-${title}`, icon: 'right', title, sub, run: () => go(p, { anchor: anchor || '' }) }));

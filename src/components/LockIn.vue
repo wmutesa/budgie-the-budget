@@ -60,6 +60,7 @@ onUnmounted(() => document.removeEventListener('keydown', esc));
   <Teleport to="body">
     <div v-if="focus.task && !focus.min" class="lk" :class="[color, { ended: focus.ended, paused: !focus.running && !focus.ended }]" role="dialog" aria-modal="true" :aria-label="`Lock In: ${focus.task.title}`" data-test="timer">
       <BlockField />
+      <div class="lk-glass" aria-hidden="true" />
       <button type="button" class="lk-min" title="Minimise (Esc): keep the timer in the top bar" aria-label="Minimise" data-test="timer-min" @click="minimize"><Icon name="collapse" :size="18" />Minimise</button>
 
       <div class="lk-stage">

@@ -6,8 +6,8 @@ import { occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, KINDS, 
 import { catKey, catLabel, catColor } from '../lib/cats';
 import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
-import TaskEditor from './TaskEditor.vue';
-import EmojiPick from './EmojiPick.vue';
+import { breakDown } from '../lib/breakdown';
+import { deleteTask } from '../lib/undo';
 import DateField from './DateField.vue';
 import TimeField from './TimeField.vue';
 import { startFocus } from '../lib/focus';
@@ -215,27 +215,20 @@ function pick(x, then) {
   });
 }
 
-// ---------- the edit card ----------
-// The edit icon on a list row opens its editor as a card laid over the same
-// thing on the calendar, so it is edited where it sits. When it is not on the
-// calendar (another day, a folded view), the card opens beside the row.
-const over = ref(null); // { x: row, style }
-const overEl = ref(null);
-function placeOver(x, scroll) {
-  const cal = document.querySelector('.sch-body > .sch-time, .sch-body > .sch-cal');
-  const on = cal && (cal.querySelector(`[data-task-id="${x.task.id}"][data-date="${x.date}"]`) || cal.querySelector(`[data-task-id="${x.task.id}"]`));
-  const rowEl = document.querySelector(`.sch-row[data-key="${x.key}"]`);
-  const anchor = on || rowEl;
-  if (on && scroll) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  const r = anchor?.getBoundingClientRect();
-  const w = Math.min(420, window.innerWidth - 24);
-  let left = r ? (on ? r.left : r.right + 10) : (window.innerWidth - w) / 2;
-  left = Math.max(12, Math.min(left, window.innerWidth - w - 12));
-  const top = Math.max(12, Math.min(r ? r.top : 80, window.innerHeight - 160));
-  return { x, style: { left: `${left}px`, top: `${top}px`, width: `${w}px`, maxHeight: `${window.innerHeight - top - 12}px` }, onCalendar: Boolean(on) };
+// ---------- editing in place (no edit card) ----------
+// The title is renamed where it sits; date, time and length come from the
+// calendar icon; steps from the break-down icon. Priority is not set by hand:
+// the AI decides it from what was said and from the deadline.
+function rename(x, e) {
+  const v = e.target.innerText.replace(/\s+/g, ' ').trim();
+  if (v && v !== x.task.title) x.task.title = v; else e.target.innerText = x.task.title;
 }
-const overTitle = ref(null);
-// Keep a floating card fully on screen, using its real size once it has drawn.
+const splittingKey = ref('');
+async function splitRow(x) {
+  splittingKey.value = x.key;
+  try { await breakDown(x.task); } finally { splittingKey.value = ''; }
+}
+// Keep a floating card (the quick add) fully on screen, using its real size once it has drawn.
 function keepOnScreen(el, holder) {
   if (!el || !holder?.value) return;
   const r = el.getBoundingClientRect();
@@ -244,19 +237,6 @@ function keepOnScreen(el, holder) {
   const left = Math.max(m, Math.min(r.left, vw - r.width - m));
   if (Math.abs(top - r.top) > 1 || Math.abs(left - r.left) > 1) holder.value = { ...holder.value, style: { ...holder.value.style, top: `${top}px`, left: `${left}px`, maxHeight: `${vh - top - m}px` } };
 }
-function editOver(x) {
-  if (over.value?.x.key === x.key) { over.value = null; return; }
-  over.value = placeOver(x, true);
-  nextTick(() => keepOnScreen(overEl.value, over));
-}
-const closeOver = () => { over.value = null; };
-// The card follows its item when the page scrolls.
-let raf = 0;
-const onScroll = () => { if (!over.value || raf) return; raf = requestAnimationFrame(() => { raf = 0; if (over.value) { over.value = placeOver(over.value.x, false); nextTick(() => keepOnScreen(overEl.value, over)); } }); };
-// Esc closes the card, unless it is closing a date or time picker inside it.
-const escOver = e => { if (e.key === 'Escape' && over.value && !document.querySelector('.pk-pop')) closeOver(); };
-onMounted(() => { window.addEventListener('scroll', onScroll, { passive: true }); document.addEventListener('keydown', escOver); });
-onUnmounted(() => { window.removeEventListener('scroll', onScroll); document.removeEventListener('keydown', escOver); });
 
 // ---------- pick a day from a month calendar ----------
 const pickOpen = ref(false);
@@ -281,7 +261,7 @@ function openFromNav() {
   nav.task = '';
   if (!x) return;
   // From search or a notification: show it, and open its card.
-  pick(x, row => setTimeout(() => editOver(row), 350));
+  pick(x);
 }
 onMounted(() => nextTick(openFromNav));
 watch(() => nav.task, () => nextTick(openFromNav));
@@ -294,7 +274,6 @@ function outside(e) {
   const t = e.target;
   if (!(t instanceof Element) || t.closest('.pk-pop')) return;
   if (calOpen.value && calPopEl.value && !calPopEl.value.contains(t) && !t.closest('[data-test="calendars-open"]')) calOpen.value = false;
-  if (over.value && overEl.value && !overEl.value.contains(t) && !t.closest(`.sch-row[data-key="${over.value.x.key}"] [data-test="row-edit"]`)) over.value = null;
   if (pickOpen.value && pickEl.value && !pickEl.value.contains(t) && !t.closest('[data-test="sch-today"]')) pickOpen.value = false;
 }
 onMounted(() => document.addEventListener('mousedown', outside));
@@ -306,7 +285,6 @@ const fresh = ref(null);
 const freshText = ref('');
 const freshEl = ref(null);
 function newHere(e, col) {
-  if (over.value) { over.value = null; return; }
   const r = e.currentTarget.getBoundingClientRect();
   const mins = Math.floor((((e.clientY - r.top) / HOUR.value) * 60 + startH.value * 60) / 30) * 30;
   const w = Math.min(320, window.innerWidth - 24);
@@ -343,15 +321,21 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
         <button type="button" class="sch-day" title="Pick a day" :aria-expanded="pickOpen" data-test="sch-today" @click="openPick"><Icon name="calendar" :size="15" />{{ dateLabel }}</button>
         <div v-if="pickOpen" ref="pickEl" class="sch-pick" role="dialog" aria-label="Pick a day" data-test="sch-pick" @keydown.esc="pickOpen = false">
           <div class="sch-pick-head">
-            <button type="button" class="sch-step" aria-label="Previous month" @click="pickStep(-1)"><Icon name="left" :size="14" /></button>
             <b>{{ pickTitle }}</b>
-            <button type="button" class="sch-step" aria-label="Next month" @click="pickStep(1)"><Icon name="right" :size="14" /></button>
+            <span class="sch-pick-nav">
+              <button type="button" class="sch-step" aria-label="Previous month" @click="pickStep(-1)"><Icon name="left" :size="14" /></button>
+              <button type="button" class="sch-step" aria-label="Next month" @click="pickStep(1)"><Icon name="right" :size="14" /></button>
+            </span>
           </div>
           <div class="sch-pick-grid">
             <span v-for="w in WEEK_HEAD" :key="w" class="sch-pick-w">{{ w }}</span>
             <button v-for="c in pickDays" :key="c.d" type="button" class="sch-pick-d" :class="{ other: c.other, today: c.d === today(), on: c.d === day, busy: c.busy }" :aria-label="fromIso(c.d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })" :aria-current="c.d === day ? 'date' : undefined" :data-test="`pick-${c.d}`" @click="pickDay(c.d)">{{ c.n }}</button>
           </div>
-          <button type="button" class="sch-pick-today" @click="pickDay(today())">Today</button>
+          <div class="sch-pick-foot">
+            <button type="button" class="sch-pick-today" @click="pickDay(today())">Today</button>
+            <button type="button" class="sch-pick-today" @click="pickDay(addDays(today(), 1))">Tomorrow</button>
+            <span class="sch-pick-key"><i />has plans</span>
+          </div>
         </div>
         <button type="button" class="sch-step" :title="`Previous ${unit}`" :aria-label="`Previous ${unit}`" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
         <button type="button" class="sch-step" :title="`Next ${unit}`" :aria-label="`Next ${unit}`" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
@@ -381,20 +365,25 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
               <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
               <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
-                <span class="sch-row-t">{{ x.task.title }}</span>
+                <span class="sch-row-t" :contenteditable="x.summary ? 'false' : 'plaintext-only'" spellcheck="false" role="textbox" :aria-label="`Title of ${x.task.title}`" title="Click to rename" data-test="row-title" @keydown.enter.prevent="$event.target.blur()" @keydown.esc="$event.target.innerText = x.task.title; $event.target.blur()" @blur="rename(x, $event)">{{ x.task.title }}</span>
                 <span class="sch-tags"><span v-if="range !== 'day'" class="sch-tag">{{ x.summary ? 'Repeats' : rowDate(x) }}</span><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
               </span>
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
               <span class="sch-row-acts">
                 <button v-if="!x.summary && !x.done" type="button" class="sch-icon" :aria-label="`Lock in on ${x.task.title}`" title="Lock In: a timer for just this" data-test="row-lockin" @click="startFocus(x.task)"><Icon name="timer" :size="15" /></button>
                 <button type="button" class="sch-icon" :aria-expanded="whenKey === x.key" :aria-label="`Date and time of ${x.task.title}`" title="Date and time" data-test="row-when" @click="whenKey = whenKey === x.key ? '' : x.key"><Icon name="when" :size="15" /></button>
-                <button type="button" class="sch-icon" :aria-expanded="over?.x.key === x.key" :aria-label="`Edit ${x.task.title}`" title="Edit" data-test="row-edit" @click="editOver(x)"><Icon name="edit" :size="15" /></button>
+                <button v-if="!x.summary && !x.task.subtasks?.length" type="button" class="sch-icon" :class="{ spin: splittingKey === x.key }" :aria-label="`Break ${x.task.title} into steps`" title="Break it into steps" data-test="row-split" @click="splitRow(x)"><Icon name="split" :size="15" /></button>
+                <button type="button" class="sch-icon danger" :aria-label="`Delete ${x.task.title}`" title="Delete" data-test="row-delete" @click="deleteTask(x.task)"><Icon name="trash" :size="15" /></button>
               </span>
               <div v-if="whenKey === x.key" class="sch-when" data-test="row-when-pop">
                 <DateField v-model="x.task.date" label="Date" placeholder="No date" />
                 <TimeField v-model="x.task.time" label="Time" />
+                <label class="sch-when-min"><input v-model.number="x.task.mins" type="number" min="0" step="5" aria-label="Minutes" placeholder="min" /><span>min</span></label>
                 <button type="button" class="sch-icon" title="Done" aria-label="Done" @click="whenKey = ''"><Icon name="check" :size="15" /></button>
               </div>
+              <ul v-if="x.task.subtasks?.length && !x.summary" class="sch-steps" data-test="row-steps">
+                <li v-for="st in x.task.subtasks" :key="st.id" :class="{ done: st.done }"><label><input v-model="st.done" type="checkbox" />{{ st.title }}</label></li>
+              </ul>
             </li>
           </ul>
         </div>
@@ -438,17 +427,6 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
           <input v-model="freshText" placeholder="What is it? e.g. “Study group 2h”" aria-label="New item" data-test="sch-new-input" />
           <button class="btn primary small" :disabled="!freshText.trim()">Add</button>
         </form>
-      </div>
-    </Teleport>
-    <Teleport to="body">
-      <div v-if="over" ref="overEl" class="sch-over" :class="{ beside: !over.onCalendar }" :style="over.style" role="dialog" :aria-label="`Edit ${over.x.task.title}`" data-test="sch-over" @keydown.esc="closeOver">
-        <div class="sch-over-head" :style="{ '--c': catColor(over.x.task) }">
-          <i />
-          <input ref="overTitle" v-model="over.x.task.title" class="sch-over-title" aria-label="Title" maxlength="160" data-test="over-title" />
-          <EmojiPick v-model="over.x.task.title" :input="overTitle" />
-          <button type="button" class="sch-icon" title="Close" aria-label="Close" @click="closeOver"><Icon name="x" :size="16" /></button>
-        </div>
-        <TaskEditor :task="over.x.task" head-title @close="closeOver" />
       </div>
     </Teleport>
   </div>

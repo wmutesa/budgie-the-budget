@@ -222,7 +222,7 @@ function download() {
     <section class="rep-box rep-top">
       <div class="rep-top-row">
         <div>
-          <p class="rep-crumb">REPORTS / <b>{{ rangeName.toUpperCase() }}</b></p>
+          <p class="rep-crumb">PROGRESS / <b>{{ rangeName.toUpperCase() }}</b></p>
           <h1>How your {{ rangeName }} went</h1>
         </div>
         <button type="button" class="rep-btn" title="Download the data as a spreadsheet (CSV)" data-test="rep-download" @click="download"><Icon name="download" :size="15" />Download</button>

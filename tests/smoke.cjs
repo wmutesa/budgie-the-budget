@@ -155,7 +155,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Progress'], 'the three pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule'], 'two pages: Progress is part of the Overview');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -226,13 +226,13 @@ async function run(url) {
   assert.equal(await page.$('[data-test="view-tasks"], [data-test="view-agenda"]'), null, 'the Schedule has no Tasks or Agenda views');
   assert.equal(await page.$('[data-test="planner"] [data-test="remind"]'), null, 'task reminders live on the Profile page');
   assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Schedule shows today\'s activity by category');
-  // A row in the activity list, found by what it says, and its editor.
+  // A row in the activity list, found by what it says. Rows are edited in place: there is no edit card.
   const row = text => page.locator('[data-test="sch-row"]', { hasText: text }).first();
-  // The edit icon on a row opens its editor as a card over the thing on the calendar.
-  const edit = async text => { await row(text).locator('[data-test="row-edit"]').click(); await page.waitForSelector('[data-test="sch-over"] [data-test="task-edit"]'); return page.locator('[data-test="sch-over"] [data-test="task-edit"]'); };
-  // Deleting is one click in the editor, with Undo in a notification.
+  assert.equal(await page.$('[data-test="row-edit"]'), null, 'there is no edit card any more');
+  // Deleting is one click on the row, with Undo in a notification.
   const before = await page.locator('[data-test="sch-row"]').count();
-  await (await edit('Haircut')).locator('[aria-label="Delete"]').click();
+  await row('Haircut').hover();
+  await row('Haircut').locator('[data-test="row-delete"]').click();
   assert.equal(await page.locator('[data-test="sch-row"]').count(), before - 1, 'a task is deleted at once');
   await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
   assert.equal(await page.locator('[data-test="sch-row"]').count(), before, 'Undo brings it back');
@@ -255,25 +255,35 @@ async function run(url) {
   await page.click(`[data-test="pick-${inDays(1)}"]`);
   assert.equal(await page.$('[data-test="sch-pick"]'), null, 'picking a day closes the picker');
   assert.match(await row('Essay 2').textContent(), /Essay 2[\s\S]*Assignment[\s\S]*English[\s\S]*High/, 'a deadline shows its kind, #project and high priority');
-  // The editor: AI breakdown (rules here, since no model runs in the test), a goal, and the pickers.
-  const editor = await edit('Essay 2');
-  await editor.locator('[data-test="breakdown"]').click();
-  await page.waitForFunction(() => document.querySelectorAll('[data-test="task-edit"] .tk-subs li').length === 6);
-  await editor.locator('[data-test="task-goal"]').selectOption({ label: 'Run A 10K' });
-  await editor.locator('[data-test="time-field"]').click();
+  // In place: break into steps (rules here, since no model runs in the test), rename, and date, time and length.
+  await row('Essay 2').hover();
+  await row('Essay 2').locator('[data-test="row-split"]').click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-test="sch-row"]')].some(r => r.textContent.includes('Essay 2') && r.querySelectorAll('[data-test="row-steps"] li').length === 6));
+  const title = row('Essay 2').locator('[data-test="row-title"]');
+  await title.click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Final');
+  await page.keyboard.press('Enter');
+  assert.ok(await row('Essay 2 Final').count(), 'a title is renamed where it sits');
+  await row('Essay 2 Final').locator('[data-test="row-title"]').click();
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Backspace');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.$('[data-test="ai-priority"], .sch-row .seg'), null, 'no priority buttons: the AI sets priority');
+  await row('Essay 2').hover();
+  await row('Essay 2').locator('[data-test="row-when"]').click();
+  const when = page.locator('[data-test="row-when-pop"]');
+  await when.locator('[data-test="time-field"]').click();
   await page.waitForSelector('[data-test="time-pop"]');
   if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
   await page.fill('[data-test="time-pop"] .tp-type', '4:30pm');
   await page.press('[data-test="time-pop"] .tp-type', 'Enter');
-  assert.match(await editor.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
-  await editor.locator('[data-test="date-field"]').click();
+  assert.match(await when.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
+  await when.locator('[data-test="date-field"]').click();
   await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
   assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
   await page.keyboard.press('Escape');
   assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
-  // A click outside the card closes it.
-  await page.click('.sch-title');
-  assert.equal(await page.$('[data-test="sch-over"]'), null, 'clicking outside closes the edit card');
+  await page.locator('[data-test="row-when-pop"] [aria-label="Done"]').click();
   await page.click('[data-test="sch-today"]');
   await page.click('.sch-pick-today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.
@@ -393,16 +403,8 @@ async function run(url) {
   await box.click({ position: { x: 12, y: 10 } });
   await page.waitForSelector('.sch-row.flash');
   assert.equal((await page.textContent('.sch-row.flash .sch-row-t')).trim(), boxTitle, 'the clicked item is highlighted in the list');
-  assert.equal(await page.$('[data-test="sch-over"], .sch-row [data-test="task-edit"]'), null, 'no editor opens until you ask for it');
-  // Its edit icon opens the editor as a card laid over the item on the calendar, with its steps.
-  await page.locator('.sch-row.flash [data-test="row-edit"]').click();
-  await page.waitForSelector('[data-test="sch-over"] [data-test="task-edit"]');
-  { const b = await box.boundingBox(); const o = await page.locator('[data-test="sch-over"]').boundingBox();
-    assert.ok(Math.abs(o.y - b.y) < 8 && o.x <= b.x + 2 && o.x + o.width >= b.x + Math.min(b.width, o.width) - 2, `the card sits over the calendar item (${JSON.stringify({ b, o })})`); }
-  assert.ok(await page.$('[data-test="sch-over"] .tk-subs'), 'with its steps');
+  assert.equal(await page.$('.sch-row [data-test="task-edit"]'), null, 'no editor opens');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
-  await page.keyboard.press('Escape');
-  assert.equal(await page.$('[data-test="sch-over"]'), null, 'Esc closes the card');
   assert.equal(await page.$('[data-test="sch-quick"]'), null, 'nothing sits between the Schedule header and the calendar');
   // Week and month are part of the Schedule; a day opens the day time line.
   await page.click('[data-test="cal-week"]');
@@ -486,9 +488,8 @@ async function run(url) {
   await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
   assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to your schedule[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-schedule action');
   await page.press('[data-test="search"]', 'Enter');
-  // It opens on its day, in the list with its editor open.
-  await page.waitForFunction(() => document.querySelector('[data-test="sch-over"] [data-test="over-title"]')?.value === 'Dentist', null, { timeout: 5000 });
-  await page.keyboard.press('Escape');
+  // It opens on its day, highlighted in the list.
+  await page.waitForFunction(() => /Dentist/.test(document.querySelector('.sch-row.flash')?.textContent || ''), null, { timeout: 5000 });
   await page.click('.sch-title');
   const unreadCount = async () => Number((await page.textContent('[data-test="bell-count"]').catch(() => '0')).replace('+', '')) || 0;
   const unread0 = await unreadCount();
@@ -615,7 +616,7 @@ async function run(url) {
     await guide.waitForTimeout(400);
   }
   assert.ok(steps >= 7, `the guide walks through the app (${steps} steps)`);
-  assert.match(seen, /Three pages, zero clutter[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
+  assert.match(seen, /Two pages, zero clutter[\s\S]*Add anything[\s\S]*Plan your days[\s\S]*Check before it counts/, 'the guide covers the pages and the Add button');
   assert.match(seen, /private key stays on your device/, 'the guide explains how passkeys work');
   await guide.waitForSelector('[data-test="guide"]', { state: 'detached' });
   await guide.click(tab('Overview'));
@@ -654,7 +655,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Schedule', 'Progress', 'Settings', 'Privacy']) {
+  for (const p of ['Overview', 'Schedule', 'Settings', 'Privacy']) {
     if (p === 'Settings' || p === 'Privacy') { await mobile.click('[data-test="account"]'); await mobile.click(`[data-test="menu-${p.toLowerCase()}"]`); } else
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);

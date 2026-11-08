@@ -4,13 +4,14 @@ import { reactive } from 'vue';
 import { store } from './store';
 
 // The pages in the top bar; Settings and Privacy open from the avatar menu.
-export const PAGES = ['Overview', 'Schedule', 'Progress'];
+export const PAGES = ['Overview', 'Schedule'];
 export const ALL_PAGES = [...PAGES, 'Settings', 'Privacy'];
 export const nav = reactive({ page: 'Overview', anchor: '', task: '', day: '' });
 // "Planner" was the Schedule's old name; links that still use it land there.
 export const go = (page, { anchor = '', task = '' } = {}) => {
   if (page === 'Planner') page = 'Schedule';
-  if (page === 'Reports') page = 'Progress';
+  // Progress lives at the bottom of the Overview now.
+  if (page === 'Reports' || page === 'Progress') { page = 'Overview'; anchor = anchor || '#progress'; }
   if (page === 'Focus') page = 'Schedule'; // Focus is now Lock In, on every activity
   if (page === 'Account' || page === 'Profile') page = 'Settings';
   if (!ALL_PAGES.includes(page)) return;
