@@ -65,16 +65,34 @@ const nextStep = computed(() => {
       <template v-if="best">Your {{ best.t.title.toLowerCase() }} streak is <mark class="m-green">{{ best.n }} days</mark>. </template>
       <template v-if="nextStep">{{ nextStep.text }}<template v-if="nextStep.what">{{ ' ' }}<b>{{ nextStep.what }}</b> <span class="lede-note">({{ nextStep.note }})</span></template>. </template>
     </p>
+    <div class="td-brief-side">
+  <div class="td-brief-ring" data-test="today-ring">
+        <div class="cell-head"><p class="label">Today</p><span class="muted small">{{ items.length - left.length }} of {{ items.length }} done</span></div>
+        <div class="pln-ring td-ring" :style="{ '--p': pct }" role="img" :aria-label="`${pct}% of today done`"><b>{{ pct }}%</b><span>done</span></div>
+        <p v-if="habits.length" class="muted small td-habits">{{ habits.filter(h => items.some(x => x.task === h.t && x.done)).length }} of {{ habits.filter(h => items.some(x => x.task === h.t)).length }} habits today</p>
+      </div>
     <p class="brief-acts">
       <button type="button" class="btn small primary" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="14" />Add something</button>
       <button type="button" class="btn small" @click="go('Schedule')"><Icon name="calendar" :size="14" />Open Schedule</button>
     </p>
+    </div>
   </section>
   </div>
-  <!-- Progress leads the Overview: how the week or month went, right under the brief -->
-  <ReportsView id="progress" class="td-progress" />
-  <div class="td-col td-main span-8">
-  <section class="card cell" data-test="today-list">
+  <!-- How things are going, beside your goals and what is next -->
+  <ReportsView id="progress" part="main" class="td-progress span-8" />
+  <div class="td-col td-side span-4">
+  <section class="card cell" data-test="today-goals">
+    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones on the Schedule" aria-label="Milestones on the Schedule" @click="go('Schedule')"><Icon name="right" /></button></div>
+    <ul v-if="goals.length" class="td-goals">
+      <li v-for="x in goals" :key="x.g.id" :class="{ pending: x.g.pending }" :data-goal-id="x.g.id">
+        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>
+        <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
+        <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
+      </li>
+    </ul>
+    <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
+  </section>
+  <section class="card cell td-now" data-test="today-list">
     <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="go('Schedule')"><Icon name="calendar" /></button></div>
     <ul v-if="left.length" class="tk-list"><TaskRow v-for="x in shown" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
     <p v-else-if="items.length" class="empty-note">All done for today.</p>
@@ -93,25 +111,10 @@ const nextStep = computed(() => {
       </ul>
       <p v-else class="empty-note">No assignments or exams due this week.</p>
     </div>
+    <!-- Suggested for you, as part of the same card -->
+    <div class="td-sugg-in"><PlanSuggest /></div>
   </section>
   </div>
-  <div class="td-col td-side span-4">
-  <section class="card cell td-ring-card">
-    <div class="cell-head"><p class="label">Today</p><span class="muted small">{{ items.length - left.length }} of {{ items.length }} done</span></div>
-    <div class="pln-ring td-ring" :style="{ '--p': pct }" role="img" :aria-label="`${pct}% of today done`"><b>{{ pct }}%</b><span>done</span></div>
-    <p v-if="habits.length" class="muted small td-habits">{{ habits.filter(h => items.some(x => x.task === h.t && x.done)).length }} of {{ habits.filter(h => items.some(x => x.task === h.t)).length }} habits today</p>
-  </section>
-  <div class="card cell td-sugg"><PlanSuggest /></div>
-  <section class="card cell" data-test="today-goals">
-    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones on the Schedule" aria-label="Milestones on the Schedule" @click="go('Schedule')"><Icon name="right" /></button></div>
-    <ul v-if="goals.length" class="td-goals">
-      <li v-for="x in goals" :key="x.g.id" :class="{ pending: x.g.pending }" :data-goal-id="x.g.id">
-        <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>
-        <span class="td-bar"><i :style="{ width: `${x.p.pct}%`, background: x.g.color }" /></span>
-        <span v-if="x.p.next" class="muted small">Next: {{ x.p.next.title }} · {{ dayLabel(x.p.next.date) }}</span>
-      </li>
-    </ul>
-    <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
-  </section>
-  </div>
+  <!-- How your month went: the wide summary, last on the page -->
+  <ReportsView part="facts" class="td-facts span-12" />
 </template>

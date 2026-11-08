@@ -64,7 +64,7 @@ const SCREENS = [
   ['day-pick', async p => { await p.keyboard.press('Escape'); await p.click('[data-test="sch-today"]'); }],
   ['lockin', async p => { await p.keyboard.press('Escape'); if (await p.$('[data-test="sch-pick"]')) await p.click('[data-test="sch-today"]'); if ((await p.getAttribute('[data-test="cal-day"]', 'aria-pressed')) !== 'true') await p.click('[data-test="cal-day"]'); if (await p.$('[aria-label="Show the list"]')) await p.click('[aria-label="Show the list"]'); await p.locator('[data-test="sch-row"] [data-test="row-lockin"]').first().click(); }],
   ['lockin-off', async p => { await p.click('[data-test="timer-stop"]'); }],
-  ['overview-progress', async p => { await p.click('[data-test="nav-overview"]'); await p.waitForSelector('#progress [data-test="rep-stat"]'); }],
+  ['overview-progress', async p => { await p.click('[data-test="nav-overview"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
   ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
   ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.locator('body').press('n'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
   ['review', async p => { await p.click('[data-test="capture-sort"]'); await p.waitForSelector('.cr-hole'); }],

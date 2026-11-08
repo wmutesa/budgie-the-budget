@@ -1,3 +1,8 @@
+<script>
+import { ref as refShared } from 'vue';
+const sharedRange = refShared('month');
+</script>
+
 <script setup>
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
@@ -10,7 +15,9 @@ import Icon from './Icon.vue';
 // a few tables, what it means, and what to try next. Mostly text; cards and
 // charts only where they help.
 const RANGES = [['week', 'Week', 7], ['month', 'Month', 30], ['quarter', '3 months', 90]];
-const range = ref('month');
+// One range for both parts on the Overview (the charts and the summary at the bottom).
+const range = sharedRange;
+const props = defineProps({ part: { type: String, default: 'all' } });
 const rangeName = computed(() => ({ week: 'week', month: 'month', quarter: 'three months' })[range.value]);
 const days = computed(() => RANGES.find(r => r[0] === range.value)[2]);
 const to = computed(() => today());
@@ -217,9 +224,9 @@ function download() {
 </script>
 
 <template>
-  <div class="rep span-12" data-test="reports">
+  <div class="rep" :class="[`rep-part-${part}`]" data-test="reports">
     <!-- Header and the key facts -->
-    <section class="rep-box rep-top">
+    <section v-if="part !== 'main'" class="rep-box rep-top">
       <div class="rep-top-row">
         <div>
           <p class="rep-crumb">PROGRESS / <b>{{ rangeName.toUpperCase() }}</b></p>
@@ -237,7 +244,7 @@ function download() {
       </dl>
     </section>
 
-    <div class="rep-layout">
+    <div v-if="part !== 'facts'" class="rep-layout">
       <div class="rep-main">
         <!-- The main chart -->
         <section class="rep-box rep-chart-box">
@@ -312,38 +319,6 @@ function download() {
         </div>
       </div>
 
-      <!-- The side: short sections of facts -->
-      <aside class="rep-side">
-        <section class="rep-sec" data-test="rep-says">
-          <h3><Icon name="trend" :size="14" />HOW IT WENT</h3>
-          <dl class="rep-kv">
-            <div><dt>Completion</dt><dd>{{ cur.rate }}%</dd></div>
-            <div><dt>Days active</dt><dd>{{ stats.consistency }}%</dd></div>
-            <div><dt>Busiest day</dt><dd>{{ weekdays[0]?.n ? weekdays[0].name : '–' }}</dd></div>
-            <div><dt>Lightest day</dt><dd>{{ weekdays[6]?.name || '–' }}</dd></div>
-            <div><dt>Peak time</dt><dd>{{ peak ? `${peak.name} ${slotLabel(peak.h)}` : '–' }}</dd></div>
-            <div><dt>Compared with before</dt><dd>{{ pct(delta(cur.done.length, prev.done.length)) }}</dd></div>
-          </dl>
-        </section>
-        <section class="rep-sec">
-          <h3><Icon name="target" :size="14" />VERDICT</h3>
-          <div class="rep-verdict">
-            <p class="rep-verdict-t">{{ verdict.label }}</p>
-            <p class="muted small">{{ verdict.why }}</p>
-            <div class="rep-sure"><span>How sure</span><b>{{ verdict.sure }}%</b></div>
-            <span class="rep-meter"><i :style="{ width: `${verdict.sure}%` }" /></span>
-          </div>
-        </section>
-        <section class="rep-sec">
-          <h3><Icon name="clock" :size="14" />FOCUS</h3>
-          <dl class="rep-kv">
-            <div><dt>Sessions</dt><dd>{{ cur.sessions.length }}</dd></div>
-            <div><dt>Average session</dt><dd>{{ cur.sessions.length ? hours(avgSession) : '–' }}</dd></div>
-            <div><dt>Longest</dt><dd>{{ longest ? hours(longest.mins) : '–' }}</dd></div>
-            <div><dt>Focus and output</dt><dd>{{ stats.r == null ? '–' : `${strength(stats.r)} (r ${stats.r})` }}</dd></div>
-          </dl>
-        </section>
-      </aside>
     </div>
   </div>
 </template>

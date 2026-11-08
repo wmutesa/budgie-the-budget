@@ -31,7 +31,7 @@ function draw() {
   const W = innerWidth, H = innerHeight;
   el.width = W * dpr; el.height = H * dpr;
   const ctx = el.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#f7f7fa'; ctx.fillRect(0, 0, W, H);
   const cols = Math.ceil(W / CELL), rows = Math.ceil(H / CELL);
   // The same layout each time for this screen size, so a resize does not reshuffle it wildly.
   let seed = cols * 131 + rows * 7;
