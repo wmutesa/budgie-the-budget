@@ -471,4 +471,35 @@ await check("Budgie's server AI: the same instructions, and its answer checked",
     for (const x of ['Gym', 'Call mom', 'Essay due Friday', 'Test on Friday', 'Thank-you card for Jo', '📚 Read chapter 3']) assert.ok(!isNotTask(x), x);
   });
 }
+
+// ---------- hearing well: no repeats, learned words, run-on lists, syllabus titles ----------
+{
+  const { unloop, newWords, applyVocab, learnCorrections, tidyTitle, isNotTask } = await import('../../src/lib/titles.js');
+  const { splitSpoken, routeAll } = await import('../../src/lib/router.js');
+  await check('nothing is written twice', () => {
+    assert.equal(unloop('I need to I need to finish the essay the essay today'), 'I need to finish the essay today');
+    assert.equal(newWords('Essay due Friday at 5. Gym on Monday', 'Gym on Monday at 6. Call mom tomorrow.'), 'at 6. Call mom tomorrow.');
+    assert.equal(newWords('Essay due Friday at 5. Gym on Monday at 6.', 'Essay due Friday at 5.'), '');
+    assert.equal(newWords('', 'Call mom'), 'Call mom');
+  });
+  await check('your corrections become words Budgie knows', () => {
+    assert.deepEqual(learnCorrections('call grace in kegali about the itd f project', 'Call Grace in Kigali about the ITDF project'), [{ heard: 'kegali', word: 'Kigali' }, { heard: 'itd f', word: 'ITDF' }]);
+    assert.equal(applyVocab('meeting in kegali about itd f', [{ heard: 'kegali', word: 'Kigali' }, { heard: 'itd f', word: 'ITDF' }]), 'meeting in Kigali about ITDF');
+  });
+  await check('a run-on list of assignments splits at each due date', () => {
+    const said = 'Work on A paper of English due Friday Consuming cultures paper due December 15 globalization and social change paper due December 15 Reading for history of Southeast Asia due Tuesday Project for ITD completion';
+    const r = routeAll(splitSpoken(said).join('\n'));
+    assert.deepEqual(r.map(x => x.task.title), ['English Paper', 'Consuming Cultures Paper', 'Globalization And Social Change Paper', 'Reading For History Of Southeast Asia', 'ITD Completion Project']);
+    assert.deepEqual(splitSpoken('Lab report due Friday at 5pm for chemistry and a quiz on Monday'), ['Lab report due Friday at 5pm for chemistry', 'quiz on Monday']);
+  });
+  await check('titles read like a syllabus', () => {
+    assert.equal(tidyTitle('a paper of English'), 'English paper');
+    assert.equal(tidyTitle('work on the essay for history'), 'history essay');
+    assert.equal(tidyTitle('Call mom'), 'Call mom');
+  });
+  await check('fragments that are not tasks are dropped', () => {
+    for (const x of ['and then the', 'on Friday', 'so it was like', 'um so yeah']) assert.ok(isNotTask(x), x);
+    for (const x of ['Gym', 'Essay due Friday', 'Call Grace in Kigali']) assert.ok(!isNotTask(x), x);
+  });
+}
 console.log(`\n${n} checks passed`);

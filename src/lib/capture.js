@@ -58,6 +58,8 @@ function settle(made) {
 // when it finds about as much as the rules and invents nothing.
 // Open things by name, so "mark the lab report as done" can find one.
 const myOpen = () => store.tasks.filter(t => !t.pending && (!t.done || t.repeat)).slice(-80).map(t => t.title);
+// Words you taught Budgie (and the corrections it learned), so the AI spells them your way.
+const myVocab = () => [...new Set((store.vocab || []).map(v => v.word).filter(Boolean))].slice(0, 100);
 const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
 // What Gemini heard in a recording, kept so it is not sent twice when the text is left as written.
 export const lastHeard = { transcript: '', items: null };
@@ -101,7 +103,7 @@ export async function breakDown(text, audio = null) {
     try {
       const d = new Date();
       // Your own categories, so items land in them; the rules' split as a checklist so nothing is missed.
-      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen());
+      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen(), myVocab());
       const cmds = (items || []).map(fromItem).filter(Boolean);
       const ok = (items || []).filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));
       if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
@@ -110,7 +112,7 @@ export async function breakDown(text, audio = null) {
   // Budgie's own AI on its server (a large open model on Cloudflare): no key needed.
   try {
     const d = new Date();
-    const { items } = await budgieBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen());
+    const { items } = await budgieBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen(), myVocab());
     const cmds = (items || []).map(fromItem).filter(Boolean);
     const ok = (items || []).filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));
     if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Budgie AI'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }

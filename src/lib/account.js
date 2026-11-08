@@ -293,7 +293,7 @@ export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', 
 // Live words: one short piece of a recording, written down by Budgie's server.
 // terms: the person's own words (categories, course codes, task names), to help the speech model spell them.
 export const liveWords = (audio, prompt, terms = [], partial = false) => api('/api/voice/live', { method: 'POST', body: { audio, prompt, terms, partial } }).then(r => r.text || '');
-export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = []) => api('/api/gemini/breakdown', { method: 'POST', body: { text, today, weekday, timeZone, categories, hints, existing } });
+export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/gemini/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 // Budgie's own server AI: the same breakdown, for everyone, without a key.
-export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = []) => api('/api/voice/breakdown', { method: 'POST', body: { text, today, weekday, timeZone, categories, hints, existing } });
+export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/voice/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

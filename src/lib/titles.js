@@ -85,6 +85,8 @@ const CHATTER = [
   'you', 'thank you for watching', 'thanks for watching', 'subscribe', 'music', 'applause', 'laughter', 'silence', 'inaudible', 'blank audio',
 ];
 const CHATTER_SET = new Set(CHATTER);
+const STOP = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'so', 'then', 'to', 'of', 'in', 'on', 'at', 'for', 'with', 'it', 'its', "it's", 'is', 'was', 'be', 'that', 'this', 'there', 'just', 'like', 'um', 'uh', 'yeah', 'okay', 'ok', 'well', 'i', "i'm", 'me', 'my', 'we', 'you', 'they', 'he', 'she', 'also', 'too', 'very', 'really', 'kind', 'sort', 'thing', 'things', 'stuff', 'something', 'anything', 'what', 'um', 'hmm', 'oh', 'ah', 'right', 'gonna', 'wanna', 'gotta', 'do', 'did', 'does', 'have', 'has', 'had', 'are', 'were', 'been', 'if', 'as', 'by', 'up', 'out', 'about', 'from', 'into', 'now']);
+const WHEN = new Set(['today', 'tomorrow', 'tonight', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'morning', 'afternoon', 'evening', 'night', 'next', 'week', 'month', 'year', 'weekend', 'noon', 'midnight', 'due', 'every', 'day', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']);
 const squash = s => String(s ?? '').toLowerCase().replace(/[’`]/g, "'").replace(/\p{Extended_Pictographic}|️|‍/gu, '').replace(/[^\p{L}\p{N}'\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
 
 export function isNotTask(line) {
@@ -99,7 +101,91 @@ export function isNotTask(line) {
   if (words.every(w => CHATTER_SET.has(w))) return true;
   // [Music], (silence) and other captions a speech model writes for sounds.
   if (/^[[(].*[\])]$/.test(raw)) return true;
+  // Nothing left but little words ("and then the", "so it was like"), or only a when ("on Friday").
+  const content = words.filter(w => !STOP.has(w));
+  if (!content.length) return true;
+  if (content.every(w => WHEN.has(w) || /^\d+(?:st|nd|rd|th|am|pm)?$/.test(w))) return true;
   return false;
 }
 
 export const hasEmoji = s => EMOJI.test(String(s ?? ''));
+
+// ---------- hearing well: no repeats, your words spelled your way ----------
+const norm = s => String(s ?? '').toLowerCase().replace(/[’']/g, "'").replace(/[^\p{L}\p{N}'\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
+
+// Speech models sometimes loop ("I need to I need to finish"); keep one of each run.
+export function unloop(text) {
+  let s = String(text ?? '');
+  for (let n = 6; n >= 1; n--) {
+    const re = new RegExp(`\\b((?:[\\p{L}\\p{N}']+[\\s,]+){${n - 1}}[\\p{L}\\p{N}']+)(?:[\\s,.]+\\1\\b)+`, 'giu');
+    s = s.replace(re, '$1');
+  }
+  return s;
+}
+
+// New words heard, minus anything already at the end of what was written:
+// pieces of speech overlap, and a repeat should never be written twice.
+export function newWords(before, heard) {
+  const next = unloop(heard).trim();
+  if (!next) return '';
+  const b = norm(before).split(' ').filter(Boolean);
+  const nRaw = next.split(/\s+/);
+  const n = nRaw.map(w => norm(w));
+  const tail = norm(before).slice(-Math.max(200, norm(next).length + 20));
+  if (norm(next).length > 8 && tail.includes(norm(next))) return ''; // said again: already there
+  for (let k = Math.min(14, b.length, n.length); k >= 2; k--) {
+    if (b.slice(-k).join(' ') === n.slice(0, k).join(' ')) return nRaw.slice(k).join(' ');
+  }
+  return next;
+}
+
+// Corrections you made to what Budgie heard become rules for next time
+// (that is how it learns your accent and your names): [{ heard, word }].
+export function applyVocab(text, vocab = []) {
+  let s = String(text ?? '');
+  for (const v of vocab) {
+    if (!v?.heard || !v?.word) continue;
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${v.heard.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')}(?![\\p{L}\\p{N}])`, 'giu');
+    s = s.replace(re, v.word);
+  }
+  return s;
+}
+
+// What changed between what was heard and what you kept: short replaced
+// phrases (1 to 3 words), the corrections worth remembering.
+export function learnCorrections(heard, kept) {
+  const a = String(heard ?? '').split(/\s+/).filter(Boolean), b = String(kept ?? '').split(/\s+/).filter(Boolean);
+  if (!a.length || !b.length || a.length > 600 || b.length > 600) return [];
+  const clean = w => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+  const A = a.map(w => norm(w)), B = b.map(w => norm(w));
+  // Longest common subsequence, walked from the start: equal words line up,
+  // and each gap between them is one replacement (what was heard, what you kept).
+  const L = Array.from({ length: A.length + 1 }, () => new Int16Array(B.length + 1));
+  for (let i = A.length - 1; i >= 0; i--) for (let j = B.length - 1; j >= 0; j--) L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0, hi = [], wi = [];
+  const flush = () => {
+    const h = hi.map(clean).join(' ').trim(), w = wi.map(clean).join(' ').trim();
+    if (h && w && hi.length <= 3 && wi.length <= 3 && norm(h) !== norm(w) && /\p{L}/u.test(w)) out.push({ heard: h, word: w });
+    hi = []; wi = [];
+  };
+  while (i < A.length && j < B.length) {
+    if (A[i] === B[j]) { flush(); i++; j++; }
+    else if (L[i + 1][j] >= L[i][j + 1]) hi.push(a[i++]);
+    else wi.push(b[j++]);
+  }
+  while (i < A.length) hi.push(a[i++]);
+  while (j < B.length) wi.push(b[j++]);
+  flush();
+  return out.slice(0, 20);
+}
+
+// Titles the way a syllabus names them: "paper of English" is "English paper".
+export function tidyTitle(raw) {
+  const KIND = '(?:paper|essay|report|quiz|exam|test|midterm|final|homework|assignment|project|presentation|reading|lab|problem set|worksheet)';
+  return String(raw ?? '').trim()
+    // "Work on a paper of English": the assignment itself is the title.
+    .replace(new RegExp(`^(?:work on|do|finish|start|write|submit|complete)\\s+(?=(?:a|an|the|my)?\\s*(?:[\\p{L}-]+\\s+){0,3}${KIND}\\b)`, 'iu'), '')
+    .replace(/^(?:a|an|the|my)\s+/i, '')
+    .replace(/^(paper|essay|report|quiz|exam|test|midterm|final|homework|assignment|project|presentation|reading|lab)\s+(?:of|for|in|on)\s+([\p{L}][\p{L}\d&-]*(?:\s+[\p{L}\d&-]+)?)$/iu, (_, kind, subject) => `${subject} ${kind}`);
+}

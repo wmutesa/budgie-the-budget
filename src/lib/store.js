@@ -45,6 +45,9 @@ function fromSaved(saved = {}) {
     me: saved.me && typeof saved.me === 'object' ? saved.me : pickMe(saved.digest?.profile),
     // How you look in Budgie: { color } for your avatar, picked at random at first and editable.
     profile: saved.profile && typeof saved.profile === 'object' ? saved.profile : {},
+    // Words Budgie should know (names, places, apps, course codes), and corrections it learned
+    // from your edits to what it heard: { word, heard?, learned? }. Used for spelling and your accent.
+    vocab: Array.isArray(saved.vocab) ? saved.vocab.filter(v => v && typeof v.word === 'string' && v.word.trim()).slice(-300) : [],
   };
 }
 const SAVED_FIELDS = Object.keys(fromSaved());

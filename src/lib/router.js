@@ -61,6 +61,27 @@ function splitDue(part) {
   return out;
 }
 
+// Lists said in one breath: "A paper of English due Friday Consuming cultures paper
+// due December 15 Reading for history due Tuesday". Each due date ends an item, unless
+// what follows is about that item ("at 5", "for chemistry", "and", a time).
+const DUE_AT = new RegExp(String.raw`\bdue\s+(?:on\s+|by\s+)?(?:(?:next|this)\s+)?(?:(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)(?:day)?(?:\s+the\s+\d{1,2}(?:st|nd|rd|th)?)?|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s+\d{1,2}(?:st|nd|rd|th)?|the\s+\d{1,2}(?:st|nd|rd|th)|\d{1,2}\/\d{1,2}|tomorrow|today|tonight|next\s+week)(?:\s+(?:at|by)\s+\d{1,2}(?::\d{2})?\s*(?:[ap]\.?\s?m\.?)?)?`, 'gi');
+const KEEPS_GOING = /^(?:at|by|for|in|on|before|after|until|around|from|to|and|or|with|which|that|it|[,;.]|\d|#|noon|midnight|in the|[ap]\.?m\b)/i;
+function splitAfterDue(part) {
+  const out = [];
+  let rest = part, m;
+  DUE_AT.lastIndex = 0;
+  while ((m = DUE_AT.exec(rest))) {
+    const end = m.index + m[0].length;
+    const after = rest.slice(end).trim();
+    if (after.split(/\s+/).length >= 2 && !KEEPS_GOING.test(after)) {
+      out.push(rest.slice(0, end).trim());
+      rest = after; DUE_AT.lastIndex = 0;
+    }
+  }
+  out.push(rest.trim());
+  return out.filter(Boolean);
+}
+
 export function splitSpoken(text) {
   const sentences = String(text)
     .replace(/\r/g, '')
@@ -80,7 +101,7 @@ export function splitSpoken(text) {
     const m = s.match(CONTEXT);
     const course = m && (m[1] || m[2]);
     if (course && !NOT_COURSE.test(course)) { tag = ` #${course.replace(/\s+/g, '')}`; s = s.slice(m[0].length); }
-    const parts = s.replace(AND_SPLIT, '\n').replace(COMMA_SPLIT, '\n').split('\n').flatMap(splitDue);
+    const parts = s.replace(AND_SPLIT, '\n').replace(COMMA_SPLIT, '\n').split('\n').flatMap(splitAfterDue).flatMap(splitDue);
     for (const p of parts) {
       const clean = p.trim()
         .replace(/^(?:and|so|okay|ok|um+|uh+|well)\b[,\s]*/i, '')

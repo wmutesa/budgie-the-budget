@@ -8,7 +8,7 @@ import { store } from '../lib/store';
 import { canCapture, prime, createLive } from '../lib/livevoice';
 import { liveWords, account } from '../lib/account';
 import Icon from './Icon.vue';
-import { spokenMarks } from '../lib/titles';
+import { spokenMarks, newWords, applyVocab, learnCorrections } from '../lib/titles';
 import { diag, from, flush } from '../lib/diag';
 
 // The one way to add anything. Tap Add and talk: Budgie listens to the
@@ -17,12 +17,26 @@ import { diag, from, flush } from '../lib/diag';
 // listens. Only Stop, on the card, ends it: Budgie then breaks what you said
 // into separate things and puts each one in place. Typed text is added line by line.
 const micNote = ref('');
+// Everything Budgie wrote down this time, before your edits: comparing it with what you
+// keep teaches Budgie your names and your accent.
+let heardRaw = '';
+function learnFromEdits() {
+  const pairs = learnCorrections(heardRaw.trim(), capture.text);
+  heardRaw = '';
+  if (!pairs.length) return;
+  const list = store.vocab || (store.vocab = []);
+  for (const p of pairs) { const i = list.findIndex(v => (v.heard || '').toLowerCase() === p.heard.toLowerCase()); if (i >= 0) list.splice(i, 1); list.push({ ...p, learned: new Date().toISOString().slice(0, 10) }); }
+  if (list.length > 300) list.splice(0, list.length - 300);
+}
 // The words so far in the phrase you are saying, faded until you pause.
 const partial = ref('');
 // Keyterms (as ElevenLabs calls them): your categories, course codes and open task names,
 // so the speech model spells them your way. At most 50, each short.
 function keyterms() {
   const out = new Set();
+  for (const v of store.vocab || []) out.add(v.word);
+  if (store.me?.location) out.add(store.me.location);
+  if (store.me?.school) out.add(store.me.school);
   for (const p of Object.keys(store.projects || {})) out.add(p);
   for (const t of store.tasks || []) { if (t.project) out.add(t.project); }
   for (const t of (store.tasks || []).filter(x => !x.done).slice(0, 80)) { const m = t.title.match(/\b[A-Z]{2,5}\s?\d{2,4}[A-Z]?\b/g); if (m) m.forEach(x => out.add(x)); }
@@ -45,7 +59,7 @@ const live = createLive({
   send: (audio, prompt, isPartial) => liveWords(audio, prompt, keyterms(), Boolean(isPartial)),
   onPartial: t => { partial.value = t; },
   onLevel: v => { level.value = v; },
-  onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, spokenMarks(t)); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
+  onText: t => { spoken.value = true; liveFailed = false; const fresh = newWords(capture.text, applyVocab(spokenMarks(t), store.vocab)); heardRaw += ` ${fresh}`; capture.text = join(capture.text, fresh); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {
     diag('live-error', { code, msg: m.slice(0, 160) });
     if (code === 'silent') { micNote.value = m; return; }
@@ -93,7 +107,7 @@ function openSheet({ voice = canSpeak.value } = {}) {
   diag('open-sheet', { voice, already: capture.open, at: capture.at, sorting: capture.sorting });
   if (capture.open) { box.value?.focus(); return; }
   if (voice) prime();
-  capture.open = true; spoken.value = false; micNote.value = '';
+  capture.open = true; spoken.value = false; micNote.value = ''; heardRaw = '';
   nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
 }
 // While recording, the card stays open: only Stop ends it.
@@ -125,6 +139,7 @@ async function sortIt() {
     }
     if (!capture.text.trim()) { if (wasListening) micNote.value = liveFailed ? `${micNote.value.split(' Keep talking')[0]} Nothing could be written down. Add a free Gemini key in Profile, or type instead.` : NOTHING; return; }
     capture.sorting = false;
+    if (heardRaw.trim()) learnFromEdits();
     const n = await sortAndPlace(capture.text, { spoken: spoken.value, audio: geminiAudio.value ? audio : null });
     if (!n && capture.open) micNote.value = 'Nothing to add was found in that. Edit the words and tap Add again.';
   } finally {

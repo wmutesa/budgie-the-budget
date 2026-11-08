@@ -1,13 +1,12 @@
 <script setup>
 import ReportsView from './ReportsView.vue';
+import NextCard from './NextCard.vue';
 import { ref, computed } from 'vue';
 import { store } from '../lib/store';
 import { occurrences, today, addDays, dayLabel, timeLabel, toMins, streak, KINDS } from '../lib/tasks';
 import { progress } from '../lib/goals';
 import { go } from '../lib/nav';
-import TaskRow from './TaskRow.vue';
 import Icon from './Icon.vue';
-import PlanSuggest from './PlanSuggest.vue';
 import { deleteGoal } from '../lib/undo';
 import { capture } from '../lib/capture';
 
@@ -92,28 +91,8 @@ const nextStep = computed(() => {
     </ul>
     <p v-else class="empty-note">No goals yet. Tap Add and say something like “I want to run a 10K by March”; Budgie plans the milestones.</p>
   </section>
-  <section class="card cell td-now" data-test="today-list">
-    <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="go('Schedule')"><Icon name="calendar" /></button></div>
-    <ul v-if="left.length" class="tk-list"><TaskRow v-for="x in shown" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-    <p v-else-if="items.length" class="empty-note">All done for today.</p>
-    <p v-if="items.length" class="td-more">
-      <button v-if="upNext.length > SHOW" type="button" class="pln-more" data-test="today-more" @click="allOpen = !allOpen">{{ allOpen ? 'Show fewer' : `${upNext.length - SHOW} more today` }}</button>
-      <button v-if="items.length - left.length" type="button" class="pln-more" :aria-expanded="showDone" @click="showDone = !showDone">{{ showDone ? 'Hide done' : `${items.length - left.length} done` }}</button>
-      <button type="button" class="pln-more" @click="go('Schedule')">See the day</button>
-    </p>
-    <ul v-if="showDone" class="tk-list"><TaskRow v-for="x in items.filter(y => y.done)" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
-    <p v-if="!items.length" class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
-    <!-- This week's deadlines, as part of Up next -->
-    <div class="td-week" data-test="today-deadlines">
-      <div class="cell-head"><p class="label">This week</p><span class="muted small">{{ deadlines.length }} deadlines</span></div>
-      <ul v-if="deadlines.length" class="td-list">
-        <li v-for="t in deadlines.slice(0, 6)" :key="t.id" :style="{ '--k': KINDS[t.kind].color }"><i /><span><b>{{ t.title }}</b><span class="muted small">{{ dayLabel(t.date) }}{{ t.time ? ` · ${timeLabel(t.time)}` : '' }}{{ t.project ? ` · #${t.project}` : '' }}</span></span></li>
-      </ul>
-      <p v-else class="empty-note">No assignments or exams due this week.</p>
-    </div>
-    <!-- Suggested for you, as part of the same card -->
-    <div class="td-sugg-in"><PlanSuggest /></div>
-  </section>
+  <!-- One card for what is coming up: today, this week's deadlines and ideas -->
+  <NextCard :up-next="upNext" :deadlines="deadlines" />
   </div>
   <!-- How your month went: the wide summary, last on the page -->
   <ReportsView part="facts" class="td-facts span-12" />

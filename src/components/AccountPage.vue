@@ -10,6 +10,7 @@ import ProfileYou from './ProfileYou.vue';
 import DigestSettings from './DigestSettings.vue';
 import GeminiKey from './GeminiKey.vue';
 import PlanCalendars from './PlanCalendars.vue';
+import VocabCard from './VocabCard.vue';
 import { toast } from '../lib/toast';
 import { snapshot } from '../lib/store';
 import { addSample, removeSample, hasSample } from '../lib/sample';
@@ -146,6 +147,7 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
       <template v-if="tab === 'profile'"><ProfileYou /></template>
 
       <template v-else-if="tab === 'digests'">
+        <VocabCard />
         <GeminiKey />
         <DigestSettings v-if="DIGESTS_LIVE" />
         <AIPanel />

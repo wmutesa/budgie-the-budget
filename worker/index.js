@@ -430,12 +430,12 @@ async function routes(request, env, url) {
     const key = `gemini-split:${user.id}`;
     if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
     await countFailure(env, key);
-    const { text, today, weekday, timeZone, categories, hints, existing } = await body(request);
+    const { text, today, weekday, timeZone, categories, hints, existing, vocab } = await body(request);
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
-      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
+      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) }) });
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
   }
   // Budgie's own AI breaks what was said into separate items: for everyone, no key needed.
@@ -443,12 +443,12 @@ async function routes(request, env, url) {
     const key = `voice-split:${user.id}`;
     if (await tooManyAttempts(env, key, 200)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
     await countFailure(env, key);
-    const { text, today, weekday, timeZone, categories, hints, existing } = await body(request);
+    const { text, today, weekday, timeZone, categories, hints, existing, vocab } = await body(request);
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
-      return json({ items: await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
+      return json({ items: await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) }) });
     } catch (e) { return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
   }
   // Diagnostics from the Add card (states and counts, never words), so a
@@ -489,7 +489,10 @@ async function routes(request, env, url) {
         const initial = `${glossary}${before}`.slice(-700).trim();
         const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio, vad_filter: true, ...(initial ? { initial_prompt: initial } : {}) });
         const text = String(out?.text || '').trim();
-        return json({ text: ghost(text) ? '' : text, via: 'whisper' });
+        // Whisper sometimes hands back its own prompt (what was said before): not new words.
+        const flat = x => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+        const echo = text && flat(text).length > 6 && flat(initial).includes(flat(text));
+        return json({ text: ghost(text) || echo ? '' : text, via: 'whisper' });
       } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
     const data = await accountData(env, user.id);
