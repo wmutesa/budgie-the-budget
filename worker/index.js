@@ -90,10 +90,10 @@ async function tooManyAttempts(env, key, max = MAX_FAILED_RECOVERIES) {
 // Daily usage counts for the owner's Admin pages: how often voice and AI were used, and how often they failed.
 // Counts only: never what was said.
 let usageReady = false;
-async function bump(env, userId, key) {
+async function bump(env, userId, key, by = 1) {
   try {
     if (!usageReady) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS usage_daily (day TEXT NOT NULL, user_id TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, user_id, key))').run(); usageReady = true; }
-    await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + 1').bind(new Date().toISOString().slice(0, 10), userId, key).run();
+    await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, ?) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + excluded.n').bind(new Date().toISOString().slice(0, 10), userId, key, Math.round(by)).run();
   } catch { /* counting never gets in the way */ }
 }
 async function countFailure(env, key) {
@@ -457,8 +457,10 @@ async function routes(request, env, url) {
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
+      const ts = Date.now();
       const items = await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) });
       await bump(env, user.id, 'split-budgie');
+      await bump(env, user.id, 'ms-split-budgie', Date.now() - ts);
       return json({ items });
     } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
   }
@@ -488,6 +490,7 @@ async function routes(request, env, url) {
     if (await tooManyAttempts(env, key, 2000)) return fail(429, 'A lot of talking this hour. Live words pause; Stop still works.');
     await countFailure(env, key);
     const { audio, prompt, terms, partial: partialReq } = await body(request);
+    const t0 = Date.now();
     // Keyterms (the person's categories, course codes and task names) help the model spell them their way.
     const words = (Array.isArray(terms) ? terms : []).filter(x => typeof x === 'string').slice(0, 50).map(x => x.replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(Boolean);
     if (typeof audio !== 'string' || !audio || audio.length > 3 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That piece of audio could not be read.');
@@ -506,13 +509,14 @@ async function routes(request, env, url) {
         const flat = x => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
         const echo = text && flat(text).length > 6 && flat(initial).includes(flat(text));
         await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-whisper${text && !ghost(text) && !echo ? '' : '-empty'}`);
+        await bump(env, user.id, 'ms-whisper', Date.now() - t0);
         return json({ text: ghost(text) || echo ? '' : text, via: 'whisper' });
       } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
     const data = await accountData(env, user.id);
     const gkey = tidyKey(data?.digest?.geminiKey);
     if (keyShapeOk(gkey)) {
-      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-gemini`); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
+      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-gemini`); await bump(env, user.id, 'ms-gemini-live', Date.now() - t0); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
     await bump(env, user.id, 'live-failed');
     return fail(503, lastErr ? `Live words are not available right now (${lastErr}).` : 'Live words are not available right now.');

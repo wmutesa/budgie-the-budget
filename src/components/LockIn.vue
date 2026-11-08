@@ -4,6 +4,7 @@ import { store } from '../lib/store';
 import { today, isoDay } from '../lib/tasks';
 import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss } from '../lib/focus';
 import Icon from './Icon.vue';
+import { catColor } from '../lib/cats';
 import BlockField from './BlockField.vue';
 
 // Lock In: Budgie's timer, full screen. A chunky toy timer on a black field of
@@ -39,6 +40,8 @@ const icon = computed(() => cells(ICONS[focus.ended ? 'cat' : focus.running ? 'l
 // One of three toy colours per session, and a line of encouragement.
 const COLORS = ['cyan', 'lime', 'grape'];
 const color = computed(() => COLORS[(focus.task?.title?.length || 0) % COLORS.length]);
+// The timer is the colour of the task's category, like its block on the calendar.
+const bodyColor = computed(() => (focus.task ? catColor(focus.task) : ''));
 const LINES = [
   'Phone face down. Future you says thanks.',
   'One thing. Just this one. The rest can wait its turn.',
@@ -58,7 +61,7 @@ onUnmounted(() => document.removeEventListener('keydown', esc));
 
 <template>
   <Teleport to="body">
-    <div v-if="focus.task && !focus.min" class="lk" :class="[color, { ended: focus.ended, paused: !focus.running && !focus.ended }]" role="dialog" aria-modal="true" :aria-label="`Lock In: ${focus.task.title}`" data-test="timer">
+    <div v-if="focus.task && !focus.min" class="lk" :class="[color, { ended: focus.ended, paused: !focus.running && !focus.ended, tinted: !!bodyColor }]" :style="bodyColor ? { '--task': bodyColor } : {}" role="dialog" aria-modal="true" :aria-label="`Lock In: ${focus.task.title}`" data-test="timer">
       <BlockField />
       <div class="lk-glass" aria-hidden="true" />
       <button type="button" class="lk-min" title="Minimise (Esc): keep the timer in the top bar" aria-label="Minimise" data-test="timer-min" @click="minimize"><Icon name="collapse" :size="18" />Minimise</button>

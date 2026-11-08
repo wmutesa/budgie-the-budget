@@ -275,8 +275,10 @@ async function run(url) {
   await when.locator('[data-test="time-field"]').click();
   await page.waitForSelector('[data-test="time-pop"]');
   if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
-  await page.fill('[data-test="time-pop"] .tp-type', '4:30pm');
-  await page.press('[data-test="time-pop"] .tp-type', 'Enter');
+  await page.click('[data-test="tp-h-4"]');
+  await page.click('[data-test="tp-m-30"]');
+  await page.click('[data-test="time-pop"] .tp-ampm button:has-text("PM")');
+  await page.click('[data-test="tp-done"]');
   assert.match(await when.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
   await when.locator('[data-test="date-field"]').click();
   await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
@@ -288,7 +290,7 @@ async function run(url) {
   await page.click('.sch-pick-today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.
   await page.click('[data-test="calendars-open"]');
-  assert.deepEqual(await page.$$eval('.cal-ways button', b => b.map(x => x.textContent.trim())), ['Link', 'File', 'Holidays', 'Type it'], 'more than one way to add a calendar');
+  assert.deepEqual(await page.$$eval('.cal-ways button', b => b.map(x => x.textContent.trim())), ['Link', 'File', 'Public', 'Type it'], 'more than one way to add a calendar');
   await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
   await page.click('[data-test="feed-add"]');
   await page.waitForFunction(() => /Imported/.test(document.querySelector('[data-test="calendars"]').textContent));

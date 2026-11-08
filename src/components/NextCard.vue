@@ -6,7 +6,7 @@ import { makeTask, today, dayLabel, timeLabel, toggleDone, KINDS } from '../lib/
 import { planGoal } from '../lib/goals';
 import { startFocus } from '../lib/focus';
 import { catColor } from '../lib/cats';
-import { go } from '../lib/nav';
+import { go, nav } from '../lib/nav';
 import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
@@ -37,6 +37,8 @@ function accept(s) {
   toast(s.goal ? `Milestones planned for “${s.goal.title}”.` : s.run ? 'Done.' : 'Added to your schedule.', { kind: 'success' });
 }
 const dismiss = s => store.dismissed.push(s.id);
+// The rest of today, on the Schedule's day view.
+function openDay() { store.planner.cal = 'day'; nav.day = ''; go('Schedule'); }
 </script>
 
 <template>
@@ -67,9 +69,8 @@ const dismiss = s => store.dismissed.push(s.id);
       </li>
     </ul>
     <p v-else class="empty-note">Nothing coming up. Suspiciously calm. Tap Add and say what is on your mind.</p>
-    <p v-if="rows.length > SHOW" class="td-more">
-      <button type="button" class="pln-more" data-test="today-more" @click="all = !all">{{ all ? 'Show less' : moreToday ? `${moreToday} more today` : `${rows.length - SHOW} more` }}</button>
-      <button type="button" class="pln-more" @click="go('Schedule')">See the day</button>
-    </p>
+    <button v-if="upNext.length" type="button" class="nx-more" data-test="today-more" @click="openDay">
+      <span>{{ moreToday ? `${moreToday} more today` : 'All of today' }}</span><span class="muted">See the day</span><Icon name="right" :size="15" />
+    </button>
   </section>
 </template>

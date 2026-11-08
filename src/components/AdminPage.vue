@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { adminSummary } from '../lib/account';
+import { adminSummary, invitePerson } from '../lib/account';
+import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
 // The owner's Admin view: how Budgie is doing for everyone, as counts and
@@ -36,8 +37,49 @@ const usageRows = computed(() => [
   ['Live words that failed', u.value['live-failed'] || 0, 0],
   ['Breakdowns (Budgie AI)', u.value['split-budgie'] || 0, u.value['split-budgie-failed'] || 0],
 ]);
+// The models behind recording and sorting, with this week's use, misses and speed.
+const avg = (msKey, keys) => { const n = keys.reduce((a, k) => a + (u.value[k] || 0), 0); return n ? Math.round((u.value[msKey] || 0) / n) : null; };
+const models = computed(() => [
+  { name: 'Whisper large v3 turbo', job: 'Writes down what you say, phrase by phrase', where: 'Cloudflare Workers AI', calls: (u.value['live-final-whisper'] || 0) + (u.value['live-partial-whisper'] || 0) + (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), misses: (u.value['live-final-whisper-empty'] || 0) + (u.value['live-partial-whisper-empty'] || 0), ms: avg('ms-whisper', ['live-final-whisper', 'live-partial-whisper', 'live-final-whisper-empty', 'live-partial-whisper-empty']), state: 'In use' },
+  { name: 'Gemini Flash (own key)', job: 'Writes down and sorts, for people with their own key', where: 'Google', calls: (u.value['live-final-gemini'] || 0) + (u.value['live-partial-gemini'] || 0), misses: 0, ms: avg('ms-gemini-live', ['live-final-gemini', 'live-partial-gemini']), state: 'Optional' },
+  { name: 'Llama 3.3 70B', job: 'Splits what was said into tasks, routines, events and goals', where: 'Cloudflare Workers AI', calls: (u.value['split-budgie'] || 0) + (u.value['split-budgie-failed'] || 0), misses: u.value['split-budgie-failed'] || 0, ms: avg('ms-split-budgie', ['split-budgie']), state: 'In use · teacher for training' },
+  { name: 'Qwen 2.5 (0.5B and 1.5B)', job: 'On-device splitting when the server is unreachable', where: "The person's browser", calls: null, misses: null, ms: null, state: 'Fallback · to be fine-tuned daily from Nov 9' },
+  { name: 'Budgie rules', job: 'Title Case, nonsense filter, run-on splitting, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
+]);
+// Calendars across everyone: how many people added each one, and whether it is working.
+const calHealth = computed(() => {
+  const m = new Map();
+  for (const p of people.value) for (const f of p.feeds) { const r = m.get(f.name) || { name: f.name, people: 0, failing: 0, events: 0 }; r.people++; r.events += f.count || 0; if (f.error) r.failing++; m.set(f.name, r); }
+  return [...m.values()].sort((a, b) => b.people - a.people || b.failing - a.failing);
+});
+const learnedTotal = computed(() => people.value.reduce((n, p) => n + (p.learned || 0), 0));
+// Invite someone from here.
+const inviteName = ref(''); const inviteLink = ref('');
+async function invite() {
+  const name = inviteName.value.trim(); if (!name) return;
+  try { const r = await invitePerson(name); inviteLink.value = r.link; inviteName.value = ''; toast(`Invite for ${name} ready. It works once and expires in ${r.expiresInDays} days.`, { kind: 'success' }); }
+  catch (e) { toast(e.message || 'The invite could not be made.', { kind: 'error' }); }
+}
+// Download what this page shows, as a spreadsheet.
+function csv() {
+  const rows = {
+    People: [['Person', 'Role', 'Last seen', 'Passkeys', 'Signed in', 'Open tasks', 'Tasks', 'Added this week', 'Locked in min', 'Recordings'], ...people.value.map(p => [p.name, p.role, p.lastSeen ? new Date(p.lastSeen).toISOString() : '', p.passkeys, p.sessions, p.open, p.tasks, p.added, p.focusMins, p.recordings])],
+    Voice: [['Where', 'Recordings', 'Heard', 'Empty', 'Failed', 'Mic blocked', 'Mic muted', 'Quiet rescued'], ...(data.value?.voice || []).map(v => [v.where, v.recordings, v.heard, v.empty, v.failed, v.micBlocked, v.silent, v.quietRescued])],
+    Models: [['Model', 'Job', 'Where', 'Calls', 'Misses', 'Avg ms', 'State'], ...models.value.map(m => [m.name, m.job, m.where, m.calls ?? '', m.misses ?? '', m.ms ?? '', m.state])],
+    Errors: [['Message', 'Times', 'Last', 'Where'], ...(data.value?.errors || []).map(e => [e.msg, e.n, new Date(e.last).toISOString(), e.where])],
+    Sync: [['Person', 'Saves', 'Conflicts', 'Bytes'], ...people.value.map(p => [p.name, p.version, p.conflicts, p.bytes])],
+    'AI usage': [['What', 'Calls', 'Empty or failed'], ...usageRows.value],
+    Calendars: [['Calendar', 'People', 'Failing', 'Events'], ...calHealth.value.map(c => [c.name, c.people, c.failing, c.events])],
+  }[props.section] || [];
+  const text = rows.map(r => r.map(x => `"${String(x ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
+  a.download = `budgie-admin-${props.section.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
 const DESC = {
   People: 'Who uses Budgie, how recently, and how much.',
+  Models: 'The models that write down and sort what people say: how much they were used, how often they missed, and how fast they were.',
   Voice: 'Recording health by device and browser: what was heard, what was not, and why.',
   Errors: 'What broke in the app, and which version each device is running.',
   Sync: 'Saving between devices: conflicts, and how full each account is.',
@@ -54,13 +96,20 @@ const DESC = {
         <h1>{{ section }}</h1>
         <p class="muted">{{ DESC[section] }}</p>
       </div>
-      <button type="button" class="btn small" :disabled="busy" data-test="admin-refresh" @click="load"><Icon name="refresh" :size="14" />{{ busy ? 'Loading…' : 'Refresh' }}</button>
+      <span class="adm-acts">
+        <button type="button" class="btn small" :disabled="!data" data-test="admin-csv" @click="csv"><Icon name="download" :size="14" />CSV</button>
+        <button type="button" class="btn small" :disabled="busy" data-test="admin-refresh" @click="load"><Icon name="refresh" :size="14" />{{ busy ? 'Loading…' : 'Refresh' }}</button>
+      </span>
     </header>
     <p v-if="error" class="adm-error">{{ error }}</p>
     <p v-else-if="!data" class="muted">Loading…</p>
 
     <template v-else>
       <!-- People -->
+      <section v-if="section === 'People'" class="adm-box adm-invite">
+        <form @submit.prevent="invite"><input v-model="inviteName" class="field" placeholder="Name of someone to invite" aria-label="Name to invite" maxlength="60" data-test="admin-invite-name" /><button class="btn small primary" :disabled="!inviteName.trim()" data-test="admin-invite"><Icon name="plus" :size="14" />Invite</button></form>
+        <p v-if="inviteLink" class="small adm-link"><span class="muted">Send this link (it works once):</span> <code>{{ inviteLink }}</code></p>
+      </section>
       <section v-if="section === 'People'" class="adm-box">
         <table class="adm-table">
           <thead><tr><th>Person</th><th>Last seen</th><th>Devices</th><th>Open tasks</th><th>Added this week</th><th>Locked in</th><th>Words known</th><th>Recordings</th></tr></thead>
@@ -100,6 +149,25 @@ const DESC = {
             <thead><tr><th>Person</th><th>Recordings</th><th>Phrases heard</th><th>Empty</th><th>Mic blocked</th><th>Mic muted</th><th>Words learned</th></tr></thead>
             <tbody><tr v-for="p in people" :key="p.id"><td><b>{{ p.name }}</b></td><td>{{ p.recordings }}</td><td>{{ p.heard }}</td><td>{{ p.empty }}</td><td :class="{ bad: p.micBlocked }">{{ p.micBlocked }}</td><td :class="{ bad: p.silent }">{{ p.silent }}</td><td>{{ p.learned }}</td></tr></tbody>
           </table>
+        </section>
+      </template>
+
+      <!-- Models -->
+      <template v-else-if="section === 'Models'">
+        <section class="adm-box">
+          <table class="adm-table">
+            <thead><tr><th>Model</th><th>Job</th><th>Runs on</th><th>Calls</th><th>Empty or failed</th><th>Avg speed</th><th>State</th></tr></thead>
+            <tbody><tr v-for="m in models" :key="m.name"><td><b>{{ m.name }}</b></td><td>{{ m.job }}</td><td>{{ m.where }}</td><td>{{ m.calls ?? '–' }}</td><td :class="{ bad: m.misses && m.calls && m.misses / m.calls > .3 }">{{ m.misses ?? '–' }}<span v-if="m.calls && m.misses != null" class="muted"> ({{ pct(m.misses, m.calls) }}%)</span></td><td>{{ m.ms != null ? `${(m.ms / 1000).toFixed(1)} s` : '–' }}</td><td>{{ m.state }}</td></tr></tbody>
+          </table>
+        </section>
+        <section class="adm-box adm-train">
+          <h2>Training</h2>
+          <dl class="adm-kv">
+            <div><dt>First run</dt><dd>Mon Nov 9, then a new model every day</dd></div>
+            <div><dt>Corrections learned (training signal)</dt><dd>{{ learnedTotal }}</dd></div>
+            <div><dt>Opted in to help Budgie hear better</dt><dd>Not built yet</dd></div>
+            <div><dt>Plan and scores</dt><dd><a href="https://github.com/wmutesa/budgie-the-budget/issues/4" target="_blank" rel="noopener noreferrer">Issue #4</a></dd></div>
+          </dl>
         </section>
       </template>
 
@@ -148,7 +216,19 @@ const DESC = {
       </section>
 
       <!-- Calendars -->
-      <section v-else-if="section === 'Calendars'" class="adm-box">
+      <template v-else-if="section === 'Calendars'">
+      <section class="adm-box">
+        <h2>Across everyone</h2>
+        <table class="adm-table">
+          <thead><tr><th>Calendar</th><th>People</th><th>Events</th><th>Failing</th></tr></thead>
+          <tbody>
+            <tr v-for="c in calHealth" :key="c.name"><td><b>{{ c.name }}</b></td><td>{{ c.people }}</td><td>{{ c.events }}</td><td :class="{ bad: c.failing }">{{ c.failing }}</td></tr>
+            <tr v-if="!calHealth.length"><td colspan="4" class="muted">No calendars connected yet.</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="adm-box">
+        <h2>By person</h2>
         <table class="adm-table">
           <thead><tr><th>Person</th><th>Calendar</th><th>Events</th><th>State</th></tr></thead>
           <tbody>
@@ -159,6 +239,7 @@ const DESC = {
           </tbody>
         </table>
       </section>
+      </template>
     </template>
     <p class="muted small adm-foot">Counts and states only: nobody's tasks or words appear here. Diagnostic logs are deleted after 30 days.</p>
   </div>

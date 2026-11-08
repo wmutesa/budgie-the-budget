@@ -6,7 +6,7 @@ import { store } from './store';
 // The pages in the top bar; Settings and Privacy open from the avatar menu.
 export const PAGES = ['Overview', 'Schedule'];
 // The owner's Admin view has its own pages (counts and states, never anyone's words).
-export const ADMIN_PAGES = ['People', 'Voice', 'Errors', 'Sync', 'AI usage', 'Calendars'];
+export const ADMIN_PAGES = ['People', 'Voice', 'Models', 'Errors', 'Sync', 'AI usage', 'Calendars'];
 export const ALL_PAGES = [...PAGES, ...ADMIN_PAGES, 'Settings', 'Privacy'];
 const savedMode = (() => { try { return localStorage.getItem('budgie.view') === 'admin' ? 'admin' : 'user'; } catch { return 'user'; } })();
 // mode: 'user' (your planner) or 'admin' (the owner's view of how Budgie is doing), remembered on this device.

@@ -32,7 +32,7 @@ import { store } from './lib/store';
 // from the avatar. The Add button adds anything from anywhere; Lock In (the
 // timer) starts from any activity.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', People: 'user', Voice: 'mic', Errors: 'help', Sync: 'refresh', 'AI usage': 'sparkle', Calendars: 'calendar' };
+const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', People: 'user', Voice: 'mic', Errors: 'help', Sync: 'refresh', Models: 'trend', 'AI usage': 'sparkle', Calendars: 'calendar' };
 // The owner can switch to the Admin view (from the avatar menu); everyone else sees their planner.
 const adminView = computed(() => nav.mode === 'admin' && account.user?.role === 'owner');
 const tabs = computed(() => (adminView.value ? ADMIN_PAGES : PAGES));

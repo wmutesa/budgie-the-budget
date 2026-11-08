@@ -206,7 +206,7 @@ async function main() {
     await owner.page.click('[data-test="account"]');
     await owner.page.click('[data-test="view-admin"]');
     await owner.page.waitForSelector('[data-test="admin-people"] .adm-table');
-    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['People', 'Voice', 'Errors', 'Sync', 'AI usage', 'Calendars'], 'the Admin view has its own pages');
+    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['People', 'Voice', 'Models', 'Errors', 'Sync', 'AI usage', 'Calendars'], 'the Admin view has its own pages');
     assert.match(await owner.page.textContent('[data-test="admin-people"]'), /Alex/, 'People lists everyone');
     // The line between the views: no planner tools in the Admin view.
     assert.ok(await owner.page.$('[data-test="admin-badge"]'), 'the Admin view is marked in the top bar');
@@ -219,7 +219,7 @@ async function main() {
     await owner.page.click('[data-test="menu-settings"]');
     assert.deepEqual(await owner.page.$$eval('[data-test="settings-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Devices & security', 'People'], 'Settings in the Admin view: people and devices only');
     await owner.page.click('[data-test="nav-people"]');
-    for (const t of ['voice', 'errors', 'sync', 'ai-usage', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-box`); }
+    for (const t of ['voice', 'models', 'errors', 'sync', 'ai-usage', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-box`); }
     const memberAdmin = await alex.page.evaluate(async () => (await fetch('/api/admin/summary')).status);
     assert.equal(memberAdmin, 403, 'members cannot see the Admin view');
     await owner.page.click('[data-test="account"]');
