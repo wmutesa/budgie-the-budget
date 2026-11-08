@@ -6,6 +6,8 @@
 // a moment after you say them. Stop hands back the whole recording, as 16 kHz
 // mono WAV, for Gemini to read in full when you have a key.
 
+import { diag } from './diag';
+
 export const canCapture = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!(window.AudioContext || window.webkitAudioContext);
 export const MAX_SECONDS = 5 * 60;
 const RATE = 16000;
@@ -22,7 +24,8 @@ export function prime() {
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!ctx || ctx.state === 'closed') ctx = new Ctx();
     ctx.resume?.();
-  } catch { ctx = null; }
+    diag('prime', { state: ctx.state, rate: ctx.sampleRate });
+  } catch (e) { diag('prime-failed', { err: e?.name || String(e) }); ctx = null; }
 }
 
 // send(wavBase64, prompt) → text; onText(newWords); onLevel(0..1); onError(message, code)
@@ -53,13 +56,16 @@ export function createLive({ send, onText, onLevel, onError }) {
     piece = []; pieceLen = 0; quietFor = 0; loud = false;
     if (!hadVoice || !send) return; // silence: nothing to write down
     const audio = b64(wav(join(blocks)));
+    diag('piece', { secs: +(blocks.reduce((a, b) => a + b.length, 0) / RATE).toFixed(1) });
     chain = chain.then(async () => {
       try {
         const text = String(await send(audio, said.slice(-200)) || '').trim();
         failures = 0;
+        diag('piece-text', { chars: text.length });
         if (text) { said = `${said} ${text}`.trim(); onText?.(text); }
       } catch (e) {
         failures++;
+        diag('piece-failed', { status: e?.status, msg: String(e?.message || '').slice(0, 200) });
         if (failures === 1 || e?.status === 503) onError?.(e?.message || 'Live words could not be written down.', e?.status === 503 ? 'unavailable' : 'failed');
       }
     });
@@ -67,15 +73,20 @@ export function createLive({ send, onText, onLevel, onError }) {
 
   async function start() {
     if (live) return true;
+    diag('start', { canCapture, ctx: ctx?.state });
     prime();
     if (!ctx) { onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
     } catch (e) {
+      diag('mic-failed', { err: e?.name, msg: String(e?.message || '').slice(0, 200) });
       onError?.(e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'The microphone is blocked for this site. Allow it in the browser (the icon in the address bar, or Settings for this website), then tap Speak again.' : e?.name === 'NotFoundError' ? 'No microphone was found.' : 'The microphone could not be started.', 'mic');
       return false;
     }
+    { const tr = stream.getAudioTracks()[0]; diag('mic-ok', { label: !!tr?.label, state: tr?.readyState, muted: tr?.muted, settings: JSON.stringify(tr?.getSettings?.() || {}).slice(0, 200) }); tr?.addEventListener('ended', () => diag('track-ended')); tr?.addEventListener('mute', () => diag('track-muted')); tr?.addEventListener('unmute', () => diag('track-unmuted')); }
     try { await ctx.resume?.(); } catch { /* fine */ }
+    diag('ctx', { state: ctx.state, rate: ctx.sampleRate });
+    let ticks = 0, peak = 0;
     all = []; piece = []; pieceLen = 0; quietFor = 0; loud = false; total = 0; said = ''; failures = 0;
     src = ctx.createMediaStreamSource(stream);
     proc = ctx.createScriptProcessor(4096, 1, 1);
@@ -84,6 +95,8 @@ export function createLive({ send, onText, onLevel, onError }) {
       const input = e.inputBuffer.getChannelData(0);
       let sum = 0; for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       const level = Math.sqrt(sum / input.length);
+      peak = Math.max(peak, level);
+      if (++ticks === 1 || ticks % 12 === 0) { diag('audio', { ticks, peak: +peak.toFixed(4), ctx: ctx.state }); peak = 0; }
       onLevel?.(Math.min(1, level * 12));
       const block = down(input, ctx.sampleRate);
       all.push(block); piece.push(block);
@@ -97,6 +110,7 @@ export function createLive({ send, onText, onLevel, onError }) {
     src.connect(proc);
     proc.connect(ctx.destination); // Safari only runs the processor when it is connected
     live = true;
+    diag('listening');
     return true;
   }
 
@@ -104,6 +118,7 @@ export function createLive({ send, onText, onLevel, onError }) {
   async function stop() {
     if (!live) return null;
     live = false;
+    diag('stop', { secs: Math.round(total) });
     if (pieceLen) cut();
     teardown();
     await chain;
@@ -111,7 +126,7 @@ export function createLive({ send, onText, onLevel, onError }) {
     all = [];
     return pcm.length > RATE * 0.6 ? { data: b64(wav(pcm)), mime: 'audio/wav' } : null;
   }
-  function cancel() { live = false; piece = []; all = []; teardown(); }
+  function cancel() { diag('cancel', { was: live }); live = false; piece = []; all = []; teardown(); }
   function teardown() {
     try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }
     if (proc) proc.onaudioprocess = null;

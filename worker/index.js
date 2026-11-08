@@ -451,6 +451,23 @@ async function routes(request, env, url) {
       return json({ items: await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
     } catch (e) { return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
   }
+  // Diagnostics from the Add card (states and counts, never words), so a
+  // problem on one device can be traced. The newest 50 per person are kept.
+  if (path === '/api/diag' && method === 'POST') {
+    const key = `diag:${user.id}`;
+    if (await tooManyAttempts(env, key, 300)) return json({ ok: false });
+    await countFailure(env, key);
+    const raw = await request.text();
+    if (raw.length > 64 * 1024) return fail(413, 'Too much.');
+    let parsed = {};
+    try { parsed = JSON.parse(raw); } catch { return fail(400, 'Not JSON.'); }
+    if (!Array.isArray(parsed.events)) return fail(400, 'No events.');
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS diag_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, ua TEXT, build TEXT, events TEXT NOT NULL)').run();
+    await env.DB.prepare('INSERT INTO diag_logs (user_id, created_at, ua, build, events) VALUES (?, ?, ?, ?, ?)')
+      .bind(user.id, now(), String(parsed.ua || '').slice(0, 300), String(parsed.build || '').slice(0, 120), JSON.stringify(parsed.events.slice(0, 400))).run();
+    await env.DB.prepare('DELETE FROM diag_logs WHERE user_id = ? AND id NOT IN (SELECT id FROM diag_logs WHERE user_id = ? ORDER BY id DESC LIMIT 50)').bind(user.id, user.id).run();
+    return json({ ok: true });
+  }
   // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
   // Cloudflare's Whisper first (free, no key); the person's Gemini key otherwise.
   if (path === '/api/voice/live' && method === 'POST') {

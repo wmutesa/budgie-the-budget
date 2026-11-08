@@ -6,8 +6,9 @@ import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
 import { store } from '../lib/store';
 import { canCapture, prime, createLive } from '../lib/livevoice';
-import { liveWords } from '../lib/account';
+import { liveWords, account } from '../lib/account';
 import Icon from './Icon.vue';
+import { diag, from, flush } from '../lib/diag';
 
 // The one way to add anything. Tap Add and talk: Budgie listens to the
 // microphone itself and your words appear in the card as you speak (written
@@ -31,6 +32,7 @@ const live = createLive({
   onLevel: v => { level.value = v; },
   onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, t); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {
+    diag('live-error', { code, msg: m.slice(0, 160) });
     if (code === 'mic' || code === 'unsupported') { recLive.value = false; micNote.value = `${m} You can type instead.`; return; }
     liveFailed = true;
     micNote.value = hasKey.value
@@ -41,7 +43,7 @@ const live = createLive({
 // Older browsers without audio capture: their own dictation, if they have it.
 const dict = useDictation({
   continuous: true,
-  onError: m => { micNote.value = `${m} You can type instead.`; },
+  onError: m => { diag('dict-error', { msg: m.slice(0, 160) }); micNote.value = `${m} You can type instead.`; },
   onText: t => { spoken.value = true; capture.text = join(base, t); },
   onFinal: t => { capture.text = join(base, t).trim(); },
 });
@@ -53,11 +55,13 @@ const box = ref(null);
 function onEdit() { if (dict.listening.value) { base = capture.text; dict.commit(); } }
 
 async function listen() {
+  diag('listen', { canCapture, canDictate });
   micNote.value = ''; liveFailed = false;
   if (capture.text && !capture.text.endsWith('\n')) capture.text += '\n';
   if (canCapture) {
     recLive.value = true;
     const ok = await live.start();
+    diag('started', { ok, open: capture.open });
     if (!ok) recLive.value = false;
     return;
   }
@@ -69,17 +73,19 @@ const stopAll = () => { if (recLive.value) live.cancel(); recLive.value = false;
 // Open: start listening straight away when the browser can. Called from the tap,
 // so the microphone can start (Safari only allows sound to start inside a tap).
 function openSheet({ voice = canSpeak.value } = {}) {
+  diag('open-sheet', { voice, already: capture.open, at: capture.at, sorting: capture.sorting });
   if (capture.open) { box.value?.focus(); return; }
   if (voice) prime();
   capture.open = true; spoken.value = false; micNote.value = '';
   nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
 }
 // While recording, the card stays open: only Stop ends it.
-function close() { if (listening.value) return; capture.open = false; }
+function close() { diag('close-asked', { listening: listening.value }); if (listening.value) return; capture.open = false; }
 // How it will be split (the rules; the AI may tidy the wording), shown as you go.
 const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
 const NOTHING = 'Nothing was heard. Check that the microphone is allowed for this site and not muted, then tap Speak again, or type instead.';
 async function sortIt() {
+  diag('sort', { listening: listening.value, chars: capture.text.length, spoken: spoken.value });
   if (capture.sorting) return;
   const wasListening = listening.value;
   capture.sorting = true; // Stop shows at once that it is working
@@ -116,7 +122,12 @@ const onKey = e => {
   if (!capture.open && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('input, textarea, select, [contenteditable]')) { e.preventDefault(); openSheet({ voice: false }); }
 };
 onMounted(() => window.addEventListener('keydown', onKey));
-onUnmounted(() => window.removeEventListener('keydown', onKey));
+onUnmounted(() => { diag('unmounted', { open: capture.open, listening: listening.value }); flush(); window.removeEventListener('keydown', onKey); });
+// Who opens and closes the card, as it happens.
+watch(() => capture.open, v => diag(v ? 'card-open' : 'card-closed', { listening: listening.value, from: from() }), { flush: 'sync' });
+watch(listening, v => diag(v ? 'listening-on' : 'listening-off', { open: capture.open }), { flush: 'sync' });
+watch(() => [account.status, account.sync, account.note], ([status, sync, note]) => diag('account', { status, sync, note: note || '' }), { flush: 'sync' });
+onMounted(() => diag('mounted', { canCapture, canDictate, secure: window.isSecureContext }));
 watch(() => capture.open, v => { if (!v && listening.value) stopAll(); });
 defineExpose({ openSheet });
 const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I want to run a 10K by March', 'Mark the lab report as done'];
