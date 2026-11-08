@@ -13,7 +13,9 @@ export const canCapture = typeof window !== 'undefined' && !!navigator.mediaDevi
 const BLOCKED = 'The microphone is blocked for Budgie. On a Mac in Safari: Safari menu, Settings for this website, Microphone: Allow (and System Settings, Privacy & Security, Microphone: Safari on). On iPhone: Settings, Apps, Safari or Chrome, Microphone: on. Then tap Speak again.';
 export const MAX_SECONDS = 5 * 60;
 const RATE = 16000;
-const QUIET = 0.012;      // below this level counts as silence
+const QUIET = 0.012;      // a normal microphone: below this counts as silence
+const FLOOR_X = 3.5;      // or: this many times the room's own noise, for quiet microphones (Safari on a Mac)
+const MIN_VOICE = 0.0006; // never below this
 const PAUSE = 0.55;       // seconds of silence that end a phrase
 const MIN_PIECE = 1.2;    // seconds before a phrase may be cut
 const MAX_PIECE = 9;      // seconds: cut even without a pause
@@ -63,7 +65,8 @@ export function createLive({ send, onText, onLevel, onError }) {
     const blocks = piece; const hadVoice = loud;
     piece = []; pieceLen = 0; quietFor = 0; loud = false;
     if (!hadVoice || !send) return; // silence: nothing to write down
-    const audio = b64(wav(join(blocks)));
+    sentAny = true;
+    const audio = b64(wav(normalize(join(blocks))));
     diag('piece', { secs: +(blocks.reduce((a, b) => a + b.length, 0) / RATE).toFixed(1) });
     chain = chain.then(async () => {
       try {
@@ -80,6 +83,8 @@ export function createLive({ send, onText, onLevel, onError }) {
   }
 
   let ticks = 0, peak = 0, heardAny = false, rebuilt = false, silentTold = false, watchdog = null;
+  let floor = 1, sentAny = false; // the quietest level heard (the room), and whether any phrase was sent
+  const voiceAt = () => Math.max(MIN_VOICE, Math.min(QUIET, floor * FLOOR_X));
   function wire() {
     try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }
     src = ctx.createMediaStreamSource(stream);
@@ -89,7 +94,7 @@ export function createLive({ send, onText, onLevel, onError }) {
       const input = e.inputBuffer.getChannelData(0);
       let sum = 0; for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       const level = Math.sqrt(sum / input.length);
-      if (level > 0) heardAny = true;
+      if (level > 0) { heardAny = true; floor = Math.min(floor * 1.002 + 0.00001, Math.max(level, 0.0002)); }
       peak = Math.max(peak, level);
       if (++ticks === 1 || ticks % 12 === 0) { diag('audio', { ticks, peak: +peak.toFixed(4), ctx: ctx.state, muted: stream?.getAudioTracks()[0]?.muted }); peak = 0; }
       onLevel?.(Math.min(1, level * 12));
@@ -97,7 +102,7 @@ export function createLive({ send, onText, onLevel, onError }) {
       all.push(block); piece.push(block);
       const secs = block.length / RATE;
       pieceLen += secs; total += secs;
-      if (level >= QUIET) { loud = true; quietFor = 0; } else quietFor += secs;
+      if (level >= voiceAt()) { loud = true; quietFor = 0; } else quietFor += secs;
       if ((pieceLen >= MIN_PIECE && quietFor >= PAUSE && loud) || pieceLen >= MAX_PIECE) cut();
       else if (!loud && pieceLen >= 3) { piece = []; pieceLen = 0; quietFor = 0; } // long silence: drop it
       if (total >= MAX_SECONDS) stop();
@@ -124,8 +129,13 @@ export function createLive({ send, onText, onLevel, onError }) {
     }
   }
 
-  async function start() {
-    if (live) return true;
+  let starting = null; // one start at a time: two taps must not open the microphone twice
+  function start() {
+    if (live) return Promise.resolve(true);
+    if (!starting) starting = begin().finally(() => { starting = null; });
+    return starting;
+  }
+  async function begin() {
     diag('start', { canCapture, ctx: ctx?.state || 'none' });
     prime();
     if (!Ctx) { onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
@@ -142,7 +152,7 @@ export function createLive({ send, onText, onLevel, onError }) {
     if (!ctx) { teardown(); onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
     try { await ctx.resume?.(); } catch { /* fine */ }
     diag('ctx', { state: ctx.state, rate: ctx.sampleRate });
-    ticks = 0; peak = 0; heardAny = false; rebuilt = false; silentTold = false;
+    ticks = 0; peak = 0; heardAny = false; rebuilt = false; silentTold = false; floor = 1; sentAny = false;
     all = []; piece = []; pieceLen = 0; quietFor = 0; loud = false; total = 0; said = ''; failures = 0;
     wire();
     live = true;
@@ -161,6 +171,16 @@ export function createLive({ send, onText, onLevel, onError }) {
     await chain;
     const pcm = join(all);
     all = [];
+    // Nothing was loud enough to send while talking (a very quiet microphone):
+    // send the whole recording once, and let the server's voice detection decide.
+    if (!sentAny && heardAny && send && pcm.length > RATE * 1 && pcm.length < RATE * 120) {
+      diag('stop-send-all', { secs: +(pcm.length / RATE).toFixed(1) });
+      try {
+        const text = String(await send(b64(wav(normalize(pcm))), '') || '').trim();
+        diag('piece-text', { chars: text.length, all: true });
+        if (text) { said = text; onText?.(text); }
+      } catch (e) { diag('piece-failed', { status: e?.status, all: true }); }
+    }
     return pcm.length > RATE * 0.6 ? { data: b64(wav(pcm)), mime: 'audio/wav' } : null;
   }
   function cancel() { diag('cancel', { was: live }); live = false; piece = []; all = []; teardown(); }
@@ -175,6 +195,16 @@ export function createLive({ send, onText, onLevel, onError }) {
   return { start, stop, cancel, get live() { return live; } };
 }
 
+// Quiet microphones: raise the level so the peak is near full scale (at most 30x).
+function normalize(pcm) {
+  let peak = 0;
+  for (let i = 0; i < pcm.length; i++) { const a = Math.abs(pcm[i]); if (a > peak) peak = a; }
+  if (!peak || peak > 0.5) return pcm;
+  const g = Math.min(30, 0.9 / peak);
+  const out = new Float32Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) out[i] = pcm[i] * g;
+  return out;
+}
 function join(blocks) {
   const n = blocks.reduce((a, b) => a + b.length, 0);
   const out = new Float32Array(n);
