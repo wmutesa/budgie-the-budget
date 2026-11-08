@@ -87,7 +87,7 @@ onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => window.removeEventListener('keydown', onKey));
 watch(() => capture.open, v => { if (!v && listening.value) stopAll(); });
 defineExpose({ openSheet });
-const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'Call mom Sunday afternoon', 'I want to run a 10K by March'];
+const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I want to run a 10K by March', 'Mark the lab report as done'];
 </script>
 
 <template>

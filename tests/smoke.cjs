@@ -191,6 +191,16 @@ async function run(url) {
   await page.click('[data-test="review-keep"]');
   await page.click('[data-test="review-drop"]');
   assert.equal(await page.$('[data-test="capture-review"]'), null, 'the review is done');
+  // Commands about what is already planned change it; the rest is added. One Undo puts the changes back.
+  await page.click('[data-test="capture"]');
+  await page.fill('[data-test="capture-text"]', 'haircut is done\nmake essay 2 low priority\nbuy stamps today');
+  await page.click('[data-test="capture-sort"]');
+  await page.waitForSelector('[data-test="toast"]:has-text("2 changes from what you said")');
+  assert.match(await page.textContent('[data-test="toasts"]'), /Done: Haircut[\s\S]*Low priority: Essay 2/, 'the toast says what changed');
+  await page.waitForSelector('[data-test="capture-review"]');
+  assert.match(await page.textContent('.cr-count'), /of 1/, 'only the new thing is reviewed');
+  await page.click('[data-test="review-keep"]');
+  await page.click('[data-test="toast"]:has-text("2 changes") .toast-act');
 
   // Schedule: what Add sent is here. No Tasks or Agenda views any more.
   await page.click(tab('Schedule'));
@@ -209,6 +219,8 @@ async function run(url) {
   assert.equal(await page.locator('[data-test="sch-row"]').count(), before - 1, 'a task is deleted at once');
   await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
   assert.equal(await page.locator('[data-test="sch-row"]').count(), before, 'Undo brings it back');
+  assert.equal(await row('Haircut').evaluate(e => e.classList.contains('done')), false, 'Undo after a spoken command un-ticks Haircut');
+  assert.ok(await row('stamps').count(), 'and keeps what was added in the same breath');
   // Ticked things sink to the bottom of their category.
   await row('Haircut').locator('.sch-check').click();
   assert.equal(await page.$$eval('.sch-group', gs => gs.filter(g => { const r = [...g.querySelectorAll('[data-test="sch-row"]')]; const i = r.findIndex(x => x.classList.contains('done')); return i >= 0 && r.slice(i).some(x => !x.classList.contains('done')); }).length), 0, 'done things come last in each category');

@@ -292,8 +292,8 @@ await check('the Gemini answer is checked before it is used', async () => {
   try {
     const items = await geminiSplit('k'.repeat(30), { text: 'essay due friday at 5 and gym mondays', today: '2026-11-08', weekday: 'Sunday', timeZone: 'UTC' });
     assert.equal(items.length, 2, 'items without a title are dropped');
-    assert.deepEqual(items[0], { title: 'Essay', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: '', days: [], course: 'English', priority: '' });
-    assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '' }, 'bad kinds, dates, times and days are cleaned');
+    assert.deepEqual(items[0], { title: 'Essay', kind: 'assignment', date: '2026-11-13', time: '17:00', minutes: 30, repeat: '', days: [], course: 'English', priority: '', action: 'add', target: '' });
+    assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '', action: 'add', target: '' }, 'bad kinds, dates, times and days are cleaned');
   } finally { globalThis.fetch = realFetch; }
 });
 await check('assignments keep their full names, their dates and the right category', () => {
@@ -400,5 +400,23 @@ await check('said priority reaches the task, and stays out of the title', () => 
   assert.equal(lo.priority, 'low'); assert.equal(lo.title, 'Take shirts to the dry cleaner');
   const quick = p(itemLine({ title: 'Call Aunt Beate back', kind: 'task', date: '2026-11-08', time: '', minutes: 15, course: '' }));
   assert.equal(quick.mins, 15); assert.equal(quick.title, 'Call Aunt Beate back');
+});
+await check('voice commands change what is planned; everything else is added', async () => {
+  const { readCommand, pullCommands, listToTag } = await import('../../src/lib/commands.js');
+  const keep = store.tasks;
+  store.tasks = [makeTask({ title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', project: 'Chemistry' }), makeTask({ title: 'Call the dentist', date: '2026-11-09' }), makeTask({ title: 'Problem Set 7', kind: 'assignment' }), makeTask({ title: 'Problem Set 8', kind: 'assignment' })];
+  assert.equal(readCommand('mark the lab report as done')?.act, 'done');
+  assert.equal(readCommand('I finished lab report 3')?.task.title, 'Lab Report 3');
+  assert.equal(readCommand('delete the dentist task')?.task.title, 'Call the dentist');
+  const mv = readCommand('move lab report 3 to Friday');
+  assert.equal(mv?.act, 'move'); assert.match(mv.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(readCommand('make problem set 7 high priority')?.priority, 'high');
+  assert.equal(readCommand('mark problem set as done'), null, 'two tasks fit: not a command');
+  assert.equal(readCommand('delete my old photos'), null, 'nothing planned by that name: not a command');
+  assert.equal(readCommand('complete the problem set 7 by Friday'), null, '"complete X by Friday" is a new task, not a tick');
+  const { cmds, rest } = pullCommands(['mark the lab report as done', 'essay due Friday', 'call John tomorrow at 3pm to my Work list']);
+  assert.equal(cmds.length, 1); assert.equal(rest[0], 'essay due Friday'); assert.equal(rest[1], 'call John tomorrow at 3pm #Work');
+  assert.equal(p(listToTag('prepare onboarding checklist on the Marketing board')).project, 'Marketing');
+  store.tasks = keep;
 });
 console.log(`\n${n} checks passed`);

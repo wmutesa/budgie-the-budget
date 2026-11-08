@@ -11,6 +11,7 @@ import { geminiBreakdown, geminiHear } from './account';
 import { itemLine, localLine, withKind, saidIn as said } from './itemline';
 import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
+import { pullCommands, fromItem, runCommands } from './commands';
 import { go, nav } from './nav';
 
 export const capture = reactive({
@@ -54,32 +55,38 @@ function settle(made) {
 // lists each item with a clear title, its kind, the date and time words and
 // the course, and Budgie works out the exact dates. An AI answer is used only
 // when it finds about as much as the rules and invents nothing.
+// Open things by name, so "mark the lab report as done" can find one.
+const myOpen = () => store.tasks.filter(t => !t.pending && (!t.done || t.repeat)).slice(-80).map(t => t.title);
 const myCategories = () => [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
 export async function breakDown(text, audio = null) {
   // The recording first: Gemini hears it, writes down what was said and lists every item.
   if (audio && store.digest?.geminiKey && store.planner?.geminiAudio !== false) {
     try {
       const d = new Date();
-      const heard = await geminiHear({ audio: audio.data, mime: audio.mime, typed: text, today: isoDay(d), weekday: d.toLocaleDateString('en-US', { weekday: 'long' }), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, categories: myCategories() });
+      const heard = await geminiHear({ audio: audio.data, mime: audio.mime, typed: text, today: isoDay(d), weekday: d.toLocaleDateString('en-US', { weekday: 'long' }), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone, categories: myCategories(), existing: myOpen() });
       const words = `${heard.transcript || ''} ${text}`;
-      const ok = (heard.items || []).filter(x => said(words)(x.title));
+      const cmds = (heard.items || []).map(fromItem).filter(Boolean);
+      const ok = (heard.items || []).filter(x => x.action === 'add' || !x.action).filter(x => said(words)(x.title));
       const rulesHeard = tidyDictation(splitSpoken(heard.transcript || text).join('\n')).split('\n').filter(Boolean);
-      if (ok.length && ok.length >= Math.ceil(rulesHeard.length * 0.75)) { capture.via = 'Gemini (recording)'; capture.heard = heard.transcript || ''; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind) }; }
+      if ((ok.length || cmds.length) && ok.length + cmds.length >= Math.ceil(rulesHeard.length * 0.75)) { capture.via = 'Gemini (recording)'; capture.heard = heard.transcript || ''; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
       if (heard.transcript && !text.trim()) text = heard.transcript; // nothing typed or heard live: use what Gemini wrote down
     } catch { /* turned off, the free limit, or offline: use the live text */ }
   }
   if (!text.trim()) return { lines: [], kinds: null };
   const split = splitSpoken(text);
-  const rules = tidyDictation(split.join('\n')).split('\n').filter(Boolean);
-  const fair = n => n >= Math.ceil(rules.length * 0.75);
+  const all = tidyDictation(split.join('\n')).split('\n').filter(Boolean);
+  // Sentences about what is already planned ("mark X done") are commands, not new things.
+  const { cmds: ruleCmds, rest: rules } = pullCommands(all);
+  const fair = n => n >= Math.ceil(all.length * 0.75);
   const real = said(text);
   if (store.digest?.geminiKey) {
     try {
       const d = new Date();
       // Your own categories, so items land in them; the rules' split as a checklist so nothing is missed.
-      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), rules.slice(0, 200));
-      const ok = (items || []).filter(x => real(x.title));
-      if (ok.length && fair(ok.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind) }; }
+      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, myCategories(), all.slice(0, 200), myOpen());
+      const cmds = (items || []).map(fromItem).filter(Boolean);
+      const ok = (items || []).filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));
+      if ((ok.length || cmds.length) && fair(ok.length + cmds.length)) { capture.via = 'Gemini'; return { lines: ok.map(itemLine), kinds: ok.map(x => x.kind), cmds }; }
     } catch { /* no key on the server yet, the free limit, or offline: carry on */ }
   }
   if (ai.enabled && ai.ready) {
@@ -89,20 +96,22 @@ export async function breakDown(text, audio = null) {
     for (const line of split) { if (cur && cur.length + line.length > 500) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
     if (cur) chunks.push(cur);
     const items = await aiExtractItems(chunks, myCategories()).catch(() => null);
-    const ok = (items || []).filter(x => real(x.title));
-    if (ok.length && fair(ok.length)) { capture.via = 'on-device AI'; return { lines: ok.map(localLine), kinds: ok.map(x => x.kind) }; }
+    // The small model only adds; the rules already caught the commands.
+    const ok = (items || []).filter(x => real(x.title) && !ruleCmds.some(c => c.said.toLowerCase().includes(x.title.toLowerCase())));
+    if (ok.length && fair(ok.length + ruleCmds.length)) { capture.via = 'on-device AI'; return { lines: ok.map(localLine), kinds: ok.map(x => x.kind), cmds: ruleCmds }; }
   }
   capture.via = 'rules';
-  return { lines: rules, kinds: null };
+  return { lines: rules, kinds: null, cmds: ruleCmds };
 }
 
 export async function sortAndPlace(text = capture.text, { spoken = false, audio = null } = {}) {
   if (!text.trim() && !audio) return 0;
   capture.sorting = true;
   // Spoken or typed, one long run of words is broken into every separate thing.
-  const { lines, kinds } = await breakDown(text, audio);
+  const { lines, kinds, cmds = [] } = await breakDown(text, audio);
+  const changed = runCommands(cmds);
   const rows = (kinds ? lines.map((l, i) => withKind(route(l), kinds[i])) : routeAll(lines.join('\n'))).filter(r => r.text);
-  if (!rows.length) { capture.sorting = false; return 0; }
+  if (!rows.length) { capture.sorting = false; if (changed) { capture.text = ''; capture.open = false; } return changed; }
   const out = await sendAll(rows);
   settle(out.made);
   markPending(out.made);
