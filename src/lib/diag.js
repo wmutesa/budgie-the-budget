@@ -10,8 +10,7 @@ const t0 = Date.now();
 export function diag(what, detail = {}) {
   events.push({ t: Date.now() - t0, what, ...detail });
   if (events.length > 400) events.splice(0, events.length - 400);
-  clearTimeout(timer);
-  timer = setTimeout(flush, 2500);
+  if (!timer) timer = setTimeout(() => { timer = null; flush(); }, 2500); // at most every 2.5 s, even while it keeps logging
 }
 // Where a call came from (for "who closed the card").
 export const from = () => (new Error().stack || '').split('\n').slice(2, 7).map(s => s.trim()).join(' | ').slice(0, 600);
