@@ -9,6 +9,8 @@
 import { diag } from './diag';
 
 export const canCapture = typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!(window.AudioContext || window.webkitAudioContext);
+// Safari on a Mac: Safari > Settings for this website; macOS: Privacy & Security > Microphone.
+const BLOCKED = 'The microphone is blocked for Budgie. On a Mac in Safari: Safari menu, Settings for this website, Microphone: Allow (and System Settings, Privacy & Security, Microphone: Safari on). On iPhone: Settings, Apps, Safari or Chrome, Microphone: on. Then tap Speak again.';
 export const MAX_SECONDS = 5 * 60;
 const RATE = 16000;
 const QUIET = 0.012;      // below this level counts as silence
@@ -17,15 +19,21 @@ const MIN_PIECE = 1.2;    // seconds before a phrase may be cut
 const MAX_PIECE = 9;      // seconds: cut even without a pause
 
 let ctx = null;
-// Call from the click itself: Safari only lets sound start inside a tap.
+const Ctx = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+// Call from the tap itself. Tells iOS this page records as well as plays
+// (Safari 16.4+), so it does not hand over a muted microphone. The audio
+// graph itself is built only after the microphone is on: on iPhone, an
+// AudioContext started first leaves the microphone muted (pure silence).
 export function prime() {
   if (!canCapture) return;
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!ctx || ctx.state === 'closed') ctx = new Ctx();
-    ctx.resume?.();
-    diag('prime', { state: ctx.state, rate: ctx.sampleRate });
-  } catch (e) { diag('prime-failed', { err: e?.name || String(e) }); ctx = null; }
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'play-and-record') navigator.audioSession.type = 'play-and-record'; } catch { /* older Safari */ }
+  diag('prime', { session: navigator.audioSession?.type || 'none', ctx: ctx?.state || 'none' });
+}
+function freshContext() {
+  try { if (ctx && ctx.state !== 'closed') ctx.close(); } catch { /* gone */ }
+  ctx = null;
+  try { ctx = new Ctx(); } catch (e) { diag('ctx-failed', { err: e?.name || String(e) }); }
+  return ctx;
 }
 
 // send(wavBase64, prompt) → text; onText(newWords); onLevel(0..1); onError(message, code)
@@ -71,23 +79,9 @@ export function createLive({ send, onText, onLevel, onError }) {
     });
   }
 
-  async function start() {
-    if (live) return true;
-    diag('start', { canCapture, ctx: ctx?.state });
-    prime();
-    if (!ctx) { onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
-    } catch (e) {
-      diag('mic-failed', { err: e?.name, msg: String(e?.message || '').slice(0, 200) });
-      onError?.(e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? 'The microphone is blocked for this site. Allow it in the browser (the icon in the address bar, or Settings for this website), then tap Speak again.' : e?.name === 'NotFoundError' ? 'No microphone was found.' : 'The microphone could not be started.', 'mic');
-      return false;
-    }
-    { const tr = stream.getAudioTracks()[0]; diag('mic-ok', { label: !!tr?.label, state: tr?.readyState, muted: tr?.muted, settings: JSON.stringify(tr?.getSettings?.() || {}).slice(0, 200) }); tr?.addEventListener('ended', () => diag('track-ended')); tr?.addEventListener('mute', () => diag('track-muted')); tr?.addEventListener('unmute', () => diag('track-unmuted')); }
-    try { await ctx.resume?.(); } catch { /* fine */ }
-    diag('ctx', { state: ctx.state, rate: ctx.sampleRate });
-    let ticks = 0, peak = 0;
-    all = []; piece = []; pieceLen = 0; quietFor = 0; loud = false; total = 0; said = ''; failures = 0;
+  let ticks = 0, peak = 0, heardAny = false, rebuilt = false, silentTold = false, watchdog = null;
+  function wire() {
+    try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }
     src = ctx.createMediaStreamSource(stream);
     proc = ctx.createScriptProcessor(4096, 1, 1);
     proc.onaudioprocess = e => {
@@ -95,8 +89,9 @@ export function createLive({ send, onText, onLevel, onError }) {
       const input = e.inputBuffer.getChannelData(0);
       let sum = 0; for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
       const level = Math.sqrt(sum / input.length);
+      if (level > 0) heardAny = true;
       peak = Math.max(peak, level);
-      if (++ticks === 1 || ticks % 12 === 0) { diag('audio', { ticks, peak: +peak.toFixed(4), ctx: ctx.state }); peak = 0; }
+      if (++ticks === 1 || ticks % 12 === 0) { diag('audio', { ticks, peak: +peak.toFixed(4), ctx: ctx.state, muted: stream?.getAudioTracks()[0]?.muted }); peak = 0; }
       onLevel?.(Math.min(1, level * 12));
       const block = down(input, ctx.sampleRate);
       all.push(block); piece.push(block);
@@ -109,7 +104,49 @@ export function createLive({ send, onText, onLevel, onError }) {
     };
     src.connect(proc);
     proc.connect(ctx.destination); // Safari only runs the processor when it is connected
+  }
+  // Exact silence (every sample 0) is a muted microphone, never a quiet room:
+  // rebuild the audio once, then say so if it is still silent.
+  function checkSilence() {
+    watchdog = null;
+    if (!live || heardAny) return;
+    if (!rebuilt) {
+      rebuilt = true;
+      diag('silent-rebuild', { muted: stream?.getAudioTracks()[0]?.muted, ctx: ctx?.state });
+      if (freshContext()) { ctx.resume?.().catch(() => {}); wire(); }
+      watchdog = setTimeout(checkSilence, 2500);
+      return;
+    }
+    if (!silentTold) {
+      silentTold = true;
+      diag('silent');
+      onError?.('Your device is giving Budgie a muted microphone (no sound at all). Close anything else using the microphone (a call, Voice Memos, Siri or another tab), then tap Stop and Speak again.', 'silent');
+    }
+  }
+
+  async function start() {
+    if (live) return true;
+    diag('start', { canCapture, ctx: ctx?.state || 'none' });
+    prime();
+    if (!Ctx) { onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+    } catch (e) {
+      diag('mic-failed', { err: e?.name, msg: String(e?.message || '').slice(0, 200) });
+      onError?.(e?.name === 'NotAllowedError' || e?.name === 'SecurityError' ? BLOCKED : e?.name === 'NotFoundError' ? 'No microphone was found.' : 'The microphone could not be started.', 'mic');
+      return false;
+    }
+    { const tr = stream.getAudioTracks()[0]; diag('mic-ok', { label: !!tr?.label, state: tr?.readyState, muted: tr?.muted, settings: JSON.stringify(tr?.getSettings?.() || {}).slice(0, 200) }); tr?.addEventListener('ended', () => diag('track-ended')); tr?.addEventListener('mute', () => diag('track-muted')); tr?.addEventListener('unmute', () => diag('track-unmuted')); }
+    // The audio graph starts only now, with the microphone already on.
+    if (!ctx || ctx.state === 'closed') freshContext();
+    if (!ctx) { teardown(); onError?.('This browser cannot use the microphone here.', 'unsupported'); return false; }
+    try { await ctx.resume?.(); } catch { /* fine */ }
+    diag('ctx', { state: ctx.state, rate: ctx.sampleRate });
+    ticks = 0; peak = 0; heardAny = false; rebuilt = false; silentTold = false;
+    all = []; piece = []; pieceLen = 0; quietFor = 0; loud = false; total = 0; said = ''; failures = 0;
+    wire();
     live = true;
+    clearTimeout(watchdog); watchdog = setTimeout(checkSilence, 2500);
     diag('listening');
     return true;
   }
@@ -128,6 +165,7 @@ export function createLive({ send, onText, onLevel, onError }) {
   }
   function cancel() { diag('cancel', { was: live }); live = false; piece = []; all = []; teardown(); }
   function teardown() {
+    clearTimeout(watchdog); watchdog = null;
     try { proc?.disconnect(); src?.disconnect(); } catch { /* fine */ }
     if (proc) proc.onaudioprocess = null;
     stream?.getTracks().forEach(t => t.stop());

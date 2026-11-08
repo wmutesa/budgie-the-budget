@@ -33,6 +33,7 @@ const live = createLive({
   onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, t); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
   onError: (m, code) => {
     diag('live-error', { code, msg: m.slice(0, 160) });
+    if (code === 'silent') { micNote.value = m; return; }
     if (code === 'mic' || code === 'unsupported') { recLive.value = false; micNote.value = `${m} You can type instead.`; return; }
     liveFailed = true;
     micNote.value = hasKey.value
