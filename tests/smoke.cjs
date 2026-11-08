@@ -66,6 +66,9 @@ window.webkitSpeechRecognition = FakeRec;
 // tests/accounts.cjs tests the real server.
 const geminiCalls = [];
 const voiceCalls = [];
+// Live words: each piece of audio the page sends gets the next scripted phrase ('' once they run out; 503 means unavailable).
+const liveScript = [];
+let liveCalls = 0;
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Budgie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
@@ -120,6 +123,7 @@ async function fakeApi(page, account = fakeAccount) {
       { title: 'Learn to play guitar', kind: 'goal', date: '', time: '', minutes: 0, repeat: '', days: [], course: '' },
     ] } }); }
     // Gemini hears a recording: what was said, and the items in it.
+    if (p === '/api/voice/live') { liveCalls++; const body = JSON.parse(req.postData() || '{}'); if (!/^UklGR/.test(body.audio || '')) return route.fulfill({ status: 400, json: { error: 'not wav' } }); const t = liveScript.length ? liveScript.shift() : ''; return t === 503 ? route.fulfill({ status: 503, json: { error: 'Live words are not available right now.' } }) : route.fulfill({ json: { text: t } }); }
     if (p === '/api/gemini/voice') { voiceCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
       { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
       { title: 'History quiz', kind: 'exam', date: inDays(10), time: '', minutes: 0, repeat: '', days: [], course: 'History' },
@@ -135,7 +139,8 @@ const fakeNetwork = (page, account) => fakeApi(page, account);
 const tab = name => `.nb-pages button:has-text("${name}")`;
 
 async function run(url) {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
+  // A fake microphone (a repeating beep) so Budgie's own listening runs for real.
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const errors = [];
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
@@ -158,7 +163,7 @@ async function run(url) {
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today-empty.png` });
 
   // Add: one button. Say or type anything; Budgie sorts it, places it, and you review each one.
-  await page.click('[data-test="capture"]');
+  await page.locator('body').press('n'); // opens Add for typing
   // One long run of words with many things in it is split into each one before anything is added.
   await page.fill('[data-test="capture-text"]', 'okay so for chemistry I have a lab report due Monday and a quiz on Wednesday and I need to finish the problem set by Friday then for history I have an essay due next Tuesday and a reading response tomorrow also call mom on Sunday and dad on Saturday gym every Monday and Wednesday at 6 pm number two pay rent on the 1st another thing buy groceries tomorrow and book a dentist appointment next week oh and I want to run a 10K by March plus meditate every morning at 7 and finally email professor Smith about the extension');
   assert.match(await page.textContent('[data-test="capture-sort"]'), /Add 14 things/, 'a long ramble shows as 14 separate things');
@@ -185,14 +190,14 @@ async function run(url) {
   assert.equal(await page.$('[data-test="capture-review"]'), null, 'the review ends when everything is decided');
   assert.equal(await page.evaluate(() => document.querySelectorAll('.pending').length), 0, 'nothing is left pending');
   // A second goal; Remove drops a sorted item.
-  await page.click('[data-test="capture"]');
+  await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'I want to run a 10K by March\nnothing important');
   await page.click('[data-test="capture-sort"]');
   await page.click('[data-test="review-keep"]');
   await page.click('[data-test="review-drop"]');
   assert.equal(await page.$('[data-test="capture-review"]'), null, 'the review is done');
   // Commands about what is already planned change it; the rest is added. One Undo puts the changes back.
-  await page.click('[data-test="capture"]');
+  await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'haircut is done\nmake essay 2 low priority\nbuy stamps today');
   await page.click('[data-test="capture-sort"]');
   await page.waitForSelector('[data-test="toast"]:has-text("2 changes from what you said")');
@@ -203,7 +208,7 @@ async function run(url) {
   await page.click('[data-test="toast"]:has-text("2 changes") .toast-act');
 
   // Two things at the same time, to check overlapping items on the calendar.
-  await page.click('[data-test="capture"]');
+  await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'Overlap big today at 2pm 120 min\nOverlap small today at 2:30pm 30 min');
   await page.click('[data-test="capture-sort"]');
   await page.click('[data-test="review-keep"]');
@@ -406,7 +411,7 @@ async function run(url) {
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/settings.png` });
   await page.keyboard.press('Escape');
   await page.click('.overlay', { position: { x: 5, y: 5 } }).catch(() => {});
-  await page.click('[data-test="capture"]');
+  await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'stats problem set due tuesday at five for statistics and the bio midterm on friday swim tuesdays and thursdays at seven call grandma tomorrow and I want to learn guitar');
   await page.click('[data-test="capture-sort"]');
   await page.waitForSelector('[data-test="capture-review"]');
@@ -475,25 +480,32 @@ async function run(url) {
   await page.waitForSelector('[data-test="schedule"]');
   assert.equal(await page.$('[data-test="bell-pop"]'), null, 'the list closes');
 
-  // Voice: tap Add and it listens at once; tap again and it sorts, then the review starts.
+  // Voice: tap Add and Budgie listens to the microphone itself; words appear in the card as they are written down.
   const voice = await context.newPage();
   await fakeNetwork(voice);
-  await voice.addInitScript(FAKE_SPEECH + ";window.__speechPhrase = 'essay due friday at 5pm then gym every monday at 6 and I want to read 12 books this year';");
   await voice.goto(url, { waitUntil: 'load' });
   assert.equal(await voice.$('[data-test="voice"]'), null, 'there is no microphone in the top bar');
+  liveScript.length = 0; liveScript.push('essay due friday at 5pm', 'then gym every monday at 6', 'and I want to read 12 books this year');
+  const live0 = liveCalls;
   await voice.click('[data-test="capture"]');
-  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="capture-text"]').value));
+  await voice.waitForFunction(() => /essay due friday/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 20000 });
   assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
   assert.match(await voice.textContent('[data-test="capture"]'), /Recording/, 'the Add button shows it is recording');
-  assert.ok(await voice.$('[data-test="capture"] .cap-rec'), 'with a recording dot, not a pause sign');
-  assert.equal(await voice.$('[data-test="capture-live"] .cap-time'), null, 'no timer pill: that is the focus timer\'s place');
-  // Edit while listening: the typed words stay; speech no longer writes over them.
+  assert.ok(await voice.$('[data-test="capture"] .cap-rec'), 'with a recording dot');
+  // The top button only opens the card; Esc, the backdrop and the X do not end it: only Stop does.
+  await voice.evaluate(() => document.querySelector('[data-test="capture"]').click());
+  await voice.keyboard.press('Escape');
+  await voice.mouse.click(5, 300);
+  assert.ok(await voice.$('[data-test="capture-sheet"]'), 'the card stays open while recording');
+  assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'and it keeps listening');
+  assert.equal(await voice.$('[data-test="capture-sheet"] [aria-label="Close"]'), null, 'no X while recording');
+  // Edit while listening: what you type stays, and later words follow it.
   await voice.focus('[data-test="capture-text"]');
   await voice.keyboard.press('End');
   await voice.keyboard.type(' soon');
-  await voice.waitForTimeout(500);
-  { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /books soon this year$|books this year soon$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
-  assert.equal(await voice.$('[data-test="capture-accent"]'), null, 'no accent to pick: listening uses the browser language');
+  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 25000 });
+  { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /soon[\s\S]*books this year$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
+  assert.ok(liveCalls - live0 >= 3, 'each phrase went to the server as audio');
   assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
   if (process.env.SHOTS) { await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` }); await voice.locator('header').first().screenshot({ path: `${process.env.SHOTS}/recording-bar.png` }); }
   // Stop: Budgie breaks what was said into separate things and places each one.
@@ -508,20 +520,14 @@ async function run(url) {
   const hearAcct = { data: { ...JSON.parse(JSON.stringify(fakeAccount.data)), digest: { ...(fakeAccount.data.digest || {}), geminiKey: 'AIzaSyFakeKeyForTheTest_1234567890' } }, version: fakeAccount.version };
   const hear = await context.newPage();
   await fakeNetwork(hear, hearAcct);
-  await hear.addInitScript(FAKE_SPEECH + `;window.__speechPhrase = 'lab report three due friday at five for chemistry';
-    navigator.mediaDevices.getUserMedia = async () => new MediaStream();
-    window.MediaRecorder = class { constructor() { this.mimeType = 'audio/webm'; this.state = 'inactive'; }
-      start() { this.state = 'recording'; setTimeout(() => this.ondataavailable?.({ data: new Blob([new Uint8Array(4000)], { type: 'audio/webm' }) }), 50); }
-      stop() { this.state = 'inactive'; setTimeout(() => this.onstop?.(), 10); } };`);
+  liveScript.length = 0; liveScript.push('lab report three due friday at five for chemistry');
   await hear.goto(url, { waitUntil: 'load' });
   await hear.click('[data-test="capture"]');
-  await hear.waitForFunction(() => /chemistry/.test(document.querySelector('[data-test="capture-text"]').value));
-  assert.match(await hear.textContent('[data-test="capture-sheet"]'), /Gemini listens to the recording/, 'the sheet says the recording goes to Gemini');
-  await hear.waitForTimeout(800);
+  await hear.waitForFunction(() => /chemistry/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 20000 });
   await hear.click('[data-test="capture-mic"]');
   await hear.waitForSelector('[data-test="capture-review"]');
   assert.equal(voiceCalls.length, 1, 'the recording is sent to Gemini once');
-  assert.ok(voiceCalls[0].audio && /^audio\//.test(voiceCalls[0].mime), 'the audio itself goes, with its type');
+  assert.ok(voiceCalls[0].audio && voiceCalls[0].mime === 'audio/wav', 'the whole recording goes, as WAV');
   assert.match(voiceCalls[0].typed || '', /lab report three/, 'the live text goes too, for spellings');
   const heardItems = [];
   for (let i = 0; i < 8 && await hear.$('[data-test="capture-review"]'); i++) { heardItems.push(`${await hear.inputValue('.cr-title')} | ${await hear.textContent('.cr-where')}`); await hear.click('[data-test="review-keep"]'); await hear.waitForTimeout(150); }
@@ -533,17 +539,12 @@ async function run(url) {
   // Live text fails (Safari with Dictation off): it keeps recording, Stop writes it down for checking, then Add sorts it once.
   const deaf = await context.newPage();
   await fakeNetwork(deaf, hearAcct);
-  await deaf.addInitScript(`window.SpeechRecognition = window.webkitSpeechRecognition = class { start() { setTimeout(() => { this.onerror?.({ error: 'service-not-allowed' }); this.onend?.(); }, 30); } stop() {} abort() {} };
-    navigator.mediaDevices.getUserMedia = async () => new MediaStream();
-    window.MediaRecorder = class { constructor() { this.mimeType = 'audio/mp4'; this.state = 'inactive'; }
-      start() { this.state = 'recording'; setTimeout(() => this.ondataavailable?.({ data: new Blob([new Uint8Array(4000)], { type: 'audio/mp4' }) }), 50); }
-      stop() { this.state = 'inactive'; } };`); // never says it stopped: Budgie must not hang
+  liveScript.length = 0; for (let i = 0; i < 40; i++) liveScript.push(503);
   await deaf.goto(url, { waitUntil: 'load' });
   const calls0 = voiceCalls.length;
   await deaf.click('[data-test="capture"]');
-  await deaf.waitForSelector('[data-test="capture-note"]:has-text("Still recording")');
-  assert.match(await deaf.textContent('[data-test="capture-note"]'), /Dictation turned on/, 'it says why there is no live text');
-  await deaf.waitForTimeout(800);
+  await deaf.waitForSelector('[data-test="capture-note"]:has-text("still recording")', { timeout: 20000 });
+  assert.match(await deaf.textContent('[data-test="capture-note"]'), /not available[\s\S]*Gemini writes it all down/, 'it says live words are down and the recording is kept');
   await deaf.click('[data-test="capture-mic"]');
   await deaf.waitForFunction(() => /Lab Report 3 due Friday/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 8000 });
   assert.match(await deaf.textContent('[data-test="capture-note"]'), /what Gemini heard/, 'Stop shows what was heard, to check and edit');
@@ -551,6 +552,7 @@ async function run(url) {
   await deaf.click('[data-test="capture-sort"]');
   await deaf.waitForSelector('[data-test="capture-review"]');
   assert.equal(voiceCalls.length, calls0 + 1, 'the recording went to Gemini once, not again on Add');
+  liveScript.length = 0;
   await deaf.close();
 
   // First-time guide, once per person, on an empty account.

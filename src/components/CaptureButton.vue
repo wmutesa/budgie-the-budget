@@ -5,114 +5,111 @@ import { routeAll, splitSpoken, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
 import { store } from '../lib/store';
-import { canRecord, isSafari, startRecording, stopRecording, cancelRecording, toGeminiAudio } from '../lib/voicerec';
+import { canCapture, prime, createLive } from '../lib/livevoice';
+import { liveWords } from '../lib/account';
 import Icon from './Icon.vue';
 
-// The one way to add anything. Tap Add and talk: the words appear as you speak
-// and you can edit them while it listens. Tap Stop and Budgie breaks what you
-// said into separate things (the on-device AI when it is ready, rules
-// otherwise) and puts each one in place. Typed text is added line by line.
-let base = '';
+// The one way to add anything. Tap Add and talk: Budgie listens to the
+// microphone itself and your words appear in the card as you speak (written
+// down by Budgie's server at each pause), and you can edit them while it
+// listens. Only Stop, on the card, ends it: Budgie then breaks what you said
+// into separate things and puts each one in place. Typed text is added line by line.
 const micNote = ref('');
 const spoken = ref(false);
+const level = ref(0);
 // New words go after what is there, with a space only when both sides have text.
 const join = (a, b) => { const t = (b || '').trimStart(); return !t ? a : !a || /\s$/.test(a) ? `${a}${t}` : `${a} ${t}`; };
+const hasKey = computed(() => !!store.digest?.geminiKey);
+// With a Gemini key the whole recording also goes to Gemini on Stop: it reads it in full.
+const geminiAudio = computed(() => canCapture && hasKey.value && store.planner?.geminiAudio !== false);
+
+// Budgie's own listening (every modern browser).
+const recLive = ref(false);
+let liveFailed = false;
+const live = createLive({
+  send: liveWords,
+  onLevel: v => { level.value = v; },
+  onText: t => { spoken.value = true; liveFailed = false; capture.text = join(capture.text, t); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
+  onError: (m, code) => {
+    if (code === 'mic' || code === 'unsupported') { recLive.value = false; micNote.value = `${m} You can type instead.`; return; }
+    liveFailed = true;
+    micNote.value = hasKey.value
+      ? `${m} Keep talking: Budgie is still recording, and Gemini writes it all down when you tap Stop.`
+      : `${m} Keep talking: Budgie is still recording and tries each phrase again. You can also type.`;
+  },
+});
+// Older browsers without audio capture: their own dictation, if they have it.
 const dict = useDictation({
   continuous: true,
-  // A blocked microphone is a quiet note in the sheet, not an alarm: typing works too.
-  // When live text fails but Gemini can hear, keep recording: Gemini writes it down on Stop.
-  onError: (m, code) => {
-    if (geminiAudio.value && code !== 'not-allowed') {
-      micNote.value = `${m} Still recording: when you tap Stop, Gemini writes down what you said so you can check and edit it.`;
-      if (!recording) startRecording().then(ok => { recording = ok; });
-      recOnly.value = true;
-      return;
-    }
-    micNote.value = `${m} You can type instead.`;
-  },
-  onCancel: () => { capture.text = base; },
+  onError: m => { micNote.value = `${m} You can type instead.`; },
   onText: t => { spoken.value = true; capture.text = join(base, t); },
   onFinal: t => { capture.text = join(base, t).trim(); },
 });
-// With a Gemini key, the recording itself also goes to Gemini when you stop
-// (it hears better than the browser). Without speech recognition in the
-// browser (Firefox), recording alone still works: Gemini writes it down.
-const geminiAudio = computed(() => canRecord && !!store.digest?.geminiKey && store.planner?.geminiAudio !== false);
-const canSpeak = computed(() => canDictate || geminiAudio.value);
-const recOnly = ref(false);
-const listening = computed(() => dict.listening.value || recOnly.value);
+let base = '';
+const canSpeak = computed(() => canCapture || canDictate);
+const listening = computed(() => recLive.value || dict.listening.value);
 const box = ref(null);
-// Edit while you talk: what you typed stays, and new words land after it.
-function onEdit() {
-  if (!listening.value) return;
-  base = capture.text;
-  dict.commit();
-}
-// Live words from the browser's dictation. With a Gemini key the recording also
-// goes to Gemini, except in Safari, which cannot do both at once: there the
-// live words are what Gemini reads. With no dictation, Budgie only records.
-let recording = false;
-const listen = () => {
-  base = capture.text && !capture.text.endsWith('\n') ? `${capture.text}\n` : capture.text;
-  micNote.value = '';
-  recording = false;
-  if (canDictate) {
-    dict.start();
-    if (geminiAudio.value && !isSafari) startRecording().then(ok => { recording = ok; });
-  } else {
-    recOnly.value = true;
-    startRecording().then(ok => { recording = ok; if (!ok) { recOnly.value = false; micNote.value = 'Allow the microphone to talk to Budgie. You can type instead.'; } });
-  }
-};
-const stopAll = () => { if (dict.listening.value) dict.stop(); recOnly.value = false; recording = false; cancelRecording(); };
+// Editing while it listens is fine: new words are added at the end.
+function onEdit() { if (dict.listening.value) { base = capture.text; dict.commit(); } }
 
-// Open: start listening straight away when the browser can.
+async function listen() {
+  micNote.value = ''; liveFailed = false;
+  if (capture.text && !capture.text.endsWith('\n')) capture.text += '\n';
+  if (canCapture) {
+    recLive.value = true;
+    const ok = await live.start();
+    if (!ok) recLive.value = false;
+    return;
+  }
+  base = capture.text;
+  dict.start();
+}
+const stopAll = () => { if (recLive.value) live.cancel(); recLive.value = false; if (dict.listening.value) dict.stop(); };
+
+// Open: start listening straight away when the browser can. Called from the tap,
+// so the microphone can start (Safari only allows sound to start inside a tap).
 function openSheet({ voice = canSpeak.value } = {}) {
+  if (capture.open) { box.value?.focus(); return; }
+  if (voice) prime();
   capture.open = true; spoken.value = false; micNote.value = '';
   nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
 }
-function close() { if (listening.value) stopAll(); capture.open = false; }
-// How it will be split, shown as you go.
+// While recording, the card stays open: only Stop ends it.
+function close() { if (listening.value) return; capture.open = false; }
 // How it will be split (the rules; the AI may tidy the wording), shown as you go.
 const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
+const NOTHING = 'Nothing was heard. Check that the microphone is allowed for this site and not muted, then tap Speak again, or type instead.';
 async function sortIt() {
   if (capture.sorting) return;
   const wasListening = listening.value;
-  const heardLive = spoken.value && capture.text.trim() !== base.trim();
   capture.sorting = true; // Stop shows at once that it is working
   try {
+    let audio = null;
+    if (recLive.value) { recLive.value = false; audio = await live.stop(); } // waits for the last words
     if (dict.listening.value) {
       dict.stop();
-      // Wait for the last words before breaking it down.
       for (let i = 0; i < 30 && dict.listening.value; i++) await new Promise(r => setTimeout(r, 50));
     }
-    recOnly.value = false;
-    const blob = recording ? await stopRecording() : null;
-    recording = false;
-    const audio = blob ? await toGeminiAudio(blob).catch(() => null) : null;
-    // No live words: Gemini writes the recording down first, so you can check and edit it.
-    if (wasListening && audio && !heardLive) {
+    // Live words failed but Gemini can hear: it writes the recording down first, so you can check and edit it.
+    if (wasListening && audio && hasKey.value && (liveFailed || !spoken.value)) {
       let said = '';
       try { said = await hear(audio); } catch (e) { micNote.value = `Gemini could not write it down (${e.message || 'no answer'}). Type it instead, or try again.`; return; }
-      if (!said) { micNote.value = 'Nothing was heard. Check the microphone is allowed for this site, then try again, or type instead.'; return; }
+      if (!said) { micNote.value = NOTHING; return; }
       capture.text = join(capture.text.trim() ? `${capture.text.trim()}\n` : '', said);
       micNote.value = 'Here is what Gemini heard. Fix any word, then tap Add.';
       nextTick(() => box.value?.focus());
       return;
     }
-    if (!capture.text.trim() && !audio) {
-      if (wasListening) micNote.value = 'Nothing was heard. Check the microphone is allowed for this site, then try again, or type instead.';
-      return;
-    }
+    if (!capture.text.trim()) { if (wasListening) micNote.value = liveFailed ? `${micNote.value.split(' Keep talking')[0]} Nothing could be written down. Add a free Gemini key in Profile, or type instead.` : NOTHING; return; }
     capture.sorting = false;
-    const n = await sortAndPlace(capture.text, { spoken: spoken.value, audio });
+    const n = await sortAndPlace(capture.text, { spoken: spoken.value, audio: geminiAudio.value ? audio : null });
     if (!n && capture.open) micNote.value = 'Nothing to add was found in that. Edit the words and tap Add again.';
   } finally {
     capture.sorting = false;
   }
 }
-// The mic: Speak starts listening; Stop ends it and sorts what was said.
-const micTap = () => (listening.value ? sortIt() : (spoken.value = true, listen()));
+// The mic on the card: Speak starts listening; Stop ends it and sorts what was said.
+const micTap = () => { if (listening.value) return sortIt(); prime(); spoken.value = true; return listen(); };
 const onKey = e => {
   if (e.key === 'Escape' && capture.open) close();
   // "N" anywhere (not while typing) opens it.
@@ -126,10 +123,10 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
 </script>
 
 <template>
-  <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: tap to stop and sort' : 'Add anything (N)'" :title="listening ? 'Tap to stop recording' : 'Add anything (N)'" data-test="capture" @click="capture.open ? sortIt() : openSheet()">
+  <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: open the card' : 'Add anything (N)'" :title="listening ? 'Recording: open the card' : 'Add anything (N)'" data-test="capture" @click="openSheet()">
     <span v-if="listening" class="cap-live" aria-hidden="true" data-test="capture-live"><i class="cap-rec" /></span>
     <span v-else class="cap-glyph"><Icon name="capture" :size="15" /></span>
-    <span class="cap-word">{{ listening ? 'Recording: tap to stop' : 'Add' }}</span>
+    <span class="cap-word">{{ listening ? 'Recording' : 'Add' }}</span>
   </button>
 
   <Teleport to="body">
@@ -137,15 +134,15 @@ const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I wan
       <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
         <header class="cap-head">
           <div>
-            <h2>{{ capture.sorting ? (store.digest?.geminiKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : recOnly ? 'Recording…' : listening ? 'Listening…' : 'Add anything' }}</h2>
-            <p class="muted small">{{ recOnly ? 'Recording. Say everything on your mind, then tap Stop: Gemini writes it down and splits it into tasks, routines, events and goals.' : listening ? `Say everything on your mind, and fix any word as you go. Tap Stop when you are done: ${geminiAudio ? 'Gemini listens to the recording and ' : 'Budgie '}splits it into tasks, routines, events and goals.` : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
+            <h2>{{ capture.sorting ? (hasKey ? 'Breaking it down with Gemini…' : 'Breaking it down…') : listening ? 'Listening…' : 'Add anything' }}</h2>
+            <p class="muted small">{{ listening ? 'Say everything on your mind. Your words appear here as you speak, and you can fix any of them. Tap Stop when you are done: Budgie splits it into tasks, routines, events and goals.' : 'Say or type several things. Budgie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
           </div>
-          <button type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
+          <button v-if="!listening" type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
         </header>
 
         <div class="cap-pad" :class="{ live: listening }">
           <textarea ref="box" v-model="capture.text" rows="4" placeholder="“Essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March”" aria-label="What to add" data-test="capture-text" @input="onEdit" @keydown.meta.enter.prevent="sortIt" @keydown.ctrl.enter.prevent="sortIt" />
-          <div class="cap-wave" aria-hidden="true"><i v-for="n in 5" :key="n" /></div>
+          <div class="cap-wave" aria-hidden="true" :style="{ '--lv': level }"><i v-for="n in 5" :key="n" /></div>
         </div>
 
         <p v-if="micNote" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ micNote }}</p>

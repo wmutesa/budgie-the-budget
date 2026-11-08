@@ -24,6 +24,8 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Cloudflare's own AI models: Whisper writes down what is said, live, while you record.
+  "ai": { "binding": "AI" },
   // New digests on Mondays and Thursdays at 11:00 UTC (see worker/digest.js).
   "triggers": { "crons": ["0 11 * * 1,4"] },
   "observability": { "enabled": true }

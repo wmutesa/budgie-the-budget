@@ -208,3 +208,21 @@ ${categories.length ? `The person already uses these categories; when an item be
   try { out = JSON.parse(raw); } catch { throw new Error('Gemini sent something Budgie could not read'); }
   return { transcript: String(out.transcript || '').replace(/[<>]/g, '').trim().slice(0, 12000), items: cleanItems(out.items) };
 }
+
+// ---------- live text: one short piece of a recording ----------
+// Used for live words while someone talks, when Cloudflare's own speech model
+// is not available. Only the words, nothing else.
+export async function geminiWords(key, { audio, prompt = '' }) {
+  const res = await fetch(`${API}/${MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'audio/wav', data: audio } }, { text: `Write down exactly what is said in this short recording, in the language spoken, with normal punctuation. Reply with only those words. If nothing is said, reply with nothing.${prompt ? ` It follows: "${prompt.slice(-200)}"` : ''}` }] }],
+      generationConfig: { temperature: 0, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 400 },
+    }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(googleSays(res.status, j));
+  return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+}

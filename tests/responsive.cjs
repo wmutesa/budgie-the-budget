@@ -65,7 +65,7 @@ const SCREENS = [
   ['focus', async p => { await p.click('[data-test="nav-focus"]'); }],
   ['reports', async p => { await p.click('[data-test="nav-progress"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
   ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
-  ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.click('[data-test="capture"]'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
+  ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.locator('body').press('n'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
   ['review', async p => { await p.click('[data-test="capture-sort"]'); await p.waitForSelector('.cr-hole'); }],
   ['review-goal', async p => { await p.click('[data-test="review-keep"]'); await p.click('[data-test="review-keep"]'); await p.waitForTimeout(400); }],
   ['search', async p => { await p.click('[data-test="review-keep"]'); await p.fill('[data-test="search"]', 'lab'); }],
@@ -79,7 +79,7 @@ const SCREENS = [
 const WIDTHS = (process.env.WIDTHS || '360,390,600,768,1024,1280,1600').split(',').map(Number);
 
 async function run(url) {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined, args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   const problems = [];
   const errors = [];
   // Fill with sample data once.

@@ -8,7 +8,7 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
-import { geminiResearch, geminiSplit, geminiVoice, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
+import { geminiResearch, geminiSplit, geminiVoice, geminiWords, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -436,6 +436,32 @@ async function routes(request, env, url) {
     try {
       return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80) }) });
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
+  }
+  // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
+  // Cloudflare's Whisper first (free, no key); the person's Gemini key otherwise.
+  if (path === '/api/voice/live' && method === 'POST') {
+    const key = `voice-live:${user.id}`;
+    if (await tooManyAttempts(env, key, 2000)) return fail(429, 'A lot of talking this hour. Live words pause; Stop still works.');
+    await countFailure(env, key);
+    const { audio, prompt } = await body(request);
+    if (typeof audio !== 'string' || !audio || audio.length > 3 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That piece of audio could not be read.');
+    const before = String(prompt || '').replace(/[<>\n]/g, ' ').slice(-200);
+    // Whisper sometimes "hears" these in silence.
+    const ghost = t => /^(?:thank you\.?|thanks for watching!?|you|bye\.?|\.+|\s*)$/i.test(t.trim());
+    let lastErr = '';
+    if (env.AI) {
+      try {
+        const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio, vad_filter: true, ...(before ? { initial_prompt: before } : {}) });
+        const text = String(out?.text || '').trim();
+        return json({ text: ghost(text) ? '' : text, via: 'whisper' });
+      } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
+    }
+    const data = await accountData(env, user.id);
+    const gkey = tidyKey(data?.digest?.geminiKey);
+    if (keyShapeOk(gkey)) {
+      try { const text = await geminiWords(gkey, { audio, prompt: before }); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
+    }
+    return fail(503, lastErr ? `Live words are not available right now (${lastErr}).` : 'Live words are not available right now.');
   }
   // Hear a recording with the person's own Gemini key: what was said, word for word, and every item in it.
   if (path === '/api/gemini/voice' && method === 'POST') {
