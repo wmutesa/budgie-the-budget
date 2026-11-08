@@ -272,19 +272,18 @@ async function run(url) {
   await row('Essay 2').hover();
   await row('Essay 2').locator('[data-test="row-when"]').click();
   const when = page.locator('[data-test="row-when-pop"]');
-  await when.locator('[data-test="time-field"]').click();
-  await page.waitForSelector('[data-test="time-pop"]');
-  if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
+  // One field for the day and the time: a month on top, hour and minute wheels below.
+  await when.locator('[data-test="when-field"]').click();
+  await page.waitForSelector('[data-test="when-pop"] .wf-day.today');
+  assert.equal(await page.locator('[data-test="when-pop"] .wf-day').count(), 42, 'the month shows six weeks');
+  if (process.env.SHOTS) { const b = await page.locator('[data-test="when-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/whenpicker.png`, clip: { x: b.x - 20, y: b.y - 20, width: b.width + 40, height: b.height + 40 } }); }
+  await page.locator(`[data-test="when-pop"] .wf-day[data-d="${inDays(1)}"]`).click();
   await page.click('[data-test="tp-h-4"]');
   await page.click('[data-test="tp-m-30"]');
   await page.click('[data-test="tp-pm"]');
-  await page.click('[data-test="tp-done"]');
-  assert.match(await when.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
-  await when.locator('[data-test="date-field"]').click();
-  await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
-  assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
+  assert.match(await when.locator('[data-test="when-field"]').textContent(), /4:30 PM/, 'the day and the time are picked together');
   await page.keyboard.press('Escape');
-  assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
+  assert.equal(await page.$('[data-test="when-pop"]'), null, 'Escape closes the picker');
   await page.locator('[data-test="row-when-pop"] [aria-label="Done"]').click();
   await page.click('[data-test="sch-today"]');
   await page.click('.sch-pick-today');

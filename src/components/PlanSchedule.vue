@@ -8,8 +8,7 @@ import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
 import { breakDown } from '../lib/breakdown';
 import { deleteTask } from '../lib/undo';
-import DateField from './DateField.vue';
-import TimeField from './TimeField.vue';
+import WhenField from './WhenField.vue';
 import { startFocus } from '../lib/focus';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
@@ -376,8 +375,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
                 <button type="button" class="sch-icon danger" :aria-label="`Delete ${x.task.title}`" title="Delete" data-test="row-delete" @click="deleteTask(x.task)"><Icon name="trash" :size="15" /></button>
               </span>
               <div v-if="whenKey === x.key" class="sch-when" data-test="row-when-pop">
-                <DateField v-model="x.task.date" label="Date" placeholder="No date" />
-                <TimeField v-model="x.task.time" label="Time" />
+                <WhenField v-model:date="x.task.date" v-model:time="x.task.time" />
                 <label class="sch-when-min"><input v-model.number="x.task.mins" type="number" min="0" step="5" aria-label="Minutes" placeholder="min" /><span>min</span></label>
                 <button type="button" class="sch-icon" title="Done" aria-label="Done" @click="whenKey = ''"><Icon name="check" :size="15" /></button>
               </div>

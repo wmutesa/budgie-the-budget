@@ -4024,3 +4024,25 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .tp-wheels .tp-cell:hover { color: #3f3f46 !important; }
 .tp-wheel-ap .tp-cell { font: 600 13px var(--sans) !important; }
 .tp-colon { position: relative; z-index: 1; text-align: center; font: 600 17px ui-monospace, monospace; color: #4c1d95; }
+
+/* ===== One field for when: day and time together ===== */
+.sch-when { grid-template-columns: 1fr 88px auto !important; }
+.sch-when > .wf-field { grid-column: 1 / -1; }
+.wf-field { width: 100%; justify-content: flex-start; }
+.wf { width: 284px !important; padding: 12px !important; display: grid; gap: 10px; background: #fff !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; border: 1px solid #ececf0 !important; border-radius: 0 !important; box-shadow: 0 16px 36px -22px rgba(9, 9, 11, .25) !important; }
+.wf-head { display: flex; align-items: center; justify-content: space-between; }
+.wf-head b { font: 600 14px var(--sans); color: #18181b; }
+.wf-head button { width: 26px; height: 26px; border: 0; background: none; color: #52525b; cursor: pointer; display: inline-grid; place-items: center; }
+.wf-head button:hover { background: #f4f4f5; }
+.wf-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.wf-wd { text-align: center; font-size: 10.5px; font-weight: 600; color: #a1a1aa; padding: 2px 0 4px; }
+.wf-day { height: 30px; border: 0; background: none; font: 500 12.5px var(--sans); color: #3f3f46; cursor: pointer; }
+.wf-day:hover { background: #fafafa; }
+.wf-day.out { color: #d4d4d8; }
+.wf-day.today { font-weight: 700; box-shadow: inset 0 -2px 0 #c4b5fd; }
+.wf-day.sel { background: #f5f3ff; color: #4c1d95; font-weight: 700; }
+.wf .tp-wheels { border-top: 1px solid #f0f0f2; padding-top: 4px; }
+.sch-when { grid-template-columns: 1fr auto !important; }
+.sch-when > .wf-field { grid-column: 1 / -1 !important; }
+.sch-when > .sch-when-min { grid-column: 1 !important; max-width: 140px; }
+.sch-when > .sch-icon { grid-column: 2 !important; }
