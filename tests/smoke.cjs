@@ -294,7 +294,9 @@ async function run(url) {
   await page.locator('[data-test="sch-box"]').first().click({ position: { x: 12, y: 10 } });
   await page.waitForSelector('.sch-sheet [data-test="task-edit"]');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/schedule.png` });
-  await page.click('.sch-sheet [aria-label="Close"]');
+  // A click outside the card closes it.
+  await page.click('.sch-title');
+  assert.equal(await page.$('.sch-sheet'), null, 'clicking outside the edit card closes it');
   assert.equal(await page.$('[data-test="sch-quick"]'), null, 'nothing sits between the Schedule header and the calendar');
   // Week and month are part of the Schedule; a day opens the day time line.
   await page.click('[data-test="cal-week"]');

@@ -177,6 +177,20 @@ function toNow() { if (!isToday.value) day.value = today(); nextTick(() => grid.
 const editing = ref(null);
 const editRow = ref('');
 const tickX = x => toggleDone(x.task, x.date);
+// A click outside an open card closes it: the edit card, the Calendars panel,
+// and the editor under a list row. Date and time pickers float outside their
+// card, so clicks in them do not count.
+const sheetEl = ref(null);
+const calPopEl = ref(null);
+function outside(e) {
+  const t = e.target;
+  if (!(t instanceof Element) || t.closest('.pk-pop')) return;
+  if (editing.value && sheetEl.value && !sheetEl.value.contains(t) && !t.closest('.sch-box')) editing.value = null;
+  if (calOpen.value && calPopEl.value && !calPopEl.value.contains(t) && !t.closest('[data-test="calendars-open"]')) calOpen.value = false;
+  if (editRow.value && t.closest('.sch-row')?.dataset.key !== editRow.value) editRow.value = '';
+}
+onMounted(() => document.addEventListener('mousedown', outside));
+onUnmounted(() => document.removeEventListener('mousedown', outside));
 </script>
 
 <template>
@@ -193,7 +207,7 @@ const tickX = x => toggleDone(x.task, x.date);
         <button v-for="[id, label] in [['day', 'Day'], ['week', 'Week'], ['month', 'Month']]" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`cal-${id}`" @click="range = id; id === 'day' && nextTick(scrollToStart)">{{ label }}</button>
       </div>
       <button type="button" class="sch-cal-btn" :aria-expanded="calOpen" data-test="calendars-open" @click="calOpen = !calOpen"><Icon name="calendar" :size="15" />Calendars<b v-if="store.feeds.length">{{ store.feeds.length }}</b></button>
-      <div v-if="calOpen" class="sch-cal-pop"><PlanCalendars /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
+      <div v-if="calOpen" ref="calPopEl" class="sch-cal-pop"><PlanCalendars /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
     </div>
 
     <div class="sch-body">
@@ -209,7 +223,7 @@ const tickX = x => toggleDone(x.task, x.date);
           <h4 v-if="range === 'day'"><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.all }}</span></h4>
           <h4 v-else><button type="button" class="sch-fold" :aria-expanded="!folded(c)" data-test="sch-fold" @click="flip(c)"><i />{{ c.label }}<span class="sch-fold-bar"><b :style="{ width: `${c.all ? Math.round((c.done / c.all) * 100) : 0}%` }" /></span><span class="muted">{{ c.done }}/{{ c.all }}</span><Icon name="right" :size="13" class="sch-fold-ic" /></button></h4>
           <ul v-if="!folded(c)">
-            <li v-for="x in c.list" :key="x.key" class="sch-row" :class="{ done: x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
+            <li v-for="x in c.list" :key="x.key" class="sch-row" :data-key="x.key" :class="{ done: x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
               <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
               <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
@@ -253,7 +267,7 @@ const tickX = x => toggleDone(x.task, x.date);
       </section>
     </div>
 
-    <div v-if="editing" class="sch-sheet" role="dialog" aria-label="Edit" @keydown.esc="editing = null">
+    <div v-if="editing" ref="sheetEl" class="sch-sheet" role="dialog" aria-label="Edit" @keydown.esc="editing = null">
       <div class="sch-sheet-head">
         <button type="button" class="sch-check" role="checkbox" :aria-checked="isDone(editing.task, editing.date)" :aria-label="`Done: ${editing.task.title}`" @click="toggleDone(editing.task, editing.date)"><Icon v-if="isDone(editing.task, editing.date)" name="check" :size="12" /></button>
         <b>{{ editing.task.title }}</b>

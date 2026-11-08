@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { store } from '../lib/store';
 import { nav } from '../lib/nav';
 import { KINDS, DAY_SHORT, isDone, toggleDone, streak, timeLabel, dayLabel, today, urgency, nextOccurrence } from '../lib/tasks';
@@ -43,6 +43,11 @@ const tick = () => toggleDone(t, day.value);
 const onDeleteKey = e => { if (!e.target.closest('input, textarea, select, .tk-edit')) deleteTask(t); };
 // Opened from search: expand and bring into view.
 const el = ref(null);
+// A click outside an open row closes its editor (date and time pickers float
+// outside the row, so clicks in them do not count). Listens only while open.
+const outside = e => { const t = e.target; if (t instanceof Element && el.value && !el.value.contains(t) && !t.closest('.pk-pop')) open.value = false; };
+watch(open, v => { if (v) document.addEventListener('mousedown', outside); else document.removeEventListener('mousedown', outside); });
+onUnmounted(() => document.removeEventListener('mousedown', outside));
 onMounted(async () => { if (nav.task === t.id) { open.value = true; nav.task = ''; await nextTick(); el.value?.scrollIntoView({ block: 'center' }); } });
 const splitting = ref(false);
 async function split() { splitting.value = true; await breakDown(t); splitting.value = false; open.value = true; }
