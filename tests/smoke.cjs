@@ -142,6 +142,10 @@ async function run(url) {
 
   // Add: one button. Say or type anything; Budgie sorts it, places it, and you review each one.
   await page.click('[data-test="capture"]');
+  // One long run of words with many things in it is split into each one before anything is added.
+  await page.fill('[data-test="capture-text"]', 'okay so for chemistry I have a lab report due Monday and a quiz on Wednesday and I need to finish the problem set by Friday then for history I have an essay due next Tuesday and a reading response tomorrow also call mom on Sunday and dad on Saturday gym every Monday and Wednesday at 6 pm number two pay rent on the 1st another thing buy groceries tomorrow and book a dentist appointment next week oh and I want to run a 10K by March plus meditate every morning at 7 and finally email professor Smith about the extension');
+  assert.match(await page.textContent('[data-test="capture-sort"]'), /Add 14 things/, 'a long ramble shows as 14 separate things');
+  assert.equal(await page.locator('.cap-rows li').count(), 14, 'each one is listed with where it will go');
   await page.fill('[data-test="capture-text"]', 'Essay 2 due tomorrow 5pm #English\nGym MWF 6pm\nI want to land a summer internship by March\nhaircut today');
   assert.match(await page.textContent('[data-test="capture-sheet"]'), /Task[\s\S]*Essay 2[\s\S]*Routine[\s\S]*Gym[\s\S]*Goal[\s\S]*Task[\s\S]*Haircut/, 'each line is sorted before anything is added');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/capture.png` });

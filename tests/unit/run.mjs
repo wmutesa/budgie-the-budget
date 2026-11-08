@@ -234,6 +234,31 @@ await check('stopping dictation breaks a run-on ramble into separate things', ()
   assert.equal(rows.length, 4, rows.map(r => r.text).join(' | '));
   assert.deepEqual(rows.map(r => r.dest), ['task', 'task', 'routine', 'goal']);
 });
+const breakDownRules = said => routeAll(tidyDictation(splitSpoken(said).join('\n')));
+await check('one long recording becomes every separate thing, with courses and verbs carried', () => {
+  const rows = breakDownRules('okay so for chemistry I have a lab report due Monday and a quiz on Wednesday and I need to finish the problem set by Friday then for history I have an essay due next Tuesday and a reading response tomorrow also call mom on Sunday and dad on Saturday gym every Monday and Wednesday at 6 pm number two pay rent on the 1st another thing buy groceries tomorrow and book a dentist appointment next week oh and I want to run a 10K by March plus meditate every morning at 7 and finally email professor Smith about the extension');
+  assert.equal(rows.length, 14, rows.map(r => r.text).join(' | '));
+  assert.deepEqual(rows.filter(r => /#chemistry/i.test(r.text)).length, 3, 'the course said once carries to each chemistry item');
+  assert.ok(rows.some(r => /^Call dad on Saturday/i.test(r.text)), 'the verb carries: call dad');
+  assert.equal(rows.filter(r => r.dest === 'routine').length, 2);
+  assert.equal(rows.filter(r => r.dest === 'goal').length, 1);
+});
+await check('fifty assignments said in one breath become fifty tasks', () => {
+  const subj = ['calculus', 'history', 'chemistry', 'english', 'spanish'], days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const said = Array.from({ length: 50 }, (_, k) => { const i = k + 1; return `${i % 3 === 0 ? 'and ' : ''}${['finish', 'submit', 'review', 'write', 'read'][i % 5]} ${subj[i % 5]} assignment ${i} due ${days[i % 5]}${i % 4 === 0 ? ' at 5 pm' : ''}`; }).join(' ');
+  const rows = breakDownRules(said);
+  assert.equal(rows.length, 50);
+  assert.ok(rows.every((r, k) => new RegExp(`assignment ${k + 1}\\b`).test(r.text)), 'each one is its own task, in order');
+});
+await check('a spoken list of things due splits into one item each', () => {
+  const rows = breakDownRules('I have an essay due Friday, a lab report due Monday and a quiz on Wednesday');
+  assert.deepEqual(rows.map(r => r.task.title), ['Essay', 'Lab report', 'Quiz']);
+  assert.deepEqual(rows.map(r => r.task.kind), ['assignment', 'assignment', 'exam'], 'assignments and exams are recognised');
+});
+await check('it does not split what belongs together', () => {
+  const rows = breakDownRules('call mom and dad tomorrow, meet Sam between 2 and 4 pm on Thursday, gym Monday and Wednesday, finish the first draft by Friday, book a table for next Tuesday');
+  assert.deepEqual(rows.map(r => r.text), ['Call mom and dad tomorrow', 'Meet Sam between 2 and 4pm on Thursday', 'Gym Monday and Wednesday', 'Finish the first draft by Friday', 'Book a table for next Tuesday']);
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

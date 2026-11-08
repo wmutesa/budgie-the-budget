@@ -27,19 +27,61 @@ export function route(line) {
 const splitCommas = line => { const parts = line.split(/,\s*/).map(x => x.trim()).filter(Boolean); return parts.length > 1 && parts.every(x => parseTask(x).date || parseTask(x).repeat || parseTask(x).time) ? parts : [line]; };
 export const routeAll = text => splitLines(text).flatMap(splitCommas).map(route);
 
-// Speech has no line breaks. Split at sentence ends, "then", "also", "after
-// that", and at "and" when what follows starts a new thing ("and remind me
-// to…", "and gym on Monday"), but not inside "call mom and dad".
-const STARTS = "(?:i |i've |i have |i need |i want |remind|remember|need to|have to|call|email|text|pay|buy|book|study|finish|submit|start|go to|meet|meeting|gym|my |add|schedule|learn|read|run|clean)";
-const AND_SPLIT = new RegExp(`,?\\s+and\\s+(?=${STARTS})`, 'gi');
+// Speech has no line breaks, and one recording can hold dozens of things.
+// Split at sentence ends; at spoken numbering ("first", "number two",
+// "next", "another one", "oh and"); at "then / also / plus / after that /
+// as well as"; and at "and" or a comma when what follows starts a new thing:
+// a verb ("call", "finish", "submit"…), "I have / I need / I want", or a
+// listed item ("a lab report due Monday", "my essay on Friday"). It does not
+// split "Monday and Wednesday", "mom and dad" or "between 2 and 4".
+const VERBS = 'call|email|text|message|pay|buy|book|study|finish|submit|start|go|meet|gym|add|schedule|learn|read|run|clean|write|review|prepare|prep|practice|practise|send|reply|plan|pick|drop|fix|watch|cook|wash|visit|see|ask|check|update|apply|register|sign|print|order|return|bring|take|make|do|attend|work|revise|research|draft|edit|record|upload|walk|train|swim|cycle|meditate|journal|organize|organise|tidy|vacuum|water|feed|renew|cancel|file|translate|interview|present|teach|tutor|help|remind|remember|need|have|want|must|should|gotta|got';
+const STARTS = `(?:i\\s|i'm\\s|i've\\s|i'll\\s|i'd\\s|we\\s|there's\\s|there\\sis\\s|(?:${VERBS})\\b|(?:a|an|the|my|our)\\s+[\\w#'-]+(?:\\s+[\\w#'-]+){0,4}\\s+(?:due|on|at|by|for|tomorrow|today|tonight|next|this|every|before|after|until)\\b)`;
+const AND_SPLIT = new RegExp(`(?:,|;)?\\s+(?:and|&)\\s+(?=${STARTS})`, 'gi');
+const COMMA_SPLIT = new RegExp(`\\s*[,;]\\s+(?=${STARTS})`, 'gi');
+const NUMBERED = /(?:,?\s*\band\s+)?\b(?:(?:number|item|task)\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)|firstly|secondly|thirdly|(?:first|second|third|next|last)\s+(?:thing|one|of\s+all)|another\s+(?:one|thing)|one\s+more\s+thing|oh\s+and|also|as\s+well\s+as|on\s+top\s+of\s+that|lastly|finally)\b\s*,?\s*/gi;
+// A new thing often starts right after a day or time, with no word between: "…on Saturday gym every Monday".
+const WHEN_WORD = '(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today|tonight|morning|afternoon|evening|night|week|month|year|weekend|[ap]m|\\d)';
+// "for chemistry I have X and Y" or "in history: X, Y": the course carries to each part.
+const CONTEXT = /^(?:(?:for|in)\s+(?:my\s+)?([a-z][\w&-]*(?:\s+\d{2,4})?)(?:\s+(?:class|course|module|unit))?\s*[,:]?\s+(?=(?:i|we|there|a|an|the|my)\b)|([a-z][\w&-]*(?:\s+\d{2,4})?)\s+(?:class|course|homework)\s*[:,]\s*)/i;
+const NOT_COURSE = /^(?:the|a|an|this|next|today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|work|home|now|then|me|it)$/i;
+
 export function splitSpoken(text) {
-  return String(text)
-    .replace(/[.!?]+\s+/g, '\n')
-    .replace(/,?\s+\b(?:and then|then|after that|also|plus)\b\s+/gi, '\n')
-    .replace(AND_SPLIT, '\n')
-    .split('\n')
-    .map(s => s.trim().replace(/^(add|remind me to|remember to)\s+/i, '').replace(/[.,;]+$/, ''))
-    .filter(s => s.length > 1);
+  const sentences = String(text)
+    .replace(/\r/g, '')
+    .replace(/(\d)\.(\d)/g, '$1·$2')                              // keep "5.30" whole
+    .replace(/\b([ap])\.\s?m\./gi, '$1m')                          // "5 p.m." is not a sentence end
+    .replace(/[.!?]+(?:\s+|$)/g, '\n')
+    .replace(NUMBERED, '\n')
+    .replace(/,?\s+\b(?:and then|then|after that|plus)\b\s+/gi, '\n')
+    .replace(new RegExp(`(?<=\\b${WHEN_WORD}\\b)\\s+(?=(?:${VERBS})\\b)`, 'gi'), '\n')
+    .split('\n');
+  const out = [];
+  for (const sentence of sentences) {
+    let s = sentence.trim().replace(/^(?:(?:okay|ok|so|um+|uh+|well|right|alright)\b[,\s]*)+/i, '');
+    if (!s) continue;
+    // A course said once applies to every thing in the sentence.
+    let tag = '';
+    const m = s.match(CONTEXT);
+    const course = m && (m[1] || m[2]);
+    if (course && !NOT_COURSE.test(course)) { tag = ` #${course.replace(/\s+/g, '')}`; s = s.slice(m[0].length); }
+    const parts = s.replace(AND_SPLIT, '\n').replace(COMMA_SPLIT, '\n').split('\n');
+    for (const p of parts) {
+      const clean = p.trim()
+        .replace(/^(?:and|so|okay|ok|um+|uh+|well)\b[,\s]*/i, '')
+        .replace(/^(?:add|remind me to|remember to|don't forget to|i need to|i have to|i've got to|i gotta|i must|i should)\s+/i, '')
+        .replace(/^(?:i have|i've got|i got|there's|there is|we have)\s+(?=(?:a|an|the|my|our|two|three|\d)\b)/i, '')
+        .replace(/^(?:a|an|the)\s+(?=\S)/i, '')
+        .replace(/[.,;]+$/, '')
+        .replace(/·/g, '.')
+        .trim();
+      if (clean.length <= 1) continue;
+      // "call mom on Sunday and dad on Saturday": the verb carries to the second person or thing.
+      const carry = !clean.includes(',') && clean.match(new RegExp(`^((?:${VERBS}))\\s+(.+?\\b(?:on|at|by|this|next|every|tomorrow|today|tonight)\\b.*?)\\s+and\\s+([\\w'-]+(?:\\s+[\\w'-]+)?\\s+(?:on|at|by|this|next|every|tomorrow|today|tonight)\\b.*)$`, 'i'));
+      const pieces = carry ? [`${carry[1]} ${carry[2]}`, `${carry[1]} ${carry[3]}`] : [clean];
+      for (const piece of pieces) out.push(tag && !/#\w/.test(piece) ? `${piece}${tag}` : piece);
+    }
+  }
+  return out;
 }
 export const routeSpoken = text => splitSpoken(text).map(route);
 

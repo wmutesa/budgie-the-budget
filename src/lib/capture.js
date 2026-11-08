@@ -42,19 +42,31 @@ function settle(made) {
 }
 
 // Sort what was said or typed and put it in place, pending review.
-// What was said, broken down into separate things, one per line: the
-// on-device AI reads and splits it when it is ready, otherwise the rules do
-// (filler out, sentence and "then / also / and I need to" breaks, planner times).
+// What was said, broken down into every separate thing, one per line. The
+// rules always run (they split at sentence ends, numbering, "then / also",
+// "and" before a new thing, listed items, and carry a course or verb across).
+// When the on-device AI is ready it reads the recording in chunks too; its
+// answer is used when it finds at least as many things as the rules, so it
+// can fix wording but never drop items.
 export async function breakDown(text) {
-  let lines = null;
-  if (ai.enabled && ai.ready) lines = await aiRewriteDictation(text).catch(() => null);
-  return lines || tidyDictation(splitSpoken(text).join('\n'));
+  const split = splitSpoken(text);
+  const rules = tidyDictation(split.join('\n'));
+  if (!(ai.enabled && ai.ready)) return rules;
+  // Chunks of a few sentences each, cut at the rules' own breaks.
+  const chunks = [];
+  let cur = '';
+  for (const line of split) { if (cur && cur.length + line.length > 600) { chunks.push(cur); cur = ''; } cur += (cur ? '. ' : '') + line; }
+  if (cur) chunks.push(cur);
+  const byAI = await aiRewriteDictation(text, chunks).catch(() => null);
+  const count = t => (t ? t.split('\n').filter(Boolean).length : 0);
+  return byAI && count(byAI) >= count(rules) ? byAI : rules;
 }
 
 export async function sortAndPlace(text = capture.text, { spoken = false } = {}) {
   if (!text.trim()) return 0;
   capture.sorting = true;
-  const rows = routeAll(spoken ? await breakDown(text) : text).filter(r => r.text);
+  // Spoken or typed, one long run of words is broken into every separate thing.
+  const rows = routeAll(await breakDown(text)).filter(r => r.text);
   if (!rows.length) { capture.sorting = false; return 0; }
   const out = await sendAll(rows);
   settle(out.made);

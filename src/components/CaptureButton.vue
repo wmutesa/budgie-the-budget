@@ -40,7 +40,8 @@ function openSheet({ voice = canDictate } = {}) {
 }
 function close() { if (listening.value) dict.stop(); capture.open = false; }
 // How it will be split, shown as you go.
-const rows = computed(() => routeAll(spoken.value ? tidyDictation(splitSpoken(capture.text).join('\n')) : capture.text));
+// How it will be split (the rules; the AI may tidy the wording), shown as you go.
+const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
 async function sortIt() {
   if (listening.value) {
     dict.stop();

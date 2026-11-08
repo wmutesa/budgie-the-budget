@@ -436,15 +436,23 @@ export async function aiPolishLead(lead, profileLine) {
   return out && typeof out.dek === 'string' && typeof out.body === 'string' ? { dek: out.dek.replace(/[<>]/g, '').slice(0, 300), body: out.body.replace(/[<>]/g, '').slice(0, 900) } : null;
 }
 
-// Rewrite dictated notes as clear planner lines: fix misheard words, drop filler,
-// one thing per line, keeping every date, time, name and #project. Returns a string or null.
-export async function aiRewriteDictation(text) {
-  const reply = await route('plan', [
-    { role: 'system', content: 'You tidy up text someone dictated into a planner, in any accent. Fix words the speech recognition clearly misheard, remove filler (um, uh, like, you know, so yeah), and write each separate thing on its own short line: a task, an event, a routine or a goal. Keep every date, day, time, duration, person, place and #tag exactly. Do not add anything that was not said. Reply with JSON only: {"lines": [string]}' },
-    { role: 'user', content: String(text).slice(0, 2000) },
-  ], { json: true, temperature: 0.1, max_tokens: 400 });
-  const lines = firstJSON(reply)?.lines;
-  if (!Array.isArray(lines)) return null;
-  const out = lines.map(x => String(x || '').replace(/[<>]/g, '').trim()).filter(Boolean).slice(0, 20);
-  return out.length ? out.join('\n') : null;
+// Break a dictated recording into every separate thing said, one per line:
+// fix misheard words, drop filler, keep every date, time, person, place and
+// #tag. Long recordings go in chunks (`chunks`, already split at natural
+// breaks) so a small model reads each part fully. Returns a string or null.
+const SPLIT_PROMPT = 'You turn a dictated planner recording into a list of separate items. People say many things at once (sometimes 50 or more) without pausing: assignments, exams, classes, tasks, errands, events, routines, habits and goals. List EVERY separate item, one per line, in the order said; never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two lines. When a course or subject is said once for several items ("for chemistry I have X and Y"), add it to each as #Course. Carry a shared verb ("call mom Sunday and dad Saturday" becomes "Call mom Sunday" and "Call dad Saturday"). Keep every date, day, time, duration, person, place and #tag exactly; fix words speech recognition clearly misheard; remove filler (um, uh, like, you know, so yeah). Do not add anything that was not said. Reply with JSON only: {"items": [string]}';
+export async function aiRewriteDictation(text, chunks = null) {
+  const parts = chunks && chunks.length ? chunks : [String(text)];
+  const out = [];
+  for (const part of parts) {
+    const reply = await route('plan', [
+      { role: 'system', content: SPLIT_PROMPT },
+      { role: 'user', content: String(part).slice(0, 1500) },
+    ], { json: true, temperature: 0.1, max_tokens: 900 });
+    const got = firstJSON(reply);
+    const list = got?.items || got?.lines;
+    if (!Array.isArray(list)) return null;
+    out.push(...list.map(x => String(x || '').replace(/[<>]/g, '').trim()).filter(Boolean));
+  }
+  return out.length ? out.slice(0, 200).join('\n') : null;
 }
