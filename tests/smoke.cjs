@@ -313,13 +313,22 @@ async function run(url) {
   assert.match(await page.title(), /^⏸ /, 'a paused session shows in the title');
   await page.click('[data-test="timer-more"]');
   assert.match(await page.textContent('[data-test="timer"] .pln-clock'), /^(29|30):\d\d$/, 'five more minutes are added');
-  // Suggested for you stays below the top bar while the page scrolls, and scrolls inside itself.
+  // The side bar is about focus now: time focused, a quick start, today's sessions. No suggestions here.
+  assert.ok(await page.$('[data-test="focus-side"]'), 'the Focus side bar is your focus');
+  assert.equal(await page.$('.fcs-side .pln-ideas'), null, 'no Suggested for you on the Focus page');
+  assert.match(await page.textContent('[data-test="focus-side"]'), /today[\s\S]*last 7 days[\s\S]*Start a session[\s\S]*Today's sessions/, 'it shows time focused, a quick start and today\'s sessions');
+  // It stays below the top bar while the page scrolls, and scrolls inside itself.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(200);
   { const nav = await page.locator('.nav-bar').boundingBox(); const card = await page.locator('.fcs-side .pln-card').boundingBox(); const vh = page.viewportSize().height;
-    assert.ok(Math.abs(card.y - (nav.y + nav.height)) < 2 && card.y + card.height <= vh + 1, `the suggestions stay in view below the top bar (${JSON.stringify({ nav, card, vh })})`);
-    assert.equal(await page.locator('.fcs-side .pln-card').evaluate(e => getComputedStyle(e).overflowY), 'auto', 'long suggestions scroll inside the panel'); }
+    assert.ok(Math.abs(card.y - (nav.y + nav.height)) < 2 && card.y + card.height <= vh + 1, `the side bar stays in view below the top bar (${JSON.stringify({ nav, card, vh })})`);
+    assert.equal(await page.locator('.fcs-side .pln-card').evaluate(e => getComputedStyle(e).overflowY), 'auto', 'a long side bar scrolls inside itself'); }
   await page.evaluate(() => window.scrollTo(0, 0));
+  // Quick start: pick something and a length; finishing logs the session.
+  await page.selectOption('[data-test="focus-pick"]', { label: 'Essay 2' }).catch(() => {});
+  await page.click('[data-test="focus-len-15"]');
+  await page.click('[data-test="focus-start"]');
+  assert.match(await page.textContent('[data-test="timer"] .pln-clock'), /^1[45]:\d\d$/, 'a 15-minute session starts');
   await page.click('[data-test="nav-schedule"]');
   // Schedule: today's list by category and a time line with a column per category.
   await page.click('[data-test="cal-day"]');

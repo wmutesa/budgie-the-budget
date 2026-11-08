@@ -2,12 +2,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { openTasks, occurrences, summary, today, addDays, dayLabel, timeLabel, toMins, toggleDone, KINDS, streak } from '../lib/tasks';
 import TaskRow from './TaskRow.vue';
-import PlanSuggest from './PlanSuggest.vue';
+import FocusSide from './FocusSide.vue';
 import Icon from './Icon.vue';
 import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss } from '../lib/focus';
 
-// Focus: what matters now. Its own page, with Budgie's suggestions as the
-// right side bar, top to bottom.
+// Focus: what matters now. Its own page, with your focus time and a quick
+// session starter as the right side bar, top to bottom.
 const now = ref(today());
 const clock = ref(new Date());
 let tick = null;
@@ -83,7 +83,7 @@ const greeting = computed(() => { const h = clock.value.getHours(); return h < 1
         </div>
       </div>
     </div>
-    <!-- Suggestions fill the whole right side, top to bottom -->
-    <aside class="fcs-side" aria-label="Suggestions"><PlanSuggest /></aside>
+    <!-- Your focus fills the whole right side, top to bottom -->
+    <aside class="fcs-side" aria-label="Your focus"><FocusSide /></aside>
   </div>
 </template>
