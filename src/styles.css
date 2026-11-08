@@ -3225,3 +3225,13 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .fcs-opt > span { display: grid; gap: 2px; }
 .fcs-held { color: #6d28d9 !important; font-weight: 600; }
 @media (max-width: 760px) { .fcs-allow-opts { grid-template-columns: minmax(0, 1fr); } }
+/* Schedule page: left and right edges match the top bar's (18px) at every width */
+.pln[data-test="planner"] > .sch { margin-left: 18px !important; margin-right: 18px !important; }
+.pln[data-test="planner"] > .pln-focusbar { margin-left: 18px !important; margin-right: 18px !important; }
+.pln-focusbar { background: #faf8ff !important; color: #18181b !important; border: 1px solid #ede9fe; border-radius: 12px; }
+.pln-focusbar .ico { color: #7c3aed; }
+.pln-focusbar .ibtn { color: #4c1d95 !important; }
+/* Focus page: left and right edges match the top bar's (18px) at every width */
+.fcs .pln-head, .fcs .pln-main { padding-left: 18px !important; padding-right: 18px !important; }
+.fcs .fcs-side .pln-card { padding-left: 18px !important; padding-right: 18px !important; }
+.fcs .fcs-side .pln-card-head { margin-left: -18px !important; margin-right: -18px !important; padding-left: 18px !important; padding-right: 18px !important; }
