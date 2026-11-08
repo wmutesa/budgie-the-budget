@@ -24,10 +24,10 @@ import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { detectAI } from './lib/ai';
 import { store } from './lib/store';
 
-// Three pages: Overview (your day and goals), Planner (schedule, tasks,
-// agenda), Focus (what matters now) and Reports (what got done). The Add button adds anything from anywhere.
+// Four pages: Overview (your day and goals), Schedule (day, week and month,
+// with your activity), Focus (what matters now) and Reports (what got done). The Add button adds anything from anywhere.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Planner: 'planner', Focus: 'target', Reports: 'trend' };
+const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Focus: 'target', Reports: 'trend' };
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -114,7 +114,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
       <template v-if="active === 'Overview'">
         <TodayView />
       </template>
-      <template v-else-if="active === 'Planner'">
+      <template v-else-if="active === 'Schedule'">
         <PlannerView />
       </template>
       <template v-else-if="active === 'Focus'">

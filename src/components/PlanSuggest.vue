@@ -17,7 +17,7 @@ function accept(s) {
   if (s.goal) planGoal(s.goal);
   if (s.task) store.tasks.unshift(makeTask({ ...s.task, source: 'suggestion' }));
   store.dismissed.push(s.id);
-  toast(s.goal ? `Milestones planned for “${s.goal.title}”.` : s.run ? 'Done.' : 'Added to your Planner.', { kind: 'success' });
+  toast(s.goal ? `Milestones planned for “${s.goal.title}”.` : s.run ? 'Done.' : 'Added to your schedule.', { kind: 'success' });
 }
 const dismiss = s => store.dismissed.push(s.id);
 async function askAI() {

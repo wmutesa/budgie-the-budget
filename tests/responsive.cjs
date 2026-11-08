@@ -52,16 +52,19 @@ const spill = () => {
 
 const SCREENS = [
   ['today', async p => { await p.click(tab('Overview')); }],
-  ['schedule', async p => { await p.click(tab('Planner')); await p.click('[data-test="view-schedule"]'); await p.click('[data-test="cal-day"]'); }],
+  ['schedule', async p => { await p.click(tab('Schedule')); await p.click('[data-test="cal-day"]'); }],
   ['week', async p => { await p.click('[data-test="cal-week"]'); }],
   ['month', async p => { await p.click('[data-test="cal-month"]'); }],
   ['schedule-edit', async p => { await p.click('[data-test="cal-day"]'); await p.locator('[data-test="sch-box"]').first().click(); }],
-  ['tasks', async p => { await p.keyboard.press('Escape'); await p.click('.sch-sheet [aria-label="Close"]').catch(() => {}); await p.click('[data-test="view-tasks"]'); }],
-  ['task-edit', async p => { await p.locator('[data-test="task"] .tk-title').first().click(); }],
-  ['agenda', async p => { await p.click('[data-test="view-agenda"]'); }],
+  ['row-edit', async p => {
+    await p.click('.sch-sheet [aria-label="Close"]').catch(() => {});
+    if (await p.$('[aria-label="Show the list"]')) await p.click('[aria-label="Show the list"]');
+    await p.locator('[data-test="sch-row"] button[aria-label^="Edit "]').first().click();
+  }],
+  ['day-pick', async p => { await p.locator('[data-test="sch-row"] [data-test="task-edit"] [aria-label="Close"]').first().click().catch(() => {}); await p.click('[data-test="sch-today"]'); }],
   ['focus', async p => { await p.click('[data-test="nav-focus"]'); }],
   ['reports', async p => { await p.click('[data-test="nav-reports"]'); await p.waitForSelector('[data-test="rep-stat"]'); }],
-  ['calendars', async p => { await p.click('[data-test="nav-planner"]'); await p.click('[data-test="view-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
+  ['calendars', async p => { await p.click('[data-test="nav-schedule"]'); await p.click('[data-test="calendars-open"]'); }],
   ['add', async p => { await p.click('[data-test="calendars-open"]'); await p.click('[data-test="capture"]'); await p.fill('[data-test="capture-text"]', 'Essay due Fri 5pm #English\ngym MWF 6pm\nI want to run a 10K by March'); }],
   ['review', async p => { await p.click('[data-test="capture-sort"]'); await p.waitForSelector('.cr-hole'); }],
   ['review-goal', async p => { await p.click('[data-test="review-keep"]'); await p.click('[data-test="review-keep"]'); await p.waitForTimeout(400); }],

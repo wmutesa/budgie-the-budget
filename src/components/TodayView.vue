@@ -54,7 +54,7 @@ const nextStep = computed(() => {
   <section class="card cell headline" id="today" data-test="today">
     <p class="label">{{ weekday }} brief</p>
     <p class="greet">Good <em>{{ part }}</em>.</p>
-    <p v-if="empty" class="lede">Budgie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Planner</b>.</p>
+    <p v-if="empty" class="lede">Budgie starts empty. Tap <b>Add</b> and say what is on your mind, or bring in your school calendar from the <b>Schedule</b>.</p>
     <p v-else class="lede" data-test="brief">
       <template v-if="items.length">Today you have <mark class="m-violet">{{ items.length }} {{ items.length === 1 ? 'thing' : 'things' }}</mark> planned<template v-if="items.length - left.length">, {{ items.length - left.length }} done</template>. </template>
       <template v-else>Nothing is planned for today yet. </template>
@@ -66,17 +66,17 @@ const nextStep = computed(() => {
     </p>
     <p class="brief-acts">
       <button type="button" class="btn small primary" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="14" />Add something</button>
-      <button type="button" class="btn small" @click="go('Planner')"><Icon name="planner" :size="14" />Open Planner</button>
+      <button type="button" class="btn small" @click="go('Schedule')"><Icon name="calendar" :size="14" />Open Schedule</button>
     </p>
   </section>
   <section class="card cell" data-test="today-list">
-    <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="store.planner.view = 'Schedule'; go('Planner')"><Icon name="calendar" /></button></div>
+    <div class="cell-head"><p class="label">Up next</p><button type="button" class="ibtn ghost" title="Open the schedule" aria-label="Open the schedule" @click="go('Schedule')"><Icon name="calendar" /></button></div>
     <ul v-if="left.length" class="tk-list"><TaskRow v-for="x in shown" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
     <p v-else-if="items.length" class="empty-note">All done for today.</p>
     <p v-if="items.length" class="td-more">
       <button v-if="upNext.length > SHOW" type="button" class="pln-more" data-test="today-more" @click="allOpen = !allOpen">{{ allOpen ? 'Show fewer' : `${upNext.length - SHOW} more today` }}</button>
       <button v-if="items.length - left.length" type="button" class="pln-more" :aria-expanded="showDone" @click="showDone = !showDone">{{ showDone ? 'Hide done' : `${items.length - left.length} done` }}</button>
-      <button type="button" class="pln-more" @click="store.planner.view = 'Schedule'; go('Planner')">See the day</button>
+      <button type="button" class="pln-more" @click="go('Schedule')">See the day</button>
     </p>
     <ul v-if="showDone" class="tk-list"><TaskRow v-for="x in items.filter(y => y.done)" :key="x.key" :task="x.task" :date="x.date" :show-date="false" /></ul>
     <p v-if="!items.length" class="empty-note">Nothing on today. Tap Add and say what is coming up.</p>
@@ -98,7 +98,7 @@ const nextStep = computed(() => {
   </section>
   <div class="card cell td-sugg"><PlanSuggest /></div>
   <section class="card cell" data-test="today-goals">
-    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones in the Planner" aria-label="Milestones in the Planner" @click="go('Planner')"><Icon name="right" /></button></div>
+    <div class="cell-head"><p class="label">Goals</p><button type="button" class="ibtn ghost" title="Milestones on the Schedule" aria-label="Milestones on the Schedule" @click="go('Schedule')"><Icon name="right" /></button></div>
     <ul v-if="goals.length" class="td-goals">
       <li v-for="x in goals" :key="x.g.id" :class="{ pending: x.g.pending }" :data-goal-id="x.g.id">
         <span class="td-goal-top"><b>{{ x.g.title }}</b><span class="muted small">{{ x.p.done }}/{{ x.p.all }}{{ x.g.by ? ` · ${x.p.daysLeft >= 0 ? `${x.p.daysLeft} days left` : 'past its date'}` : '' }}<button type="button" class="ibtn ghost danger td-goal-del" title="Delete goal" :aria-label="`Delete ${x.g.title}`" data-test="goal-delete" @click="deleteGoal(x.g)"><Icon name="trash" :size="14" /></button></span></span>

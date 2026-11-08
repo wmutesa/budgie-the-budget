@@ -303,10 +303,10 @@ function download() {
               <div><span>Days active</span><b>{{ stats.active }}/{{ days }}</b></div>
               <div><span>Trend</span><b :class="stats.slopeWeek >= 0 ? 'rep-up' : 'rep-down'">{{ stats.slopeWeek >= 0 ? '+' : '' }}{{ stats.slopeWeek }}/wk</b></div>
             </div>
-            <template v-if="nextSteps.length">
+            <div v-if="nextSteps.length" class="rep-try">
               <h3 class="rep-sub"><Icon name="sparkle" :size="14" />TRY NEXT</h3>
               <ol class="rep-next" data-test="rep-next"><li v-for="(t, i) in nextSteps.slice(0, 3)" :key="i">{{ t }}</li></ol>
-            </template>
+            </div>
           </section>
           <!-- Where it went -->
           <section class="rep-box">

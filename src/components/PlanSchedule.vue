@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
-import { occurrences, today, addDays, fromIso, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
+import { occurrences, today, addDays, fromIso, isoDay, toMins, fromMins, KINDS, toggleDone, isDone } from '../lib/tasks';
+import { startFocus } from '../lib/focus';
 import { catKey, catLabel, catColor } from '../lib/cats';
 import { nav, go } from '../lib/nav';
 import PlanCalendars from './PlanCalendars.vue';
@@ -14,7 +15,7 @@ import { placeFree, unplace } from '../lib/schedule';
 // Schedule: the activity for the day, week or month on the left, grouped by
 // category, and on the right the day's time line (one column per category)
 // or the week and month calendar, stretched to the list's height.
-const emit = defineEmits(['view']);
+
 // The day shown; others (search, the review) can open a day here.
 const day = computed({ get: () => nav.day || today(), set: v => { nav.day = v === today() ? '' : v; } });
 const clock = ref(new Date());
@@ -177,6 +178,36 @@ function toNow() { if (!isToday.value) day.value = today(); nextTick(() => grid.
 const editing = ref(null);
 const editRow = ref('');
 const tickX = x => toggleDone(x.task, x.date);
+// Focus on the item open in the edit card.
+const focusOn = x => { startFocus(x.task); editing.value = null; go('Focus'); };
+
+// ---------- pick a day from a month calendar ----------
+const pickOpen = ref(false);
+const pickEl = ref(null);
+const pickMonth = ref(day.value.slice(0, 7));
+const WEEK_HEAD = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const pickDays = computed(() => {
+  const first = fromIso(`${pickMonth.value}-01`);
+  const start = addDays(isoDay(first), -((first.getDay() + 6) % 7));
+  const span = occurrences(start, addDays(start, 41));
+  return Array.from({ length: 42 }, (_, i) => { const d = addDays(start, i); return { d, n: fromIso(d).getDate(), other: d.slice(0, 7) !== pickMonth.value, busy: span.some(x => x.date === d) }; });
+});
+const pickTitle = computed(() => fromIso(`${pickMonth.value}-01`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }));
+const pickStep = n => { const d = fromIso(`${pickMonth.value}-01`); d.setMonth(d.getMonth() + n); pickMonth.value = isoDay(d).slice(0, 7); };
+function openPick() { pickMonth.value = day.value.slice(0, 7); pickOpen.value = !pickOpen.value; }
+function pickDay(d) { day.value = d; pickOpen.value = false; }
+
+// Opened from search or a notification: open that item on its day.
+function openFromNav() {
+  if (!nav.task) return;
+  const x = items.value.find(o => o.task.id === nav.task);
+  nav.task = '';
+  if (!x) return;
+  if (x.task.time) editing.value = x; else { listOpen.value = true; editRow.value = x.key; }
+  nextTick(() => document.querySelector(`[data-task-id="${x.task.id}"]`)?.scrollIntoView({ block: 'center' }));
+}
+onMounted(() => nextTick(openFromNav));
+watch(() => nav.task, () => nextTick(openFromNav));
 // A click outside an open card closes it: the edit card, the Calendars panel,
 // and the editor under a list row. Date and time pickers float outside their
 // card, so clicks in them do not count.
@@ -188,6 +219,7 @@ function outside(e) {
   if (editing.value && sheetEl.value && !sheetEl.value.contains(t) && !t.closest('.sch-box')) editing.value = null;
   if (calOpen.value && calPopEl.value && !calPopEl.value.contains(t) && !t.closest('[data-test="calendars-open"]')) calOpen.value = false;
   if (editRow.value && t.closest('.sch-row')?.dataset.key !== editRow.value) editRow.value = '';
+  if (pickOpen.value && pickEl.value && !pickEl.value.contains(t) && !t.closest('[data-test="sch-today"]')) pickOpen.value = false;
 }
 onMounted(() => document.addEventListener('mousedown', outside));
 onUnmounted(() => document.removeEventListener('mousedown', outside));
@@ -198,7 +230,19 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
     <div class="sch-bar">
       <h2 class="sch-title">Schedule</h2>
       <div v-if="range === 'day'" class="sch-date">
-        <button type="button" class="sch-day" :title="isToday ? 'Today' : 'Back to today'" data-test="sch-today" @click="day = today()"><Icon name="calendar" :size="15" />{{ dateLabel }}</button>
+        <button type="button" class="sch-day" title="Pick a day" :aria-expanded="pickOpen" data-test="sch-today" @click="openPick"><Icon name="calendar" :size="15" />{{ dateLabel }}</button>
+        <div v-if="pickOpen" ref="pickEl" class="sch-pick" role="dialog" aria-label="Pick a day" data-test="sch-pick" @keydown.esc="pickOpen = false">
+          <div class="sch-pick-head">
+            <button type="button" class="sch-step" aria-label="Previous month" @click="pickStep(-1)"><Icon name="left" :size="14" /></button>
+            <b>{{ pickTitle }}</b>
+            <button type="button" class="sch-step" aria-label="Next month" @click="pickStep(1)"><Icon name="right" :size="14" /></button>
+          </div>
+          <div class="sch-pick-grid">
+            <span v-for="w in WEEK_HEAD" :key="w" class="sch-pick-w">{{ w }}</span>
+            <button v-for="c in pickDays" :key="c.d" type="button" class="sch-pick-d" :class="{ other: c.other, today: c.d === today(), on: c.d === day, busy: c.busy }" :aria-label="fromIso(c.d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })" :aria-current="c.d === day ? 'date' : undefined" :data-test="`pick-${c.d}`" @click="pickDay(c.d)">{{ c.n }}</button>
+          </div>
+          <button type="button" class="sch-pick-today" @click="pickDay(today())">Today</button>
+        </div>
         <button type="button" class="sch-step" title="Previous day" aria-label="Previous day" data-test="sch-prev" @click="step(-1)"><Icon name="left" :size="15" /></button>
         <button type="button" class="sch-step" title="Next day" aria-label="Next day" data-test="sch-next" @click="step(1)"><Icon name="right" :size="15" /></button>
       </div>
@@ -223,7 +267,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
           <h4 v-if="range === 'day'"><i />{{ c.label }}<span class="muted">{{ c.done }}/{{ c.all }}</span></h4>
           <h4 v-else><button type="button" class="sch-fold" :aria-expanded="!folded(c)" data-test="sch-fold" @click="flip(c)"><i />{{ c.label }}<span class="sch-fold-bar"><b :style="{ width: `${c.all ? Math.round((c.done / c.all) * 100) : 0}%` }" /></span><span class="muted">{{ c.done }}/{{ c.all }}</span><Icon name="right" :size="13" class="sch-fold-ic" /></button></h4>
           <ul v-if="!folded(c)">
-            <li v-for="x in c.list" :key="x.key" class="sch-row" :data-key="x.key" :class="{ done: x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
+            <li v-for="x in c.list" :key="x.key" class="sch-row" :data-key="x.key" :class="{ done: x.summary ? x.timesDone === x.times : x.done, pending: x.task.pending }" :data-task-id="x.task.time ? null : x.task.id" data-test="sch-row">
               <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
               <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
@@ -271,6 +315,7 @@ onUnmounted(() => document.removeEventListener('mousedown', outside));
       <div class="sch-sheet-head">
         <button type="button" class="sch-check" role="checkbox" :aria-checked="isDone(editing.task, editing.date)" :aria-label="`Done: ${editing.task.title}`" @click="toggleDone(editing.task, editing.date)"><Icon v-if="isDone(editing.task, editing.date)" name="check" :size="12" /></button>
         <b>{{ editing.task.title }}</b>
+        <button v-if="!isDone(editing.task, editing.date)" type="button" class="sch-icon" title="Focus on it for 25 minutes" aria-label="Focus on it" data-test="sheet-focus" @click="focusOn(editing)"><Icon name="play" :size="16" /></button>
         <button type="button" class="sch-icon" title="Close" aria-label="Close" @click="editing = null"><Icon name="x" :size="16" /></button>
       </div>
       <TaskEditor :task="editing.task" @close="editing = null" />

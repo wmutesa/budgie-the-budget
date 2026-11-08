@@ -88,7 +88,7 @@ export function placeOf(x) {
   const when = it.repeat
     ? (it.repeat.every === 'day' ? 'every day' : it.repeat.every === 'weekdays' ? 'weekdays' : it.repeat.every === 'month' ? 'every month' : `every ${(it.repeat.days || []).map(d => DAY_SHORT[d]).join(', ')}`)
     : it.date ? dayLabel(it.date) : 'any day';
-  return { page: 'Planner', day: it.repeat ? nextDay(it) : it.date || today(), where: [`Planner · ${x.to === 'routine' ? 'Routine' : KINDS[it.kind]?.label || 'Task'}`, when, it.time && timeLabel(it.time), it.project && `#${it.project}`].filter(Boolean).join(' · '), target: `[data-task-id="${it.id}"]` };
+  return { page: 'Schedule', day: it.repeat ? nextDay(it) : it.date || today(), where: [`Schedule · ${x.to === 'routine' ? 'Routine' : KINDS[it.kind]?.label || 'Task'}`, when, it.time && timeLabel(it.time), it.project && `#${it.project}`].filter(Boolean).join(' · '), target: `[data-task-id="${it.id}"]` };
 }
 function nextDay(t) {
   for (let i = 0; i < 31; i++) { const d = addDays(today(), i); if (occursOn(t, d)) return d; }
@@ -99,7 +99,7 @@ export function show() {
   const x = current();
   if (!x) return;
   const p = placeOf(x);
-  if (p.page === 'Planner') { store.planner.view = 'Schedule'; store.planner.cal = 'day'; nav.day = p.day; }
+  if (p.page === 'Schedule') { store.planner.cal = 'day'; nav.day = p.day; }
   go(p.page);
 }
 function advance() {

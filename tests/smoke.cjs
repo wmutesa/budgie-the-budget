@@ -1,5 +1,5 @@
 // Smoke test for the built Budgie web app. Serves dist/, fakes the live
-// account server so the test runs offline, then checks Today, the Planner,
+// account server so the test runs offline, then checks Today, the Schedule,
 // the Add button and its review, voice, search and the first-run guide.
 //
 //   npm run build && npm test
@@ -128,7 +128,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Planner', 'Focus', 'Reports'], 'the four pages');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Focus', 'Reports'], 'the four pages');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Budgie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -148,7 +148,7 @@ async function run(url) {
   await page.click('[data-test="capture-sort"]');
   await page.waitForSelector('[data-test="capture-review"]');
   assert.match(await page.textContent('.cr-count'), /Review 1 of 4/, 'the review walks through each new thing');
-  assert.match(await page.textContent('.cr-where'), /Planner · Assignment · Tomorrow · 5 PM · #English/, 'it says where the item landed');
+  assert.match(await page.textContent('.cr-where'), /Schedule · Assignment · Tomorrow · 5 PM · #English/, 'it says where the item landed');
   await page.waitForSelector('.cr-hole');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/review.png` });
   assert.equal(await page.locator('[data-task-id].pending').count() > 0, true, 'new items are dashed until kept');
@@ -171,45 +171,61 @@ async function run(url) {
   await page.click('[data-test="review-drop"]');
   assert.equal(await page.$('[data-test="capture-review"]'), null, 'the review is done');
 
-  // Planner: what the inbox sent is here.
-  await page.click(tab('Planner'));
-  await page.click('[data-test="view-schedule"]');
+  // Schedule: what Add sent is here. No Tasks or Agenda views any more.
+  await page.click(tab('Schedule'));
   await page.click('[data-test="cal-day"]');
   await page.waitForSelector('[data-test="schedule"]');
-  assert.equal(await page.$('[data-test="planner"] [data-test="remind"]'), null, 'task reminders live on the Profile page, not in the Planner');
-  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/planner-head.png`, clip: { x: 0, y: 60, width: 1440, height: 200 } });
-  assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Planner opens on the Schedule, with today\'s activity by category');
-  await page.click('[data-test="view-tasks"]');
-  // Tasks sit in one column per category; find a row by what it says.
-  const row = text => page.locator('.pln-col [data-test="task"]', { hasText: text }).first();
-  assert.equal(await page.$('[data-test="group-when"]'), null, 'tasks are always grouped by category, with no Group by switch');
-  assert.match(await row('Essay 2').textContent(), /Essay 2[\s\S]*Assignment[\s\S]*#English[\s\S]*5 PM[\s\S]*High/, 'a deadline tomorrow shows its kind, #project, time and high priority');
-  assert.match(await row('Gym').textContent(), /Gym[\s\S]*Mon Wed Fri[\s\S]*6 PM/, 'habits repeat on their days');
-  assert.match(await page.textContent('[data-test="planner"]'), /Update your CV and LinkedIn[\s\S]*Land a summer internship/, 'goal milestones are tasks linked to the goal');
-  // Deleting is one click, with Undo in a notification.
-  const before = await page.locator('[data-test="task"]').count();
-  const haircutRow = row('Haircut');
-  // Hovering shows the actions over the card without making it taller.
-  const h0 = (await haircutRow.boundingBox()).height;
-  await haircutRow.hover();
-  assert.ok(Math.abs((await haircutRow.boundingBox()).height - h0) < 1, 'hovering a card does not change its height');
-  await haircutRow.locator('[data-test="task-delete"]').click();
-  assert.equal(await page.locator('[data-test="task"]').count(), before - 1, 'a task is deleted at once');
+  assert.equal(await page.$('[data-test="view-tasks"], [data-test="view-agenda"]'), null, 'the Schedule has no Tasks or Agenda views');
+  assert.equal(await page.$('[data-test="planner"] [data-test="remind"]'), null, 'task reminders live on the Profile page');
+  assert.match(await page.textContent('.sch-list'), /activity[\s\S]*Haircut/, 'the Schedule shows today\'s activity by category');
+  // A row in the activity list, found by what it says, and its editor.
+  const row = text => page.locator('[data-test="sch-row"]', { hasText: text }).first();
+  const edit = async text => { await row(text).locator('button[aria-label^="Edit "]').click(); return row(text).locator('[data-test="task-edit"]'); };
+  // Deleting is one click in the editor, with Undo in a notification.
+  const before = await page.locator('[data-test="sch-row"]').count();
+  await (await edit('Haircut')).locator('[aria-label="Delete"]').click();
+  assert.equal(await page.locator('[data-test="sch-row"]').count(), before - 1, 'a task is deleted at once');
   await page.click('[data-test="toast"]:has-text("Haircut") .toast-act');
-  assert.equal(await page.locator('[data-test="task"]').count(), before, 'Undo brings it back');
-  if (process.env.SHOTS) { const b = await page.locator('.pln-main').boundingBox(); await row('Essay 2').hover(); await page.screenshot({ path: `${process.env.SHOTS}/rows.png`, clip: { x: b.x, y: b.y, width: b.width, height: Math.min(b.height, 620) } }); }
-  await row('List 15 places').locator('[data-test="task-check"]').click();
-  assert.match(await page.textContent('.pln-main'), /Show 1 done/, 'a ticked task moves to the done list');
+  assert.equal(await page.locator('[data-test="sch-row"]').count(), before, 'Undo brings it back');
+  // Ticked things sink to the bottom of their category.
+  await row('Haircut').locator('.sch-check').click();
+  assert.equal(await page.$$eval('.sch-group', gs => gs.filter(g => { const r = [...g.querySelectorAll('[data-test="sch-row"]')]; const i = r.findIndex(x => x.classList.contains('done')); return i >= 0 && r.slice(i).some(x => !x.classList.contains('done')); }).length), 0, 'done things come last in each category');
   // Suggestions live on the Overview.
-  assert.equal(await page.$('[data-test="planner"] [data-test="suggestions"]'), null, 'the Planner has no suggestions bar');
   await page.click(tab('Overview'));
   const idea = page.locator('[data-test="suggestion"]', { hasText: 'Work on Essay 2 today' });
   await idea.locator('[data-test="suggestion-add"]').click();
-  await page.click(tab('Planner'));
+  await page.click(tab('Schedule'));
   assert.ok(await row('Work on Essay 2').count(), 'an accepted suggestion becomes a task for today');
+  // Pick a day from the month calendar: tomorrow has the essay.
+  await page.click('[data-test="sch-today"]');
+  await page.waitForSelector('[data-test="sch-pick"]');
+  assert.equal(await page.locator('[data-test="sch-pick"] .sch-pick-d').count(), 42, 'the day picker shows a six-week month');
+  if (process.env.SHOTS) { const b = await page.locator('[data-test="sch-pick"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/daypicker.png`, clip: { x: b.x - 20, y: b.y - 60, width: b.width + 40, height: b.height + 80 } }); }
+  await page.click(`[data-test="pick-${inDays(1)}"]`);
+  assert.equal(await page.$('[data-test="sch-pick"]'), null, 'picking a day closes the picker');
+  assert.match(await row('Essay 2').textContent(), /Essay 2[\s\S]*Assignment[\s\S]*English[\s\S]*High/, 'a deadline shows its kind, #project and high priority');
+  // The editor: AI breakdown (rules here, since no model runs in the test), a goal, and the pickers.
+  const editor = await edit('Essay 2');
+  await editor.locator('[data-test="breakdown"]').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-test="task-edit"] .tk-subs li').length === 6);
+  await editor.locator('[data-test="task-goal"]').selectOption({ label: 'Run a 10K' });
+  await editor.locator('[data-test="time-field"]').click();
+  await page.waitForSelector('[data-test="time-pop"]');
+  if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
+  await page.fill('[data-test="time-pop"] .tp-type', '4:30pm');
+  await page.press('[data-test="time-pop"] .tp-type', 'Enter');
+  assert.match(await editor.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
+  await editor.locator('[data-test="date-field"]').click();
+  await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
+  assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
+  // A click outside the row closes its editor.
+  await page.click('.sch-title');
+  assert.equal(await page.$('[data-test="sch-row"] [data-test="task-edit"]'), null, 'clicking outside closes the row editor');
+  await page.click('[data-test="sch-today"]');
+  await page.click('.sch-pick-today');
   // Calendars: in the Schedule header. A Canvas link brings assignments in, with the course as the project.
-  await page.click('[data-test="view-schedule"]');
-  await page.click('[data-test="cal-day"]');
   await page.click('[data-test="calendars-open"]');
   assert.deepEqual(await page.$$eval('.cal-ways button', b => b.map(x => x.textContent.trim())), ['Link', 'File', 'Holidays', 'Type it'], 'more than one way to add a calendar');
   await page.fill('[data-test="feed-url"]', 'webcal://school.instructure.com/feeds/calendars/user_abc.ics');
@@ -224,31 +240,13 @@ async function run(url) {
   await page.setInputFiles('[data-test="cal-file"]', { name: 'class.ics', mimeType: 'text/calendar', buffer: Buffer.from(['BEGIN:VCALENDAR', 'X-WR-CALNAME:Uni', 'BEGIN:VEVENT', 'UID:x-1', `DTSTART:${inDays(0).replace(/-/g, '')}T150000`, `DTEND:${inDays(0).replace(/-/g, '')}T160000`, 'SUMMARY:Office hours', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n')) });
   await page.waitForSelector('[data-test="sch-box"]:has-text("Office hours")');
   await page.click('[data-test="calendars-open"]');
-  await page.click('[data-test="view-tasks"]');
-  assert.match(await row('Lab report').textContent(), /Lab report[\s\S]*Assignment[\s\S]*#CHEM 110[\s\S]*Calendar/, 'Canvas items become assignments with the course');
-  // AI breakdown (rules here, since no model runs in the test).
-  await row('Essay 2').hover();
-  await row('Essay 2').locator('[data-test="row-breakdown"]').click();
-  assert.match(await row('Essay 2').textContent(), /0\/6/, 'the assignment is broken into six steps');
-  // Editing a task: link it to a goal.
-  await row('Essay 2').locator('[data-test="task-goal"]').selectOption({ label: 'Run a 10K' });
-  // The date and time pickers: one design everywhere.
-  const editor = row('Essay 2').locator('[data-test="task-edit"]');
-  await editor.locator('[data-test="time-field"]').click();
-  await page.waitForSelector('[data-test="time-pop"]');
-  if (process.env.SHOTS) { const b = await page.locator('[data-test="time-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/timepicker.png`, clip: { x: b.x - 60, y: b.y - 50, width: b.width + 120, height: b.height + 70 } }); }
-  await page.fill('[data-test="time-pop"] .tp-type', '4:30pm');
-  await page.press('[data-test="time-pop"] .tp-type', 'Enter');
-  assert.match(await editor.locator('[data-test="time-field"]').textContent(), /4:30 PM/, 'a typed time is picked');
-  await editor.locator('[data-test="date-field"]').click();
-  await page.waitForSelector('[data-test="date-pop"] .dp-day.today');
-  assert.equal(await page.locator('[data-test="date-pop"] .dp-day').count(), 42, 'the date picker shows a six-week month');
-  if (process.env.SHOTS) { const b = await page.locator('[data-test="date-pop"]').boundingBox(); await page.screenshot({ path: `${process.env.SHOTS}/datepicker.png`, clip: { x: b.x - 120, y: b.y - 60, width: b.width + 240, height: b.height + 80 } }); }
-  await page.keyboard.press('Escape');
-  assert.equal(await page.$('[data-test="date-pop"]'), null, 'Escape closes the date picker');
-  assert.match(await row('Essay 2').textContent(), /Run a 10K/, 'a task shows the goal it moves forward');
-  // Week and month live in the Schedule.
-  await page.click('[data-test="view-schedule"]');
+  // The Canvas assignment is on its due day, with the course as the category.
+  await page.click('[data-test="sch-today"]');
+  await page.click(`[data-test="pick-${inDays(3)}"]`);
+  assert.match(await row('Lab report').textContent(), /Lab report[\s\S]*Assignment[\s\S]*CHEM 110/, 'Canvas items become assignments with the course');
+  await page.click('[data-test="sch-today"]');
+  await page.click('.sch-pick-today');
+  // Week and month live in the Schedule; the list follows them, by category.
   await page.click('[data-test="cal-week"]');
   assert.equal(await page.locator('.cal-dh').count(), 7, 'the week has seven days');
   const wk = page.locator('.cal-col.today [data-test="cal-item"]').first();
@@ -277,9 +275,8 @@ async function run(url) {
     assert.ok(Math.abs(card.y - (nav.y + nav.height)) < 2 && card.y + card.height <= vh + 1, `the suggestions stay in view below the top bar (${JSON.stringify({ nav, card, vh })})`);
     assert.equal(await page.locator('.fcs-side .pln-card').evaluate(e => getComputedStyle(e).overflowY), 'auto', 'long suggestions scroll inside the panel'); }
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.click('[data-test="nav-planner"]');
+  await page.click('[data-test="nav-schedule"]');
   // Schedule: today's list by category and a time line with a column per category.
-  await page.click('[data-test="view-schedule"]');
   await page.click('[data-test="cal-day"]');
   // The day covers all 24 hours, in a window that opens on the hours with activities.
   { const g = await page.locator('.sch-grid').evaluate(el => ({ labels: el.querySelectorAll('.sch-axis span').length, scrolls: el.scrollHeight > el.clientHeight + 10, top: el.scrollTop }));
@@ -305,7 +302,7 @@ async function run(url) {
   await page.waitForSelector('.sch-body');
   await page.click('[data-test="sch-next"]');
   await page.click('[data-test="sch-today"]');
-  await page.click('[data-test="view-tasks"]');
+  await page.click('.sch-pick-today');
 
   // Your details live in your profile; the AI page has no digest settings while digests are on hold.
   await page.click('[data-test="account"]');
@@ -331,20 +328,22 @@ async function run(url) {
   assert.match(await page.textContent('[data-test="brief"]'), /Today you have[\s\S]*deadline/, 'the brief describes the day');
   assert.equal(await page.$('[data-test="ai-brief"]'), null, 'no separate AI note; the next step is part of the summary');
   const tg = await page.textContent('[data-test="today-goals"]');
-  assert.ok(/Land a summer internship[\s\S]*1\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress: the ticked milestone counts');
+  assert.ok(/Land a summer internship[\s\S]*0\/6/.test(tg) && /Run a 10K/.test(tg), 'goals show progress');
   assert.equal(await page.$('[data-test="today-digest"]'), null, 'no digest card on Today for now');
   if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/today.png`, fullPage: true });
 
   // Search everything; typed text becomes an action.
   await page.fill('[data-test="search"]', 'essay');
   await page.waitForSelector('[data-test="search-pop"]');
-  assert.match(await page.textContent('[data-test="search-pop"]'), /Planner[\s\S]*Essay 2/, 'tasks show up in search');
+  assert.match(await page.textContent('[data-test="search-pop"]'), /Schedule[\s\S]*Essay 2/, 'tasks show up in search');
   await page.fill('[data-test="search"]', 'I want to learn Spanish this year');
   assert.equal(await page.getAttribute('[data-test="search-pop"] .gs-item >> nth=0', 'data-test'), 'act-goal', 'goal-like text offers a goal first');
   await page.fill('[data-test="search"]', 'dentist tomorrow 3pm');
-  assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to Planner[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-Planner action');
+  assert.match(await page.textContent('[data-test="act-task"]'), /Add “Dentist” to your schedule[\s\S]*Tomorrow · 3 PM/, 'typed plans become an add-to-schedule action');
   await page.press('[data-test="search"]', 'Enter');
-  await page.waitForFunction(() => [...document.querySelectorAll('.pln-col [data-test="task"]')].some(r => /Dentist[\s\S]*Tomorrow/.test(r.textContent)), null, { timeout: 5000 });
+  // It opens on its day, with its card open.
+  await page.waitForSelector('.sch-sheet:has-text("Dentist")', { timeout: 5000 });
+  await page.click('.sch-title');
   const unreadCount = async () => Number((await page.textContent('[data-test="bell-count"]').catch(() => '0')).replace('+', '')) || 0;
   const unread0 = await unreadCount();
   await page.click('[data-test="bell"]');
@@ -439,7 +438,7 @@ async function run(url) {
   mobile.on('pageerror', e => errors.push(`mobile page error: ${e.message}`));
   await fakeNetwork(mobile);
   await mobile.goto(url, { waitUntil: 'load' });
-  for (const p of ['Overview', 'Planner', 'Focus', 'Reports']) {
+  for (const p of ['Overview', 'Schedule', 'Focus', 'Reports']) {
     await mobile.click(tab(p));
     await mobile.waitForTimeout(150);
     const over = await mobile.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -462,26 +461,17 @@ async function run(url) {
   const timings = { fill: Number(filled.match(/in (\d+) ms/)[1]) };
   const time = async (name, act, ready) => { const t0 = Date.now(); await act(); await full.waitForSelector(ready); timings[name] = Date.now() - t0; if (process.env.SHOTS) await full.screenshot({ path: `${process.env.SHOTS}/full-${name}.png` }); };
   await time('today', () => full.click(tab('Overview')), '[data-test="today-goals"]');
-  await time('schedule', async () => { await full.click(tab('Planner')); await full.click('[data-test="view-schedule"]'); await full.click('[data-test="cal-day"]'); }, '[data-test="sch-box"]');
+  await time('schedule', async () => { await full.click(tab('Schedule')); await full.click('[data-test="cal-day"]'); }, '[data-test="sch-box"]');
   await time('week', () => full.click('[data-test="cal-week"]'), '.cal-dh');
   await time('month', () => full.click('[data-test="cal-month"]'), '.cal-mcell');
-  await time('tasks', () => full.click('[data-test="view-tasks"]'), '.pln-group');
-  // Long lists stay short: one column per category shows a few, then "Show N more".
-  assert.ok(await full.locator('.pln-col').count() >= 4, 'tasks sit in side-by-side columns');
-  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"]').count(), 'tasks have a column per project');
-  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() <= 7, 'a long column shows only the first few');
-  assert.equal(await full.$$eval('.pln-col', cols => cols.filter(c => { const rows = [...c.querySelectorAll('[data-test="task"]')]; const i = rows.findIndex(r => r.classList.contains('done')); return i >= 0 && rows.slice(i).some(r => !r.classList.contains('done')); }).length), 0, 'in Tasks, done things come last in each column');
-  await full.click('.pln-col[data-group="#Chemistry"] .pln-more');
-  assert.ok(await full.locator('.pln-col[data-group="#Chemistry"] [data-test="task"]').count() > 7, 'Show more opens the rest');
-  await full.click('[data-test="view-agenda"]');
-  assert.equal(await full.locator('[data-test="agenda-day"]').count(), 14, 'the agenda is a column per day');
-  // Done things sit at the bottom of every list.
-  const doneFirst = sel => full.$$eval(sel, cols => cols.filter(c => { const rows = [...c.querySelectorAll('[data-test="task"]')]; const i = rows.findIndex(r => r.classList.contains('done')); return i >= 0 && rows.slice(i).some(r => !r.classList.contains('done')); }).length);
-  assert.equal(await doneFirst('[data-test="agenda-day"]'), 0, 'in the agenda, done things come last each day');
+  // With a full month, the list stays a summary: categories folded, done things last when opened.
+  assert.ok(await full.locator('.sch-group [data-test="sch-fold"]').count() >= 5, 'the month list is one folded line per category');
+  await full.locator('.sch-group [data-test="sch-fold"]').first().click();
+  assert.equal(await full.$$eval('.sch-group', gs => gs.filter(g => { const r = [...g.querySelectorAll('[data-test="sch-row"]')]; const i = r.findIndex(x => x.classList.contains('done')); return i >= 0 && r.slice(i).some(x => !x.classList.contains('done')); }).length), 0, 'done things come last in each category');
   await full.click(tab('Overview'));
   assert.ok(await full.locator('[data-test="today-list"] [data-test="task"]').count() <= 5, 'Overview shows only what is next');
   assert.match(await full.textContent('[data-test="today-more"]'), /\d+ more today/, 'the rest is one tap away');
-  await time('search', () => (async () => { await full.click(tab('Planner')); await full.fill('[data-test="search"]', 'lab'); })(), '[data-test="search-pop"]');
+  await time('search', () => (async () => { await full.click(tab('Schedule')); await full.fill('[data-test="search"]', 'lab'); })(), '[data-test="search-pop"]');
   const n = await full.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.startsWith('budgie.v3'))) || '{}').tasks?.length || 0);
   console.log('with sample data:', n, 'tasks;', Object.entries(timings).map(([k, v]) => `${k} ${v} ms`).join(', '));
   for (const [k, v] of Object.entries(timings)) assert.ok(v < 2500, `${k} stays quick with sample data (${v} ms)`);
