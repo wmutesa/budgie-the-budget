@@ -58,7 +58,9 @@ export async function breakDown(text) {
   if (store.digest?.geminiKey) {
     try {
       const d = new Date();
-      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone);
+      // Your own categories, so items land in them; the rules' split as a checklist so nothing is missed.
+      const categories = [...new Set([...Object.keys(store.projects || {}), ...store.tasks.map(t => t.project).filter(Boolean)])].slice(0, 60);
+      const { items } = await geminiBreakdown(text, isoDay(d), d.toLocaleDateString('en-US', { weekday: 'long' }), Intl.DateTimeFormat().resolvedOptions().timeZone, categories, rules.split('\n').filter(Boolean).slice(0, 200));
       const lines = (items || []).map(itemLine).filter(Boolean).join('\n');
       if (count(lines) >= Math.ceil(count(rules) * 0.6)) { capture.via = 'Gemini'; return lines; }
     } catch { /* no key on the server yet, the free limit, or offline: carry on */ }

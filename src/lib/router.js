@@ -45,6 +45,20 @@ const WHEN_WORD = '(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|t
 const CONTEXT = /^(?:(?:for|in)\s+(?:my\s+)?([a-z][\w&-]*(?:\s+\d{2,4})?)(?:\s+(?:class|course|module|unit))?\s*[,:]?\s+(?=(?:i|we|there|a|an|the|my)\b)|([a-z][\w&-]*(?:\s+\d{2,4})?)\s+(?:class|course|homework)\s*[:,]\s*)/i;
 const NOT_COURSE = /^(?:the|a|an|this|next|today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|work|home|now|then|me|it)$/i;
 
+// Assignments listed without a verb or "a": "Lab Report 3 due Friday and Problem Set 7 due the 18th".
+// Split at "and" or a comma when both sides have their own "due", so "Homework 5.2 and 5.3 due Monday" stays one.
+function splitDue(part) {
+  const bits = part.split(/\s*,\s*(?:and\s+)?|\s+and\s+/i);
+  if (bits.length < 2) return [part];
+  const seps = part.match(/\s*,\s*(?:and\s+)?|\s+and\s+/gi) || [];
+  const out = [bits[0]];
+  bits.slice(1).forEach((b, i) => {
+    const last = out[out.length - 1];
+    if (/\bdue\b/i.test(last) && /\bdue\b/i.test(b)) out.push(b); else out[out.length - 1] = `${last}${seps[i]}${b}`;
+  });
+  return out;
+}
+
 export function splitSpoken(text) {
   const sentences = String(text)
     .replace(/\r/g, '')
@@ -64,12 +78,13 @@ export function splitSpoken(text) {
     const m = s.match(CONTEXT);
     const course = m && (m[1] || m[2]);
     if (course && !NOT_COURSE.test(course)) { tag = ` #${course.replace(/\s+/g, '')}`; s = s.slice(m[0].length); }
-    const parts = s.replace(AND_SPLIT, '\n').replace(COMMA_SPLIT, '\n').split('\n');
+    const parts = s.replace(AND_SPLIT, '\n').replace(COMMA_SPLIT, '\n').split('\n').flatMap(splitDue);
     for (const p of parts) {
       const clean = p.trim()
         .replace(/^(?:and|so|okay|ok|um+|uh+|well)\b[,\s]*/i, '')
         .replace(/^(?:add|remind me to|remember to|don't forget to|i need to|i have to|i've got to|i gotta|i must|i should)\s+/i, '')
-        .replace(/^(?:i have|i've got|i got|there's|there is|we have)\s+(?=(?:a|an|the|my|our|two|three|\d)\b)/i, '')
+        .replace(/^(?:i have|i've got|i got|i also have|there's|there is|we have)\s+(?!to\b)/i, '')
+        .replace(/^(?:have|has|got)\s+(?=(?:a|an|the|my|our)\b)/i, '')
         .replace(/^(?:a|an|the)\s+(?=\S)/i, '')
         .replace(/[.,;]+$/, '')
         .replace(/·/g, '.')

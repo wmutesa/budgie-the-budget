@@ -429,11 +429,12 @@ async function routes(request, env, url) {
     const key = `gemini-split:${user.id}`;
     if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Budgie used its own rules instead.');
     await countFailure(env, key);
-    const { text, today, weekday, timeZone } = await body(request);
+    const { text, today, weekday, timeZone, categories, hints } = await body(request);
+    const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
-      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60) }) });
+      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160) }) });
     } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
   }
   if (path === '/api/gemini/check' && method === 'POST') {

@@ -107,13 +107,17 @@ const SPLIT_SCHEMA = {
   },
   required: ['items'],
 };
-export async function geminiSplit(key, { text: said, today, weekday, timeZone }) {
+export async function geminiSplit(key, { text: said, today, weekday, timeZone, categories = [], hints = [] }) {
   const prompt = `You turn a dictated or typed planner note into a list of separate items for a student's calendar.
 Today is ${weekday}, ${today} (time zone ${timeZone || 'UTC'}).
 People say many things at once (sometimes 50 or more) without pausing. List EVERY separate item, in the order said: assignments, exams, classes, tasks, errands, events, routines, habits and goals. Never merge two items and never drop one. Split lists like "an essay due Friday and a quiz Monday" into two items. When a course or subject is said once for several items ("for chemistry I have X and Y"), give each that course. Carry a shared verb ("call mom Sunday and dad Saturday" is two calls).
-For each item: a short title without the date or time ("Lab report", "Call mom"); kind (assignment for homework, essays, reports and problem sets; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday" or "next Tuesday" (the next such day after today), empty if none; time in 24-hour HH:MM, empty if none; minutes if a length was said; repeat and days for things that recur; course if one applies.
-Fix words speech recognition clearly misheard. Do not add anything that was not said.
-
+For each item: the title is the item's FULL name exactly as said, keeping numbers, chapter or section numbers and subtitles ("Lab Report 3: Titration Analysis", "Problem Set 7", "Essay on the French Revolution", "Read chapter 7 of the biology textbook"), but without the date, time, "due", "I have" or filler; kind (assignment for homework, essays, reports and problem sets; exam for tests, quizzes and midterms; class for lectures, seminars and labs that repeat; event for meetings, appointments and plans with a time; routine for habits that repeat; goal for something to achieve by a date; otherwise task); date as YYYY-MM-DD worked out from words like "tomorrow", "Friday", "next Tuesday" (the next such day after today), "the 18th" (the next 18th), "Friday the 21st" (the 21st: a day number wins over a weekday), "11/20" (month/day), "in two weeks" or "end of the month" (its last day); empty if none; time in 24-hour HH:MM ("midnight" or "end of day" is 23:59, "noon" is 12:00), empty if none; minutes if a length was said; repeat and days for things that recur; course: the category, taken from a spoken "hashtag X" or "#X", a course code ("CHEM 110", "CS 61A"), "for <subject>", or the subject in the name ("psych midterm" is Psychology).
+${categories.length ? `The person already uses these categories; when an item belongs to one, use its exact name: ${categories.join(', ')}.
+` : ''}Fix words speech recognition clearly misheard. Do not add anything that was not said.
+${hints.length ? `
+A simple splitter found these parts; use them only as a checklist so nothing is missed (the note itself is what counts):
+${hints.map(h => `- ${h}`).join('\n')}
+` : ''}
 Note:
 ${said}`;
   const res = await fetch(`${API}/${MODEL}:generateContent`, {

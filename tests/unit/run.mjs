@@ -296,6 +296,46 @@ await check('the Gemini answer is checked before it is used', async () => {
     assert.deepEqual(items[1], { title: 'Gym', kind: 'task', date: '', time: '', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' }, 'bad kinds, dates, times and days are cleaned');
   } finally { globalThis.fetch = realFetch; }
 });
+await check('assignments keep their full names, their dates and the right category', () => {
+  const rows = breakDownRules('for chemistry I have Lab Report 3 Titration Analysis due November 14th at 11:59 pm and Problem Set 7 due the 18th. For history the essay on the French Revolution is due Friday the 21st. Hashtag calculus homework 5.2 and 5.3 due next Monday. English 101 reading response on chapter 4 of The Great Gatsby due tomorrow at noon. Psych midterm on December 2nd. Biology quiz 4 on cell respiration this Thursday hashtag bio');
+  const got = rows.map(r => [r.task.title, r.task.date.slice(5), r.task.time, r.task.project, r.task.kind]);
+  assert.deepEqual(got.map(g => g[0]), ['Lab Report 3 Titration Analysis', 'Problem Set 7', 'Essay on the French Revolution', 'Homework 5.2 and 5.3', 'English 101 reading response on chapter 4 of The Great Gatsby', 'Psych midterm', 'Biology quiz 4 on cell respiration']);
+  assert.deepEqual(got.map(g => g[3]), ['Chemistry', 'Chemistry', 'History', 'Calculus', 'English 101', 'Psychology', 'Biology']);
+  assert.deepEqual(got.map(g => g[4]), ['assignment', 'assignment', 'assignment', 'assignment', 'assignment', 'exam', 'exam']);
+  assert.equal(got[0][1], '11-14'); assert.equal(got[0][2], '23:59');
+  assert.equal(got[1][1].slice(3), '18', '"the 18th" is the 18th');
+  assert.equal(got[2][1].slice(3), '21', '"Friday the 21st" is the 21st');
+  assert.equal(got[5][1], '12-02');
+});
+await check('course codes, numeric dates, two-word subjects and spoken hashtags', () => {
+  const rows = breakDownRules('MATH 201 problem set 9 due 11/20 at 9 am and the MATH 201 midterm is on the 3rd. CS 61A Project 2: Linked Lists due in two weeks hashtag computer science. Spanish oral presentation due end of the month. I also have a stats lab writeup due Wednesday at 5 pm, a reading quiz in econ on Friday, and an art history paper due December 10th at midnight');
+  assert.deepEqual(rows.map(r => r.task.title), ['MATH 201 problem set 9', 'MATH 201 midterm', 'CS 61A Project 2: Linked Lists', 'Spanish oral presentation', 'Stats lab writeup', 'Reading quiz in econ', 'Art history paper']);
+  assert.deepEqual(rows.map(r => r.task.project), ['MATH 201', 'MATH 201', 'Computer Science', 'Spanish', 'Statistics', 'Economics', 'Art History']);
+  assert.deepEqual(rows.map(r => r.task.kind), ['assignment', 'exam', 'assignment', 'assignment', 'assignment', 'exam', 'assignment']);
+  assert.equal(rows[0].task.date.slice(5), '11-20'); assert.equal(rows[0].task.time, '09:00');
+  assert.equal(rows[1].task.date.slice(8), '03');
+  assert.equal(rows[6].task.date.slice(5), '12-10'); assert.equal(rows[6].task.time, '23:59');
+});
+await check('a category you already use is kept, whatever the case or short form', () => {
+  const saved = store.projects;
+  store.projects = { Biology: { color: '#16a34a' }, 'CHEM 110': { color: '#7c3aed' } };
+  try {
+    const rows = breakDownRules('quiz on Friday hashtag bio. lab report due Monday #chem110. reading for biology tomorrow');
+    assert.deepEqual(rows.map(r => r.task.project), ['Biology', 'CHEM 110', 'Biology']);
+  } finally { store.projects = saved; }
+});
+await check('Gemini is given your categories and a checklist of what was said', async () => {
+  const realFetch = globalThis.fetch;
+  let sent = '';
+  globalThis.fetch = async (url, opts) => { sent = JSON.parse(opts.body).contents[0].parts[0].text; return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[]}' }] } }] }) }; };
+  try {
+    await geminiSplit('k'.repeat(30), { text: 'lab report friday', today: '2026-11-08', weekday: 'Sunday', categories: ['Chemistry', 'CHEM 110'], hints: ['Lab report friday'] });
+    assert.match(sent, /already uses these categories[^\n]*Chemistry, CHEM 110/);
+    assert.match(sent, /checklist[\s\S]*- Lab report friday/);
+    assert.match(sent, /FULL name exactly as said/);
+    assert.match(sent, /Friday the 21st/);
+  } finally { globalThis.fetch = realFetch; }
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

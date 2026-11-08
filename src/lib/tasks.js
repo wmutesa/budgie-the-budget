@@ -62,7 +62,7 @@ export function makeTask(fields = {}) {
 // ---------- quick add: "essay due fri 5pm #english !" ----------
 const KIND_RULES = [
   ['exam', /\b(exam|midterm|final exam|finals|quiz|test)\b/i],
-  ['assignment', /\b(assignment|essay|homework|hw|problem set|pset|lab report|paper|report|project due|submission|submit|reading response|discussion post)\b/i],
+  ['assignment', /\b(assignment|essay|homework|hw|problem set|pset|lab report|lab write-?up|write-?up|paper|report|project \d+|project due|project:|presentation|worksheet|case study|draft|outline|thesis|dissertation|portfolio|poster|submission|submit|reading response|response paper|discussion post|annotated bibliography|bibliography|exercises?)\b/i],
   ['class', /\b(class|lecture|seminar|lab|tutorial|program|workshop|course|attendance|attend|practice|rehearsal)\b/i],
   ['routine', /\b(wake up|wake|shower|breakfast|lunch|dinner|eat|gym|workout|work out|run|jog|walk|sleep|bed|meditate|journal|stretch|skincare|call (my )?(friends?|mom|dad|family|parents))\b/i],
   ['event', /\b(meeting|meet|appointment|dentist|doctor|interview|party|event|dinner with|lunch with|date|concert|game|birthday|wedding|flight|trip)\b/i],
@@ -99,6 +99,46 @@ function readTime(h, m, ap) {
 }
 
 // Parse one line into task fields. Returns { title, date, time, mins, repeat, priority, project, kind, found: [...chips] }.
+// ---------- categories from what was said ----------
+// Common subjects, spoken short or long, to one name each.
+const SUBJECTS = {
+  chem: 'Chemistry', chemistry: 'Chemistry', ochem: 'Organic Chemistry', bio: 'Biology', biology: 'Biology', physics: 'Physics',
+  psych: 'Psychology', psychology: 'Psychology', calc: 'Calculus', calculus: 'Calculus', math: 'Math', maths: 'Math', algebra: 'Algebra',
+  geometry: 'Geometry', stats: 'Statistics', statistics: 'Statistics', econ: 'Economics', economics: 'Economics', english: 'English',
+  lit: 'Literature', literature: 'Literature', writing: 'Writing', history: 'History', geography: 'Geography', spanish: 'Spanish',
+  french: 'French', german: 'German', chinese: 'Chinese', mandarin: 'Mandarin', japanese: 'Japanese', latin: 'Latin', arabic: 'Arabic',
+  philosophy: 'Philosophy', phil: 'Philosophy', sociology: 'Sociology', soc: 'Sociology', anthropology: 'Anthropology', anthro: 'Anthropology',
+  gov: 'Government', government: 'Government', 'poli sci': 'Political Science', 'political science': 'Political Science',
+  cs: 'Computer Science', 'comp sci': 'Computer Science', 'computer science': 'Computer Science', programming: 'Programming', coding: 'Programming',
+  art: 'Art', music: 'Music', drama: 'Drama', accounting: 'Accounting', finance: 'Finance', marketing: 'Marketing', business: 'Business',
+  engineering: 'Engineering', nursing: 'Nursing', anatomy: 'Anatomy', law: 'Law', health: 'Health', pe: 'PE',
+  'art history': 'Art History', 'organic chemistry': 'Organic Chemistry', 'creative writing': 'Creative Writing', 'data science': 'Data Science',
+  'public health': 'Public Health', 'environmental science': 'Environmental Science', 'world history': 'World History', 'us history': 'US History',
+  'earth science': 'Earth Science', 'social studies': 'Social Studies', 'computer engineering': 'Computer Engineering', 'machine learning': 'Machine Learning',
+};
+const SUBJECT_RE = new RegExp(`\\b(${Object.keys(SUBJECTS).sort((a, b) => b.length - a.length).join('|').replace(/ /g, '\\s+')})\\b`, 'i');
+// A course code said in passing: "CHEM 110", "English 101", "MATH201".
+const COURSE_CODE = /\b([A-Z][A-Za-z]{1,11}|[A-Z]{2,5})\s?(\d{3,4}[A-Z]?|\d{2}[A-Z])\b/;
+// The name a category should have: one you already use (any case, or what a
+// short form starts: "bio" files under your "Biology"), a known subject, or
+// the words as said.
+export function categoryName(raw) {
+  const said = String(raw || '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!said) return '';
+  const key = said.toLowerCase();
+  const mine = [...new Set([...Object.keys(store.projects || {}), ...(store.tasks || []).map(t => t.project).filter(Boolean)])];
+  const squash = x => x.toLowerCase().replace(/\s+/g, '');
+  const exact = mine.find(p => squash(p) === squash(said));
+  if (exact) return exact;
+  const subject = SUBJECTS[key];
+  const bySubject = subject && mine.find(p => squash(p) === squash(subject));
+  if (bySubject) return bySubject;
+  const starts = key.length >= 3 && mine.find(p => p.toLowerCase().startsWith(key));
+  if (starts) return starts;
+  if (subject) return subject;
+  return said.replace(/^./, c => c.toUpperCase());
+}
+
 export function parseTask(raw, now = new Date()) {
   let text = ` ${String(raw).trim()} `;
   const out = { date: '', time: '', end: '', mins: null, repeat: null, priority: 'medium', project: '' };
@@ -110,7 +150,7 @@ export function parseTask(raw, now = new Date()) {
   take(/\s!{1,3}(?=\s)|\b(urgent|asap|important|high priority|top priority)\b/i, () => { out.priority = 'high'; found.push('High priority'); });
   take(/\b(low priority|someday|whenever|no rush)\b/i, () => { out.priority = 'low'; found.push('Low priority'); });
   // Project: "#english" or "#side-project".
-  take(/\s#([\p{L}\d][\p{L}\d_-]*)/u, m => { out.project = m[1].replace(/[-_]/g, ' ').replace(/^./, c => c.toUpperCase()); found.push(`#${out.project}`); });
+  take(/\s#([\p{L}\d][\p{L}\d_-]*)/u, m => { out.project = categoryName(m[1]); found.push(`#${out.project}`); });
   // Duration: "for 30 min", "1.5h", "2 hours".
   take(/\b(?:for\s+)?(\d+(?:\.\d+)?)\s*(h|hrs?|hours?|m|mins?|minutes?)\b/i, m => {
     out.mins = Math.round(Number(m[1]) * (/^h/i.test(m[2]) ? 60 : 1));
@@ -158,6 +198,16 @@ export function parseTask(raw, now = new Date()) {
     }) ||
     take(new RegExp(`\\b(?:due|by|on|before)?\\s*${MONTH_RE}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, 'i'), m => monthDay(m[1], m[2])) ||
     take(new RegExp(`\\b(?:due|by|on|before)?\\s*(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?${MONTH_RE}\\b`, 'i'), m => monthDay(m[2], m[1])) ||
+    // "the 18th", "Friday the 21st", "due the 3rd": the number of the day wins over a weekday said with it.
+    take(new RegExp(`\\b(?:(?:due|by|on|before)\\s+)?(?:(?:next|this)\\s+)?(?:${DAY_RE},?\\s+)?the\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?!\\s+(?:century|floor|amendment|edition|grade|place|time|chapter|page))`, 'i'), m => {
+      const n = Number(m[m.length - 1]); // the weekday pattern has its own group; the day number is the last one
+      if (n < 1 || n > 31) return false;
+      const d = new Date(now.getFullYear(), now.getMonth(), n);
+      if (d.getDate() !== n) return false;
+      if (isoDay(d) < base) d.setMonth(d.getMonth() + 1);
+      if (d.getDate() !== n) return false;
+      setDate(isoDay(d));
+    }) ||
     take(/\b(?:due|by|on|before)\s+(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)\b/i, m => {
       const d = new Date(now.getFullYear(), now.getMonth(), Number(m[1]));
       if (d.getDate() !== Number(m[1])) return false;
@@ -213,8 +263,17 @@ export function parseTask(raw, now = new Date()) {
   // What is left is the title.
   let title = text.replace(/\s+(due|by|on|at|for|from|every|before|until)\s*$/i, ' ').replace(/^\s*(remind me to|remember to|i need to|need to|i have to|have to|todo:?|to do:?)\s+/i, '');
   title = title.replace(/\s+(due|by|on|at)\s+(?=[,.;]|$)/gi, ' ').replace(/\s+/g, ' ').replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, '').trim();
+  title = title.replace(/\s+(?:is|are|was|were|will be|that's|which is)$/i, '').trim();
   if (!title) title = 'New task';
   title = title.charAt(0).toUpperCase() + title.slice(1);
+  // No #category said: a course code or a subject in the name gives one (the name itself stays whole).
+  if (!out.project) {
+    const code = ` ${raw} `.match(COURSE_CODE);
+    const subj = title.match(SUBJECT_RE);
+    if (code && !/^(?:room|page|chapter|unit|lab|set|homework|hw|exercise|problem|week|day|year|grade)$/i.test(code[1])) out.project = categoryName(`${code[1]} ${code[2]}`);
+    else if (subj) out.project = categoryName(SUBJECTS[subj[1].toLowerCase().replace(/\s+/g, ' ')] || subj[1]);
+    if (out.project) found.push(`#${out.project}`);
+  }
   const kind = guessKind(` ${raw} `, Boolean(out.repeat));
   // A time is enough: the usual length fills in when none is given.
   if (out.time && !out.mins) out.mins = DEFAULT_MINS[kind] || 30;
