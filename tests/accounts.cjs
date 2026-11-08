@@ -202,6 +202,18 @@ async function main() {
     assert.equal(old.status, 401, 'making new codes cancels the old ones');
     await lost.context.close();
 
+    // The owner can switch to the Admin view: counts and states for everyone, never their words.
+    await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="view-admin"]');
+    await owner.page.waitForSelector('[data-test="admin-people"] .adm-table');
+    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['People', 'Voice', 'Errors', 'Sync', 'AI usage', 'Calendars'], 'the Admin view has its own pages');
+    assert.match(await owner.page.textContent('[data-test="admin-people"]'), /Alex/, 'People lists everyone');
+    for (const t of ['voice', 'errors', 'sync', 'ai-usage', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-box`); }
+    const memberAdmin = await alex.page.evaluate(async () => (await fetch('/api/admin/summary')).status);
+    assert.equal(memberAdmin, 403, 'members cannot see the Admin view');
+    await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="view-user"]');
+    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['Overview', 'Schedule'], 'back to the user view');
     // The owner removes Alex, whose session stops working.
     await owner.page.click('[data-test="account"]');
     await owner.page.click('[data-test="menu-settings"]');

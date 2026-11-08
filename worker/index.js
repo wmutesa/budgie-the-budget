@@ -87,6 +87,15 @@ async function tooManyAttempts(env, key, max = MAX_FAILED_RECOVERIES) {
   const row = await env.DB.prepare('SELECT count, window_start FROM attempts WHERE key = ?').bind(key).first();
   return Boolean(row && now() - row.window_start < 3600e3 && row.count >= max);
 }
+// Daily usage counts for the owner's Admin pages: how often voice and AI were used, and how often they failed.
+// Counts only: never what was said.
+let usageReady = false;
+async function bump(env, userId, key) {
+  try {
+    if (!usageReady) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS usage_daily (day TEXT NOT NULL, user_id TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, user_id, key))').run(); usageReady = true; }
+    await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, 1) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + 1').bind(new Date().toISOString().slice(0, 10), userId, key).run();
+  } catch { /* counting never gets in the way */ }
+}
 async function countFailure(env, key) {
   await env.DB.prepare(
     `INSERT INTO attempts (key, count, window_start) VALUES (?1, 1, ?2)
@@ -448,8 +457,10 @@ async function routes(request, env, url) {
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
     try {
-      return json({ items: await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) }) });
-    } catch (e) { return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
+      const items = await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) });
+      await bump(env, user.id, 'split-budgie');
+      return json({ items });
+    } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Budgie AI could not be reached.').slice(0, 200)); }
   }
   // Diagnostics from the Add card (states and counts, never words), so a
   // problem on one device can be traced. The newest 50 per person are kept.
@@ -465,7 +476,9 @@ async function routes(request, env, url) {
     await env.DB.prepare('CREATE TABLE IF NOT EXISTS diag_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, ua TEXT, build TEXT, events TEXT NOT NULL)').run();
     await env.DB.prepare('INSERT INTO diag_logs (user_id, created_at, ua, build, events) VALUES (?, ?, ?, ?, ?)')
       .bind(user.id, now(), String(parsed.ua || '').slice(0, 300), String(parsed.build || '').slice(0, 120), JSON.stringify(parsed.events.slice(0, 400))).run();
-    await env.DB.prepare('DELETE FROM diag_logs WHERE user_id = ? AND id NOT IN (SELECT id FROM diag_logs WHERE user_id = ? ORDER BY id DESC LIMIT 50)').bind(user.id, user.id).run();
+    await env.DB.prepare('DELETE FROM diag_logs WHERE user_id = ? AND id NOT IN (SELECT id FROM diag_logs WHERE user_id = ? ORDER BY id DESC LIMIT 500)').bind(user.id, user.id).run();
+    // Kept for 30 days, then gone.
+    await env.DB.prepare('DELETE FROM diag_logs WHERE created_at < ?').bind(now() - 30 * 86400e3).run();
     return json({ ok: true });
   }
   // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
@@ -474,7 +487,7 @@ async function routes(request, env, url) {
     const key = `voice-live:${user.id}`;
     if (await tooManyAttempts(env, key, 2000)) return fail(429, 'A lot of talking this hour. Live words pause; Stop still works.');
     await countFailure(env, key);
-    const { audio, prompt, terms } = await body(request);
+    const { audio, prompt, terms, partial: partialReq } = await body(request);
     // Keyterms (the person's categories, course codes and task names) help the model spell them their way.
     const words = (Array.isArray(terms) ? terms : []).filter(x => typeof x === 'string').slice(0, 50).map(x => x.replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(Boolean);
     if (typeof audio !== 'string' || !audio || audio.length > 3 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That piece of audio could not be read.');
@@ -492,14 +505,16 @@ async function routes(request, env, url) {
         // Whisper sometimes hands back its own prompt (what was said before): not new words.
         const flat = x => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
         const echo = text && flat(text).length > 6 && flat(initial).includes(flat(text));
+        await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-whisper${text && !ghost(text) && !echo ? '' : '-empty'}`);
         return json({ text: ghost(text) || echo ? '' : text, via: 'whisper' });
       } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
     const data = await accountData(env, user.id);
     const gkey = tidyKey(data?.digest?.geminiKey);
     if (keyShapeOk(gkey)) {
-      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
+      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-gemini`); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
     }
+    await bump(env, user.id, 'live-failed');
     return fail(503, lastErr ? `Live words are not available right now (${lastErr}).` : 'Live words are not available right now.');
   }
   // Hear a recording with the person's own Gemini key: what was said, word for word, and every item in it.
@@ -580,6 +595,63 @@ async function routes(request, env, url) {
     if (results.length <= 1) return fail(400, 'You need at least one passkey to sign in.');
     await env.DB.prepare('DELETE FROM credentials WHERE id = ? AND user_id = ?').bind(passkey[1], user.id).run();
     return json({ ok: true });
+  }
+
+  // --- Admin (owner only): counts and states for the Admin view, never anyone's words ---
+  if (path === '/api/admin/summary' && method === 'GET') {
+    if (user.role !== 'owner') return fail(403, 'Only the owner can see the Admin view.');
+    const since = now() - 7 * 86400e3;
+    const users = (await env.DB.prepare(`SELECT u.id, u.name, u.role, u.created_at,
+        (SELECT COUNT(*) FROM credentials c WHERE c.user_id = u.id) AS passkeys,
+        (SELECT MAX(last_used_at) FROM credentials c WHERE c.user_id = u.id) AS last_signin,
+        (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?1) AS sessions,
+        d.version, d.updated_at, LENGTH(d.data) AS bytes, d.data
+      FROM users u LEFT JOIN user_data d ON d.user_id = u.id ORDER BY u.created_at`).bind(now()).all()).results;
+    let logs = [];
+    try { logs = (await env.DB.prepare('SELECT user_id, created_at, ua, build, events FROM diag_logs WHERE created_at > ? ORDER BY id').bind(since).all()).results; } catch { /* no logs yet */ }
+    let usage = [];
+    try { usage = (await env.DB.prepare('SELECT day, user_id, key, n FROM usage_daily WHERE day >= ? ORDER BY day').bind(new Date(since).toISOString().slice(0, 10)).all()).results; } catch { /* nothing counted yet */ }
+    const browser = ua => { const u = String(ua || ''); const dev = /iPhone|iPad/.test(u) ? 'iPhone' : /Android/.test(u) ? 'Android' : /Mac/.test(u) ? 'Mac' : /Windows/.test(u) ? 'Windows' : 'Other'; const br = /CriOS|Chrome\//.test(u) && !/Edg\//.test(u) ? 'Chrome' : /Edg\//.test(u) ? 'Edge' : /Firefox|FxiOS/.test(u) ? 'Firefox' : /Safari/.test(u) ? 'Safari' : 'Other'; return `${dev} · ${br}`; };
+    const per = {}; const errors = {}; const builds = {}; const voice = {};
+    for (const l of logs) {
+      let ev = []; try { ev = JSON.parse(l.events); } catch { continue; }
+      const p = per[l.user_id] ||= { lastSeen: 0, recordings: 0, heard: 0, empty: 0, micBlocked: 0, silent: 0, conflicts: 0, opens: 0 };
+      p.lastSeen = Math.max(p.lastSeen, l.created_at);
+      const b = browser(l.ua);
+      const v = voice[b] ||= { recordings: 0, heard: 0, empty: 0, failed: 0, micBlocked: 0, silent: 0, quietRescued: 0 };
+      const key = `${b} · ${l.build || '?'}`;
+      builds[key] = Math.max(builds[key] || 0, l.created_at);
+      for (const e of ev) {
+        if (e.what === 'mounted') p.opens++;
+        if (e.what === 'listening') { p.recordings++; v.recordings++; }
+        if (e.what === 'piece-text') { if (e.chars) { p.heard++; v.heard++; } else { p.empty++; v.empty++; } }
+        if (e.what === 'piece-failed') v.failed++;
+        if (e.what === 'mic-failed') { p.micBlocked++; v.micBlocked++; }
+        if (e.what === 'silent') { p.silent++; v.silent++; }
+        if (e.what === 'stop-send-all') v.quietRescued++;
+        if (e.what === 'account' && /another device/.test(e.note || '') && e.sync === 'saved') p.conflicts++;
+        if (e.what === 'window-error' || e.what === 'unhandled') { const m = String(e.msg || '').slice(0, 140); const r = errors[m] ||= { msg: m, n: 0, last: 0, where: b }; r.n++; r.last = Math.max(r.last, l.created_at); }
+      }
+    }
+    const people = users.map(u => {
+      let data = {}; try { data = JSON.parse(u.data || '{}'); } catch { /* unreadable */ }
+      const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+      const weekAgo = new Date(since).toISOString().slice(0, 10);
+      const focusMins = (Array.isArray(data.focusLog) ? data.focusLog : []).filter(x => String(x.at || '') >= weekAgo).reduce((n, x) => n + (Number(x.mins) || 0), 0);
+      const added = tasks.filter(t => String(t.createdAt || '') >= weekAgo).length;
+      const feeds = (Array.isArray(data.feeds) ? data.feeds : []).map(f => ({ name: String(f.name || 'Calendar').slice(0, 60), kind: f.kind || '', count: f.count || 0, error: f.error ? String(f.error).slice(0, 80) : '', at: f.lastSync || f.at || null }));
+      const p = per[u.id] || {};
+      return { id: u.id, name: u.name, role: u.role, created: u.created_at, passkeys: u.passkeys, sessions: u.sessions, lastSeen: Math.max(u.last_signin || 0, p.lastSeen || 0, u.updated_at || 0) || null, bytes: u.bytes || 0, version: u.version || 0, tasks: tasks.length, open: tasks.filter(t => !t.done).length, added, goals: Array.isArray(data.goals) ? data.goals.length : 0, focusMins, vocab: Array.isArray(data.vocab) ? data.vocab.length : 0, learned: Array.isArray(data.vocab) ? data.vocab.filter(v => v.heard).length : 0, feeds, recordings: p.recordings || 0, heard: p.heard || 0, empty: p.empty || 0, micBlocked: p.micBlocked || 0, silent: p.silent || 0, conflicts: p.conflicts || 0 };
+    });
+    const totals = {};
+    for (const r of usage) totals[r.key] = (totals[r.key] || 0) + r.n;
+    return json({
+      at: now(), days: 7, limitBytes: MAX_DATA_BYTES, people,
+      voice: Object.entries(voice).map(([where, v]) => ({ where, ...v })),
+      errors: Object.values(errors).sort((a, b) => b.n - a.n).slice(0, 40),
+      builds: Object.entries(builds).map(([k, at]) => ({ device: k.split(' · ').slice(0, 2).join(' · '), build: k.split(' · ').slice(2).join(' · '), at })).sort((a, b) => b.at - a.at).slice(0, 40),
+      usage: { totals, days: usage },
+    });
   }
 
   // --- people (owner only) ---

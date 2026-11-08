@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import Icon from './Icon.vue';
 import { avatar } from '../lib/profile';
 import { account, signOut } from '../lib/account';
-import { go } from '../lib/nav';
+import { go, nav, setMode } from '../lib/nav';
 
 // The avatar in the top right (the one round thing in Budgie) and its menu:
 // Settings, Privacy, the tour, and Sign out.
@@ -33,6 +33,10 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
       <div class="am-who">
         <b>{{ account.user?.name }}</b>
         <span class="muted small">{{ isOwner ? 'Owner' : 'Member' }} · {{ account.sync === 'offline' ? 'offline' : 'synced' }}</span>
+      </div>
+      <div v-if="isOwner" class="am-view" role="group" aria-label="View">
+        <button type="button" :class="{ on: nav.mode !== 'admin' }" :aria-pressed="nav.mode !== 'admin'" data-test="view-user" @click="open = false; setMode('user')"><Icon name="user" :size="14" />User view</button>
+        <button type="button" :class="{ on: nav.mode === 'admin' }" :aria-pressed="nav.mode === 'admin'" data-test="view-admin" @click="open = false; setMode('admin')"><Icon name="shield" :size="14" />Admin view</button>
       </div>
       <button type="button" role="menuitem" data-test="menu-settings" @click="to('Settings')"><Icon name="gear" :size="16" />Settings</button>
       <button type="button" role="menuitem" data-test="menu-privacy" @click="to('Privacy')"><Icon name="shield" :size="16" />Privacy</button>

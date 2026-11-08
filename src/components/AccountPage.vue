@@ -223,6 +223,7 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
         <section class="set-sec">
           <div class="set-sec-head acct-sec-head"><h2>What Budgie keeps</h2></div>
           <p class="small muted">Your planner lives in your account and on this device. Your calendar links stay private, like a password to that calendar. When you record, only short pieces of audio go to Budgie's server to be written down, and they are not kept.</p>
+          <p class="small muted" data-test="privacy-diag">To keep recording working, Budgie notes what the Add card did (opened, microphone on, words heard or not, errors), never the words themselves. Those notes are deleted after 30 days. The owner of this Budgie sees counts and states for each person, never anyone's tasks or words.</p>
         </section>
       </template>
 

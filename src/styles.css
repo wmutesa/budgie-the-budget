@@ -3857,3 +3857,29 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .vc-list button { width: 20px; height: 20px; display: grid; place-items: center; border: 0; background: none; color: #71717a; cursor: pointer; padding: 0; }
 .vc-list button:hover { color: #18181b; }
 .vc-kicker { margin: 6px 0 0; font-weight: 600; color: #52525b; }
+
+/* ===== Admin view ===== */
+.adm { padding: 22px 18px 32px; display: grid; gap: 16px; align-content: start; background: #fbfbfc; min-height: calc(100dvh - var(--nav-h, 64px)); }
+.adm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.adm-kicker { margin: 0; font: 600 11px var(--mono, ui-monospace, monospace); letter-spacing: .08em; text-transform: uppercase; color: #7c3aed; }
+.adm-head h1 { margin: 4px 0 0; font: 700 28px/1.1 var(--display, var(--sans)); }
+.adm-head p { margin: 6px 0 0; }
+.adm-box { background: #fff; border: 1px solid #ececf0; padding: 16px 18px; overflow-x: auto; }
+.adm-box h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+.adm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.adm-table th { text-align: left; font-weight: 600; font-size: 11.5px; color: #71717a; padding: 8px 10px; border-bottom: 1px solid #ececf0; white-space: nowrap; }
+.adm-table td { padding: 10px; border-bottom: 1px solid #f4f4f5; color: #27272a; vertical-align: middle; }
+.adm-table td.bad { color: #b91c1c; font-weight: 600; }
+.adm-role { margin-left: 8px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; padding: 1px 6px; background: #f4f4f5; color: #52525b; }
+.adm-msg { font-family: var(--mono, ui-monospace, monospace); font-size: 12px; max-width: 520px; overflow-wrap: anywhere; }
+.adm-ok { margin-left: 6px; font-size: 11px; color: #047857; background: #ecfdf5; padding: 1px 6px; }
+.adm-old { margin-left: 6px; font-size: 11px; color: #b45309; background: #fffbeb; padding: 1px 6px; }
+.adm-bar { display: inline-block; width: 90px; height: 6px; margin-right: 8px; background: #f4f4f5; vertical-align: middle; }
+.adm-bar i { display: block; height: 100%; background: #a78bfa; }
+.adm-bar i.bad { background: #ef4444; }
+.adm-error { color: #b91c1c; }
+.adm-foot { margin: 4px 0 0; }
+/* The view switch in the avatar menu */
+.am-view { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; margin: 2px 0 6px; background: #f4f4f5; }
+.am-menu .am-view button { height: 32px; justify-content: center; font-size: 12.5px; gap: 6px; padding: 0 6px; }
+.am-menu .am-view button.on { background: #fff; color: #18181b; font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .06); }

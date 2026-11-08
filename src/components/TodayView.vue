@@ -70,10 +70,6 @@ const nextStep = computed(() => {
         <div class="pln-ring td-ring" :style="{ '--p': pct }" role="img" :aria-label="`${pct}% of today done`"><b>{{ pct }}%</b><span>done</span></div>
         <p v-if="habits.length" class="muted small td-habits">{{ habits.filter(h => items.some(x => x.task === h.t && x.done)).length }} of {{ habits.filter(h => items.some(x => x.task === h.t)).length }} habits today</p>
       </div>
-    <p class="brief-acts">
-      <button type="button" class="btn small primary" data-test="today-add" @click="capture.open = true"><Icon name="capture" :size="14" />Add something</button>
-      <button type="button" class="btn small" @click="go('Schedule')"><Icon name="calendar" :size="14" />Open Schedule</button>
-    </p>
     </div>
   </section>
   </div>

@@ -292,6 +292,7 @@ export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', 
 export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', body: payload });
 // Live words: one short piece of a recording, written down by Budgie's server.
 // terms: the person's own words (categories, course codes, task names), to help the speech model spell them.
+export const adminSummary = () => api('/api/admin/summary');
 export const liveWords = (audio, prompt, terms = [], partial = false) => api('/api/voice/live', { method: 'POST', body: { audio, prompt, terms, partial } }).then(r => r.text || '');
 export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/gemini/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 // Budgie's own server AI: the same breakdown, for everyone, without a key.

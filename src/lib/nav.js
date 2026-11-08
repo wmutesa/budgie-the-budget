@@ -5,8 +5,17 @@ import { store } from './store';
 
 // The pages in the top bar; Settings and Privacy open from the avatar menu.
 export const PAGES = ['Overview', 'Schedule'];
-export const ALL_PAGES = [...PAGES, 'Settings', 'Privacy'];
-export const nav = reactive({ page: 'Overview', anchor: '', task: '', day: '' });
+// The owner's Admin view has its own pages (counts and states, never anyone's words).
+export const ADMIN_PAGES = ['People', 'Voice', 'Errors', 'Sync', 'AI usage', 'Calendars'];
+export const ALL_PAGES = [...PAGES, ...ADMIN_PAGES, 'Settings', 'Privacy'];
+const savedMode = (() => { try { return localStorage.getItem('budgie.view') === 'admin' ? 'admin' : 'user'; } catch { return 'user'; } })();
+// mode: 'user' (your planner) or 'admin' (the owner's view of how Budgie is doing), remembered on this device.
+export const nav = reactive({ page: 'Overview', anchor: '', task: '', day: '', mode: savedMode });
+export function setMode(mode) {
+  nav.mode = mode === 'admin' ? 'admin' : 'user';
+  try { localStorage.setItem('budgie.view', nav.mode); } catch { /* fine */ }
+  nav.page = nav.mode === 'admin' ? ADMIN_PAGES[0] : 'Overview';
+}
 // "Planner" was the Schedule's old name; links that still use it land there.
 export const go = (page, { anchor = '', task = '' } = {}) => {
   if (page === 'Planner') page = 'Schedule';

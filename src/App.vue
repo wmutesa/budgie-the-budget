@@ -16,7 +16,8 @@ import GlobalSearch from './components/GlobalSearch.vue';
 import Icon from './components/Icon.vue';
 import Toasts from './components/Toasts.vue';
 import { toast } from './lib/toast';
-import { nav, PAGES, go } from './lib/nav';
+import { nav, PAGES, ADMIN_PAGES, go } from './lib/nav';
+import AdminPage from './components/AdminPage.vue';
 import { refreshFeeds } from './lib/calendar';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
@@ -30,7 +31,10 @@ import { store } from './lib/store';
 // from the avatar. The Add button adds anything from anywhere; Lock In (the
 // timer) starts from any activity.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar' };
+const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', People: 'user', Voice: 'mic', Errors: 'help', Sync: 'refresh', 'AI usage': 'sparkle', Calendars: 'calendar' };
+// The owner can switch to the Admin view (from the avatar menu); everyone else sees their planner.
+const adminView = computed(() => nav.mode === 'admin' && account.user?.role === 'owner');
+const tabs = computed(() => (adminView.value ? ADMIN_PAGES : PAGES));
 // First-run guide: once per person, after their data has loaded; replayable from the account menu.
 const touring = ref(false);
 // AI starts once someone is signed in, so the sign-in page downloads nothing.
@@ -102,7 +106,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
           <span class="muted small nb-date">{{ today }}</span>
         </div>
         <nav class="nb-pages" aria-label="Pages">
-          <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase()}`" @click="active = p">
+          <button v-for="p in tabs" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase().replace(/\s+/g, '-')}`" @click="active = p">
             <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
           </button>
         </nav>
@@ -121,6 +125,9 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
       </template>
       <template v-else-if="active === 'Schedule'">
         <PlannerView />
+      </template>
+      <template v-else-if="ADMIN_PAGES.includes(active)">
+        <AdminPage :section="active" />
       </template>
       <template v-else-if="active === 'Settings'">
         <AccountPage kind="settings" />
