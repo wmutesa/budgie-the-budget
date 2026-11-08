@@ -495,7 +495,7 @@ async function routes(request, env, url) {
     await bump(env, user.id, 'stream-nova');
     try {
       return await env.AI.run('@cf/deepgram/nova-3', {
-        encoding: 'linear16', sample_rate: '16000', channels: 1,
+        encoding: 'linear16', sample_rate: '16000', channels: '1',
         interim_results: true, smart_format: true, punctuate: true, endpointing: '400',
       }, { websocket: true });
     } catch (e) {
