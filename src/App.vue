@@ -119,7 +119,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
   <div v-else class="app">
     <main class="grid hl canvas">
       <!-- The navigation is the first row of the grid: one slim bar that adapts to the width. -->
-      <header ref="navBar" class="cell nav-bar span-12">
+      <header ref="navBar" class="cell nav-bar span-12" :class="{ 'nb-user': !adminView }">
         <div class="nb-brand">
           <span class="brand-word">TASKIE</span>
           <span v-if="adminView" class="nb-admin" data-test="admin-badge">Admin</span>
