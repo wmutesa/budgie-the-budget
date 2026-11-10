@@ -4395,3 +4395,6 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
   .sch-row > .sch-steps { grid-column: 2; }
   .sch-row-t { word-break: normal; overflow-wrap: break-word; }
 }
+/* Little side padding: the page uses the full width, 18px from each edge, and the top bar matches. */
+.user-main > .user-page { max-width: none !important; }
+.nav-bar.nb-user { padding-left: 0 !important; padding-right: 0 !important; }
