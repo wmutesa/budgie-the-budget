@@ -4,14 +4,19 @@ import SignIn from './SignIn.vue';
 
 // Taskie's home page for anyone not signed in: one dark section on one screen.
 // A four-column grid drawn in hairlines, a soft glow, a huge thin headline,
-// the kinds of things Taskie sorts as a big list, mono labels, a strip of
-// facts, and the sign-in card right there.
+// the kinds of things Taskie sorts as a big list, mono labels and a strip of
+// facts. Sign in opens from the menu as a side panel.
 const KINDS = ['Assignments', 'Exams', 'Routines', 'Goals'];
 const k = ref(0);
 let t = null;
 onMounted(() => { if (!matchMedia('(prefers-reduced-motion: reduce)').matches) t = setInterval(() => { k.value = (k.value + 1) % KINDS.length; }, 1800); });
 onUnmounted(() => clearInterval(t));
-const toSignIn = () => document.getElementById('signin')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+// Sign in lives in a side panel, opened from the menu (or Start planning).
+const menu = ref(false);
+const toSignIn = () => { menu.value = true; };
+const esc = e => { if (e.key === 'Escape') menu.value = false; };
+onMounted(() => window.addEventListener('keydown', esc));
+onUnmounted(() => window.removeEventListener('keydown', esc));
 const FACTS = [
   ['Nova-3', 'Deepgram hears the whole recording in about a second.'],
   ['Gemini', 'Fixes names, courses and dates from your own planner.'],
@@ -30,7 +35,7 @@ const FACTS = [
       <ul class="hp3-kinds" aria-label="What Taskie sorts">
         <li v-for="(x, i) in KINDS" :key="x" :class="{ on: i === k }">{{ x }}</li>
       </ul>
-      <button type="button" class="hp3-menu" @click="toSignIn">Sign in<span aria-hidden="true" /></button>
+      <button type="button" class="hp3-menu" :aria-expanded="menu" aria-controls="hp3-panel" data-test="home-menu" @click="toSignIn">Sign in<span aria-hidden="true" /></button>
     </header>
 
     <section class="hp3-hero">
@@ -40,8 +45,15 @@ const FACTS = [
         <p class="hp3-sub">Tell Taskie everything on your mind in one go. It hears you, fixes what it misheard from your own courses and names, and turns it into a clean week.</p>
         <button type="button" class="hp3-cta" @click="toSignIn"><span class="hp3-cta-ico" aria-hidden="true"><i /><i /></span>Start planning</button>
       </div>
-      <div id="signin" class="hp3-signin"><SignIn embedded /></div>
     </section>
+
+    <!-- The side panel: sign in, invites, recovery and how passkeys work, all in one place -->
+    <div v-if="menu" class="hp3-scrim" @click="menu = false" />
+    <aside id="hp3-panel" class="hp3-panel" :class="{ open: menu }" :aria-hidden="!menu" aria-label="Sign in">
+      <div class="hp3-panel-top"><span class="hp3-mono">Menu</span><button type="button" class="hp3-close" aria-label="Close" @click="menu = false"><i /><i /></button></div>
+      <div v-if="menu" class="hp3-signin"><SignIn embedded /></div>
+      <p class="hp3-mono hp3-panel-foot">Invite-only · passkeys, no passwords</p>
+    </aside>
 
     <footer class="hp3-facts">
       <div v-for="f in FACTS" :key="f[0]" class="hp3-fact"><b>{{ f[0] }}</b><span>{{ f[1] }}</span><i aria-hidden="true" /></div>

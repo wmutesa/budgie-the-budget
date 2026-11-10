@@ -56,6 +56,7 @@ const inviteFromAdmin = async (page, name) => {
   await page.waitForSelector(`[data-test="admin-pending"]:has-text("${name}")`);
   return page.inputValue('[data-test="admin-invite-link"]');
 };
+const openSignIn = async page => { await page.waitForSelector('[data-test="home-menu"], [data-test="sign-in"]'); if (await page.$('[data-test="home-menu"]')) await page.click('[data-test="home-menu"]'); await page.waitForSelector('[data-test="sign-in"]'); };
 const userView = async page => { await page.click('[data-test="account"]'); await page.click('[data-test="view-user"]'); await page.waitForSelector('.nb-pages'); };
 async function main() {
   execFileSync(wrangler, ['d1', 'migrations', 'apply', 'budgie', '--local', '--persist-to', state], { cwd: root, stdio: 'pipe' });
@@ -112,7 +113,7 @@ async function main() {
     // Signing out clears this device's copy; signing in brings the data back.
     await owner.page.click('[data-test="account"]');
     await owner.page.click('[data-test="sign-out"]');
-    await owner.page.waitForSelector('[data-test="sign-in"]');
+    await openSignIn(owner.page);
     assert.equal(await owner.page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('budgie.v3')).length), 0, 'signing out removes the local copy');
     assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'the session ends on sign-out');
     await owner.page.click('[data-test="sign-in"]');
@@ -295,7 +296,7 @@ async function main() {
     sam.page.removeAllListeners('dialog');
     sam.page.once('dialog', d => d.accept('DELETE'));
     await sam.page.click('[data-test="delete-account"]');
-    await sam.page.waitForSelector('[data-test="sign-in"]');
+    await openSignIn(sam.page);
     assert.equal((await getJSON(sam.page, '/api/data')).status, 401, 'a deleted account is signed out');
     const people = await owner.page.evaluate(async () => (await (await fetch('/api/people')).json()).people.map(p => p.name));
     assert.ok(!people.includes('Sam'), 'a deleted account is gone from People');
