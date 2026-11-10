@@ -14,7 +14,7 @@ Taskie is a planner for students that you talk to. Tap **Add**, say everything o
 | Your tasks, routines, goals, calendar links, details about you, your Gemini key (optional) and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
 | Recordings | Sent once to be heard (Deepgram Nova-3 on Cloudflare, then Gemini), never stored | Nobody keeps them |
 | Training text (Help Taskie hear better, on unless you turn it off) | Text of what was heard and what it became, in D1 | Used to train Taskie; never shown in the Admin view |
-| Passkeys | Your device or your Apple, Google or Microsoft password manager | Only you; Taskie keeps the public half |
+| Passkeys | Your device or your Apple, Google, Microsoft, or Apple password manager | Only you; Taskie keeps the public half |
 
 Nothing personal is ever committed here: no profiles, links, tokens, addresses of private deployments or sample data about real people.
 
