@@ -15,7 +15,8 @@ const MAX_AGE = 3 * 3600e3;
 export const aiIdeas = ref([]);
 export const aiState = ref('idle'); // idle | loading | ready | failed
 let last = { at: 0, sig: '' };
-try { const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if (c && c.day === today()) { aiIdeas.value = c.ideas || []; last = { at: c.at, sig: c.sig }; aiState.value = 'ready'; } } catch { /* fresh */ }
+let failedAt = 0;
+try { const c = JSON.parse(localStorage.getItem(KEY) || 'null'); if (c && c.day === today() && c.ideas?.length) { aiIdeas.value = c.ideas || []; last = { at: c.at, sig: c.sig }; aiState.value = 'ready'; } } catch { /* fresh */ }
 
 // A compact, private-enough picture of the planner: what is open and when.
 export function facts() {
@@ -49,15 +50,17 @@ export async function refreshIdeas({ force = false } = {}) {
   const f = facts();
   const sig = sigOf(f);
   const age = Date.now() - last.at;
+  if (!force && aiState.value === 'failed' && Date.now() - failedAt < 3 * 60e3) return;
   if (!force && aiState.value !== 'failed' && ((sig === last.sig && age < MAX_AGE) || age < MIN_GAP)) return;
   aiState.value = 'loading';
   try {
     const r = await aiNext(f);
-    aiIdeas.value = (r.ideas || []).map((x, i) => ({ ...x, id: `ai-${sig}-${i}` }));
+    if (!r.ideas?.length) throw new Error('no ideas'); // never cache an empty answer: the rules fill in and it tries again
+    aiIdeas.value = r.ideas.map((x, i) => ({ ...x, id: `ai-${sig}-${i}` }));
     last = { at: Date.now(), sig };
     aiState.value = 'ready';
     try { localStorage.setItem(KEY, JSON.stringify({ day: today(), at: last.at, sig, ideas: aiIdeas.value })); } catch { /* fine */ }
-  } catch { aiState.value = 'failed'; }
+  } catch { aiState.value = 'failed'; failedAt = Date.now(); }
 }
 
 // Refresh on its own: when the planner changes (after a pause) and when the page comes back into view.

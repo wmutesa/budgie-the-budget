@@ -619,8 +619,9 @@ ${text}`;
     try {
       const out = await env.AI.run(SPLIT_MODEL, { messages: [{ role: 'user', content: `${prompt}\nReply with JSON {"ideas":[...]} only.` }], response_format: { type: 'json_schema', json_schema: schema }, temperature: 0.6, max_tokens: 1200 });
       let d = out?.response ?? out; if (typeof d === 'string') d = JSON.parse(d.match(/\{[\s\S]*\}/)?.[0] || '{}');
-      await bump(env, user.id, 'next-llama');
-      return json({ ideas: tidy(d.ideas), via: 'llama' });
+      const ideas = tidy(Array.isArray(d) ? d : d?.ideas || d?.suggestions || d?.items);
+      await bump(env, user.id, ideas.length ? 'next-llama' : 'next-llama-empty');
+      return json({ ideas, via: 'llama' });
     } catch { return fail(502, 'Ideas could not be written right now.'); }
   }
   if (path === '/api/gemini/check' && method === 'POST') {
