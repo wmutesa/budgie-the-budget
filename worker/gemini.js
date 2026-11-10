@@ -4,8 +4,34 @@
 // https links only, known tags, dates in the right shape.
 import { TAGS } from './digest.js';
 
-const MODEL = 'gemini-2.5-flash';
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
+// Google retires model names (gemini-2.5-flash stopped working for new keys), so
+// Taskie asks which models the key can use and takes the newest stable Flash
+// (not Lite, preview, image, audio or live variants), remembered for a few hours.
+const FALLBACK_MODEL = 'gemini-flash-latest';
+const picked = new Map(); // per key (hashed by its tail): { model, at }
+const versionOf = name => parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0');
+export async function geminiModel(key, { fresh = false } = {}) {
+  const k = key.slice(-8);
+  const p = picked.get(k);
+  if (!fresh && p && Date.now() - p.at < 6 * 3600e3) return p.model;
+  try {
+    const res = await fetch(`${API}?pageSize=200`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(10000) });
+    const j = await res.json().catch(() => ({}));
+    const names = (j.models || []).filter(m => (m.supportedGenerationMethods || []).includes('generateContent')).map(m => String(m.name || '').replace(/^models\//, ''));
+    const flash = names.filter(n => /^gemini-\d+(\.\d+)?-flash$/.test(n)).sort((a, b) => versionOf(b) - versionOf(a));
+    const model = flash[0] || (names.includes('gemini-flash-latest') ? 'gemini-flash-latest' : '') || names.find(n => /^gemini-[\d.]+-flash/.test(n) && !/lite|image|tts|audio|live|preview|exp/.test(n)) || FALLBACK_MODEL;
+    picked.set(k, { model, at: Date.now() });
+    return model;
+  } catch { return p?.model || FALLBACK_MODEL; }
+}
+// POST to generateContent on the best model; if Google says the model is gone (404), look again once.
+export async function geminiPost(key, body, timeout) {
+  const send = model => fetch(`${API}/${model}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
+  let res = await send(await geminiModel(key));
+  if (res.status === 404) res = await send(await geminiModel(key, { fresh: true }));
+  return res;
+}
 
 // Keys come in more than one format (the classic "AIza…" and newer ones with
 // dots), and pasting can add spaces or quotes. Tidy it, then only check that
@@ -23,7 +49,7 @@ const googleSays = (status, j) => {
 export async function checkKey(raw) {
   const key = tidyKey(raw);
   if (!keyShapeOk(key)) return { ok: false, message: 'That does not look like an API key. Copy it again from Google AI Studio.' };
-  const res = await fetch(`${API}/${MODEL}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
+  const res = await fetch(`${API}/${await geminiModel(key, { fresh: true })}`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(15000) });
   if (res.ok) return { ok: true, message: 'Google accepted the key. What you say in Add will be broken down by Gemini.' };
   const j = await res.json().catch(() => ({}));
   if (res.status === 429) return { ok: true, message: 'The key works, but its free limit is used up for now. Gemini takes over again when it resets; until then Taskie uses its own rules.' };
@@ -47,12 +73,7 @@ Reply with one JSON object inside <digest></digest> tags and nothing after it:
 "action":{"text":the one thing to do this week,"link":https URL or ""},
 "sources":[{"title":string,"url":https URL}]}
 Plain text in every field, no markdown.`;
-  const res = await fetch(`${API}/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.3 } }),
-    signal: AbortSignal.timeout(90000),
-  });
+  const res = await geminiPost(key, { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.3 } }, 90000);
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(googleSays(res.status, j));
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
@@ -153,16 +174,11 @@ ${said}`;
 }
 export async function geminiSplit(key, args) {
   const prompt = splitPrompt(args);
-  const res = await fetch(`${API}/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
+  const res = await geminiPost(key, {
       systemInstruction: SYSTEM,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: SPLIT_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 16000 },
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: SPLIT_SCHEMA, maxOutputTokens: 16000 },
+    }, 60000);
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(googleSays(res.status, j));
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');

@@ -9,10 +9,9 @@
 // with a user's own vocabulary (Deepgram keyterm prompting; CLAS), and giving the
 // LLM the audio as well as the text so it can check a guess against the sound
 // (audio-grounded correction, e.g. "Listen Again and Choose the Right Answer", 2024).
-import { splitPrompt, SPLIT_SCHEMA, cleanItems } from './gemini.js';
+import { splitPrompt, SPLIT_SCHEMA, cleanItems, geminiPost } from './gemini.js';
 
 export const NOVA = '@cf/deepgram/nova-3';
-const GEMINI = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 // Nova-3, batch: the whole recording at once (fast: about a second for a minute of speech).
 export async function novaHear(env, bytes, mime, keyterms = []) {
@@ -45,16 +44,11 @@ ${unsure.length ? `It was unsure of these words: ${unsure.join(', ')}.\n` : ''}L
 Then list the items from that corrected transcript, following these instructions:
 
 ${splitPrompt({ ...args, text: heard })}`;
-  const res = await fetch(GEMINI, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
+  const res = await geminiPost(key, {
       systemInstruction: { parts: [{ text: 'You correct speech recognition with context and turn it into a student planner\'s items. Reply only with JSON that matches the schema.' }] },
       contents: [{ role: 'user', parts: [{ inline_data: { mime_type: String(mime || 'audio/wav').split(';')[0], data: audio } }, { text: prompt }] }],
-      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: HEAR_SCHEMA, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 20000 },
-    }),
-    signal: AbortSignal.timeout(45000),
-  });
+      generationConfig: { temperature: 0.1, responseMimeType: 'application/json', responseSchema: HEAR_SCHEMA, maxOutputTokens: 20000 },
+    }, 45000);
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${String(j?.error?.message || j?.error?.status || 'no details').slice(0, 220)}`);
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
@@ -64,15 +58,10 @@ ${splitPrompt({ ...args, text: heard })}`;
 
 // Fast text-only Gemini call for small jobs (What's next ideas, notifications).
 export async function geminiJson(key, prompt, schema, { timeout = 20000, temperature = 0.6 } = {}) {
-  const res = await fetch(GEMINI, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
+  const res = await geminiPost(key, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema, thinkingConfig: { thinkingBudget: 0 }, maxOutputTokens: 4000 },
-    }),
-    signal: AbortSignal.timeout(timeout),
-  });
+      generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 4000 },
+    }, timeout);
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${String(j?.error?.message || j?.error?.status || 'no details').slice(0, 220)}`);
   return JSON.parse((j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));

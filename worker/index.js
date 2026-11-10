@@ -98,18 +98,11 @@ async function bump(env, userId, key, by = 1) {
     await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, ?) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + excluded.n').bind(new Date().toISOString().slice(0, 10), userId, key, Math.round(by)).run();
   } catch { /* counting never gets in the way */ }
 }
-// The Gemini key to use for someone: their own, else the server's (GEMINI_API_KEY secret),
-// else the owner's saved key, so Gemini is used for everyone whenever there is a key.
+// Gemini only with the person's own key (saved in Settings, AI). Without one,
+// Taskie's free built-in AI (Llama 3.3 on Cloudflare) does the job.
 async function geminiKeyFor(env, user, data) {
   const own = tidyKey(data?.digest?.geminiKey);
-  if (keyShapeOk(own)) return own;
-  const server = tidyKey(env.GEMINI_API_KEY);
-  if (keyShapeOk(server)) return server;
-  if (user.role === 'owner') return '';
-  const row = await env.DB.prepare("SELECT d.data FROM user_data d JOIN users u ON u.id = d.user_id WHERE u.role = 'owner' LIMIT 1").first().catch(() => null);
-  let owner = {}; try { owner = row ? JSON.parse(row.data) : {}; } catch { /* none */ }
-  const k = tidyKey(owner?.digest?.geminiKey);
-  return keyShapeOk(k) && owner?.planner?.shareGemini !== false ? k : '';
+  return keyShapeOk(own) ? own : '';
 }
 // Help Taskie hear better: text pairs (what Nova-3 heard, what it really was) for training. No audio.
 let samplesReady = false;
@@ -762,9 +755,8 @@ ${text}`;
     const optedOut = people.filter(p => p.helpHear === false).length;
     let devices = { devices: 0, people: 0 };
     try { const d = await env.DB.prepare('SELECT COUNT(*) AS n, COUNT(DISTINCT user_id) AS people FROM push_subs').first(); devices = { devices: d.n || 0, people: d.people || 0 }; } catch { /* none yet */ }
-    const ownerData = users.find(x => x.role === 'owner');
-    let ownerKey = false; try { ownerKey = keyShapeOk(tidyKey(JSON.parse(ownerData?.data || '{}')?.digest?.geminiKey)); } catch { /* none */ }
-    const gemini = keyShapeOk(tidyKey(env.GEMINI_API_KEY)) ? 'server' : ownerKey ? 'owner' : 'none';
+    // How many people use their own Gemini key (everyone else gets the free built-in AI).
+    const gemini = { withKey: users.filter(x => { try { return keyShapeOk(tidyKey(JSON.parse(x.data || '{}')?.digest?.geminiKey)); } catch { return false; } }).length, people: users.length };
     let geminiError = null;
     try { const r = await env.DB.prepare("SELECT value FROM app_keys WHERE name = 'gemini_last_error'").first(); geminiError = r ? JSON.parse(r.value) : null; } catch { /* none */ }
     return json({

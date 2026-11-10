@@ -44,7 +44,7 @@ const errorsWeek = computed(() => (data.value?.errors || []).reduce((n, e) => n 
 const stats = computed(() => [
   { label: 'People', value: people.value.length, note: `${activeWeek.value} active this week`, icon: 'user' },
   { label: 'Recordings heard', value: recordings.value, note: `${sum('hear-nova-failed')} failed · Nova-3 ${avg('ms-nova', ['hear-nova']) ?? '–'} ms avg`, icon: 'mic', bad: sum('hear-nova-failed') > 0 },
-  { label: 'Gemini share', value: geminiShare.value == null ? '–' : `${geminiShare.value}%`, note: data.value?.gemini === 'none' ? 'No key yet: add GEMINI_API_KEY' : `Key: ${data.value?.gemini === 'server' ? 'server secret' : "owner's, shared"}`, icon: 'sparkle', warn: data.value?.gemini === 'none' },
+  { label: 'Gemini share', value: geminiShare.value == null ? '–' : `${geminiShare.value}%`, note: `${data.value?.gemini?.withKey ?? 0} of ${data.value?.gemini?.people ?? 0} people use their own key; the rest get the free built-in AI`, icon: 'sparkle', warn: false },
   { label: 'Errors', value: errorsWeek.value, note: `${(data.value?.errors || []).length} different messages`, icon: 'help', bad: errorsWeek.value > 0 },
 ]);
 // A week of activity per day: recordings, typed notes and AI ideas.
@@ -71,8 +71,8 @@ const shownPeople = computed(() => {
 });
 const models = computed(() => [
   { name: 'Deepgram Nova-3', job: 'Hears every recording, boosted with each person’s own words', where: 'Cloudflare Workers AI', calls: sum('hear-nova', 'hear-nova-failed'), misses: sum('hear-nova-failed', 'hear-empty'), ms: avg('ms-nova', ['hear-nova']), state: 'Always · the only transcriber' },
-  { name: 'Gemini 2.5 Flash', job: 'Fixes what Nova-3 misheard from the sound and context; splits notes; ideas; steps', where: 'Google', calls: sum('hear-gemini', 'hear-gemini-failed', 'split-gemini', 'split-gemini-failed', 'next-gemini', 'next-gemini-failed', 'steps-gemini', 'steps-gemini-failed'), misses: sum('hear-gemini-failed', 'split-gemini-failed', 'next-gemini-failed', 'steps-gemini-failed'), ms: avg('ms-gemini-hear', ['hear-gemini']), state: data.value?.gemini === 'none' ? 'Waiting for a key' : 'First choice' },
-  { name: 'Llama 3.3 70B', job: 'Splits and suggests when Gemini is unavailable; teacher for training', where: 'Cloudflare Workers AI', calls: sum('split-llama', 'split-budgie', 'split-llama-failed', 'split-budgie-failed', 'next-llama', 'steps-llama'), misses: sum('split-llama-failed', 'split-budgie-failed'), ms: avg('ms-split-llama', ['split-llama']), state: 'Backup' },
+  { name: 'Gemini Flash (newest)', job: 'Fixes what Nova-3 misheard from the sound and context; splits notes; ideas; steps', where: 'Google', calls: sum('hear-gemini', 'hear-gemini-failed', 'split-gemini', 'split-gemini-failed', 'next-gemini', 'next-gemini-failed', 'steps-gemini', 'steps-gemini-failed'), misses: sum('hear-gemini-failed', 'split-gemini-failed', 'next-gemini-failed', 'steps-gemini-failed'), ms: avg('ms-gemini-hear', ['hear-gemini']), state: 'With each person’s own key' },
+  { name: 'Llama 3.3 70B', job: 'The free built-in AI: splits notes, ideas and steps for everyone without a Gemini key', where: 'Cloudflare Workers AI', calls: sum('split-llama', 'split-budgie', 'split-llama-failed', 'split-budgie-failed', 'next-llama', 'steps-llama'), misses: sum('split-llama-failed', 'split-budgie-failed'), ms: avg('ms-split-llama', ['split-llama']), state: 'Backup' },
   { name: 'Qwen 2.5 (0.5B, 1.5B)', job: 'On-device splitting when the server cannot be reached', where: 'The person’s browser', calls: null, misses: null, ms: null, state: 'Offline backup · fine-tuned daily' },
   { name: 'Taskie rules', job: 'Title Case, nonsense filter, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
 ]);
@@ -266,7 +266,6 @@ const DESC = {
           </div>
         </section>
         <p v-if="data.geminiError" class="adm-callout adm-callout-bad"><Icon name="help" :size="15" />Last Gemini error ({{ ago(data.geminiError.at) }}): <code>{{ data.geminiError.msg }}</code></p>
-        <p v-if="data.gemini === 'none'" class="adm-callout"><Icon name="sparkle" :size="15" />Gemini is not being used yet. Add a <b>GEMINI_API_KEY</b> secret to the Worker in Cloudflare (Workers, budgie, Settings, Variables and secrets), or save your own key in Settings, AI.</p>
       </template>
 
       <!-- Training -->
