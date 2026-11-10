@@ -411,6 +411,19 @@ await check('push: a reminder 10 minutes before, once; nothing for done or pendi
   assert.ok(rows.every(r => /in \d+ min|Starting now/.test(r[3])));
   assert.equal(await planFor(env, 'u1', data, tz), 0, 'never twice');
 });
+const { geminiModel } = await import('../../worker/gemini.js');
+await check('Gemini: the newest stable Flash the key can use is picked by itself', async () => {
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ models: [
+    { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/gemini-3.8-flash-lite', supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/gemini-4.0-flash-preview', supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/gemini-3.10-flash-image', supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] },
+  ] }) });
+  try { assert.equal(await geminiModel('k'.repeat(30) + 'pick1234', { fresh: true }), 'gemini-3.8-flash'); } finally { globalThis.fetch = realFetch; }
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

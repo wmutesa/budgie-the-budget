@@ -71,7 +71,7 @@ const shownPeople = computed(() => {
 });
 const models = computed(() => [
   { name: 'Deepgram Nova-3', job: 'Hears every recording, boosted with each person’s own words', where: 'Cloudflare Workers AI', calls: sum('hear-nova', 'hear-nova-failed'), misses: sum('hear-nova-failed', 'hear-empty'), ms: avg('ms-nova', ['hear-nova']), state: 'Always · the only transcriber' },
-  { name: 'Gemini Flash (newest)', job: 'Fixes what Nova-3 misheard from the sound and context; splits notes; ideas; steps', where: 'Google', calls: sum('hear-gemini', 'hear-gemini-failed', 'split-gemini', 'split-gemini-failed', 'next-gemini', 'next-gemini-failed', 'steps-gemini', 'steps-gemini-failed'), misses: sum('hear-gemini-failed', 'split-gemini-failed', 'next-gemini-failed', 'steps-gemini-failed'), ms: avg('ms-gemini-hear', ['hear-gemini']), state: 'With each person’s own key' },
+  { name: data.value?.geminiModel ? `Gemini · ${data.value.geminiModel.model}` : 'Gemini (newest Flash)', job: 'Fixes what Nova-3 misheard from the sound and context; splits notes; ideas; steps', where: 'Google', calls: sum('hear-gemini', 'hear-gemini-failed', 'split-gemini', 'split-gemini-failed', 'next-gemini', 'next-gemini-failed', 'steps-gemini', 'steps-gemini-failed'), misses: sum('hear-gemini-failed', 'split-gemini-failed', 'next-gemini-failed', 'steps-gemini-failed'), ms: avg('ms-gemini-hear', ['hear-gemini']), state: 'Own keys · newest version, checked hourly' },
   { name: 'Llama 3.3 70B', job: 'The free built-in AI: splits notes, ideas and steps for everyone without a Gemini key', where: 'Cloudflare Workers AI', calls: sum('split-llama', 'split-budgie', 'split-llama-failed', 'split-budgie-failed', 'next-llama', 'steps-llama'), misses: sum('split-llama-failed', 'split-budgie-failed'), ms: avg('ms-split-llama', ['split-llama']), state: 'Backup' },
   { name: 'Qwen 2.5 (0.5B, 1.5B)', job: 'On-device splitting when the server cannot be reached', where: 'The person’s browser', calls: null, misses: null, ms: null, state: 'Offline backup · fine-tuned daily' },
   { name: 'Taskie rules', job: 'Title Case, nonsense filter, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
@@ -265,7 +265,7 @@ const DESC = {
             </table>
           </div>
         </section>
-        <p v-if="data.geminiError" class="adm-callout adm-callout-bad"><Icon name="help" :size="15" />Last Gemini error ({{ ago(data.geminiError.at) }}): <code>{{ data.geminiError.msg }}</code></p>
+        <p v-if="data.geminiError && (!data.geminiModel || data.geminiError.at > data.geminiModel.at)" class="adm-callout adm-callout-bad"><Icon name="help" :size="15" />Last Gemini error ({{ ago(data.geminiError.at) }}): <code>{{ data.geminiError.msg }}</code></p>
       </template>
 
       <!-- Training -->

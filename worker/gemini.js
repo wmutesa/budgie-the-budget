@@ -7,14 +7,15 @@ import { TAGS } from './digest.js';
 const API = 'https://generativelanguage.googleapis.com/v1beta/models';
 // Google retires model names (gemini-2.5-flash stopped working for new keys), so
 // Taskie asks which models the key can use and takes the newest stable Flash
-// (not Lite, preview, image, audio or live variants), remembered for a few hours.
+// (not Lite, preview, image, audio or live variants), checked again every hour,
+// so a new Gemini release is used within the hour without a code change.
 const FALLBACK_MODEL = 'gemini-flash-latest';
 const picked = new Map(); // per key (hashed by its tail): { model, at }
 const versionOf = name => parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || '0');
 export async function geminiModel(key, { fresh = false } = {}) {
   const k = key.slice(-8);
   const p = picked.get(k);
-  if (!fresh && p && Date.now() - p.at < 6 * 3600e3) return p.model;
+  if (!fresh && p && Date.now() - p.at < 3600e3) return p.model;
   try {
     const res = await fetch(`${API}?pageSize=200`, { headers: { 'x-goog-api-key': key }, signal: AbortSignal.timeout(10000) });
     const j = await res.json().catch(() => ({}));
@@ -26,10 +27,13 @@ export async function geminiModel(key, { fresh = false } = {}) {
   } catch { return p?.model || FALLBACK_MODEL; }
 }
 // POST to generateContent on the best model; if Google says the model is gone (404), look again once.
+export const lastModel = { name: '' };
 export async function geminiPost(key, body, timeout) {
   const send = model => fetch(`${API}/${model}:generateContent`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body: JSON.stringify(body), signal: AbortSignal.timeout(timeout) });
-  let res = await send(await geminiModel(key));
-  if (res.status === 404) res = await send(await geminiModel(key, { fresh: true }));
+  let model = await geminiModel(key);
+  let res = await send(model);
+  if (res.status === 404) { model = await geminiModel(key, { fresh: true }); res = await send(model); }
+  if (res.ok) lastModel.name = model;
   return res;
 }
 

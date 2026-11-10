@@ -11,7 +11,7 @@ import { makeDigest, profileFromAccount } from './digest.js';
 import { cloudSplit, SPLIT_MODEL } from './cloudai.js';
 import { novaHear, geminiCorrect, geminiJson } from './hear.js';
 import { vapidKeys, pushTables, wake, queue, scheduledPush } from './push.js';
-import { geminiResearch, geminiSplit, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
+import { geminiResearch, geminiSplit, audioTypeOk, checkKey, tidyKey, keyShapeOk, lastModel } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -94,6 +94,7 @@ async function tooManyAttempts(env, key, max = MAX_FAILED_RECOVERIES) {
 let usageReady = false;
 async function bump(env, userId, key, by = 1) {
   try {
+    if (/^(hear|split|next|steps)-gemini$/.test(key) && lastModel.name) await env.DB.prepare("INSERT INTO app_keys (name, value) VALUES ('gemini_model', ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value").bind(JSON.stringify({ model: lastModel.name, at: now() })).run().catch(() => {});
     if (!usageReady) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS usage_daily (day TEXT NOT NULL, user_id TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, user_id, key))').run(); usageReady = true; }
     await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, ?) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + excluded.n').bind(new Date().toISOString().slice(0, 10), userId, key, Math.round(by)).run();
   } catch { /* counting never gets in the way */ }
@@ -759,8 +760,10 @@ ${text}`;
     const gemini = { withKey: users.filter(x => { try { return keyShapeOk(tidyKey(JSON.parse(x.data || '{}')?.digest?.geminiKey)); } catch { return false; } }).length, people: users.length };
     let geminiError = null;
     try { const r = await env.DB.prepare("SELECT value FROM app_keys WHERE name = 'gemini_last_error'").first(); geminiError = r ? JSON.parse(r.value) : null; } catch { /* none */ }
+    let geminiModel = null;
+    try { const r = await env.DB.prepare("SELECT value FROM app_keys WHERE name = 'gemini_model'").first(); geminiModel = r ? JSON.parse(r.value) : null; } catch { /* none yet */ }
     return json({
-      training: { ...training, optedOut }, push: devices, gemini, geminiError,
+      training: { ...training, optedOut }, push: devices, gemini, geminiError, geminiModel,
       at: now(), days: 7, limitBytes: MAX_DATA_BYTES, people,
       voice: Object.entries(voice).map(([where, v]) => ({ where, ...v })),
       errors: Object.values(errors).sort((a, b) => b.n - a.n).slice(0, 40),
