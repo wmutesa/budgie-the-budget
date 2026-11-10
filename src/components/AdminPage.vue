@@ -265,6 +265,7 @@ const DESC = {
             </table>
           </div>
         </section>
+        <p v-if="data.geminiError" class="adm-callout adm-callout-bad"><Icon name="help" :size="15" />Last Gemini error ({{ ago(data.geminiError.at) }}): <code>{{ data.geminiError.msg }}</code></p>
         <p v-if="data.gemini === 'none'" class="adm-callout"><Icon name="sparkle" :size="15" />Gemini is not being used yet. Add a <b>GEMINI_API_KEY</b> secret to the Worker in Cloudflare (Workers, budgie, Settings, Variables and secrets), or save your own key in Settings, AI.</p>
       </template>
 

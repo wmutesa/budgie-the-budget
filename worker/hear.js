@@ -56,7 +56,7 @@ ${splitPrompt({ ...args, text: heard })}`;
     signal: AbortSignal.timeout(45000),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(res.status === 429 ? 'Gemini free limit reached for now' : `Gemini answered ${res.status}`);
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${String(j?.error?.message || j?.error?.status || 'no details').slice(0, 220)}`);
   const raw = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
   const out = JSON.parse(raw);
   return { transcript: String(out.transcript || '').replace(/[<>]/g, '').trim().slice(0, 12000), items: cleanItems(out.items) };
@@ -74,6 +74,6 @@ export async function geminiJson(key, prompt, schema, { timeout = 20000, tempera
     signal: AbortSignal.timeout(timeout),
   });
   const j = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(res.status === 429 ? 'Gemini free limit reached for now' : `Gemini answered ${res.status}`);
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${String(j?.error?.message || j?.error?.status || 'no details').slice(0, 220)}`);
   return JSON.parse((j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join(''));
 }

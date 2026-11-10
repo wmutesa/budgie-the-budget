@@ -127,6 +127,13 @@ async function alertOwner(env, key, title, body, url = '/') {
     if (owner && await queue(env, owner.id, `admin:${key}`, title, body, url)) await wake(env, owner.id);
   } catch { /* alerts are best effort */ }
 }
+// The last thing Google said when Gemini failed (never the key), for the Admin Models page.
+async function noteGemini(env, e) {
+  try {
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS app_keys (name TEXT PRIMARY KEY, value TEXT NOT NULL)').run();
+    await env.DB.prepare("INSERT INTO app_keys (name, value) VALUES ('gemini_last_error', ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value").bind(JSON.stringify({ at: now(), msg: String(e?.message || e).replace(/AIza[\w-]+/g, '[key]').slice(0, 300) })).run();
+  } catch { /* best effort */ }
+}
 async function countFailure(env, key) {
   await env.DB.prepare(
     `INSERT INTO attempts (key, count, window_start) VALUES (?1, 1, ?2)
@@ -477,7 +484,7 @@ async function routes(request, env, url) {
     const gkey = await geminiKeyFor(env, user, await accountData(env, user.id));
     if (gkey) {
       const tg = Date.now();
-      try { const items = await geminiSplit(gkey, args); await bump(env, user.id, 'split-gemini'); await bump(env, user.id, 'ms-split-gemini', Date.now() - tg); return json({ items, via: 'gemini' }); } catch { await bump(env, user.id, 'split-gemini-failed'); }
+      try { const items = await geminiSplit(gkey, args); await bump(env, user.id, 'split-gemini'); await bump(env, user.id, 'ms-split-gemini', Date.now() - tg); return json({ items, via: 'gemini' }); } catch (e) { await bump(env, user.id, 'split-gemini-failed'); await noteGemini(env, e); }
     }
     try {
       const ts = Date.now();
@@ -538,7 +545,7 @@ async function routes(request, env, url) {
     let out = null, via = 'nova-3 + gemini';
     if (gkey) {
       const t1 = Date.now();
-      try { out = await geminiCorrect(gkey, { audio, mime, heard: nova.text, unsure: nova.unsure, ...args }); await bump(env, user.id, 'hear-gemini'); await bump(env, user.id, 'ms-gemini-hear', Date.now() - t1); } catch (e) { await bump(env, user.id, 'hear-gemini-failed'); }
+      try { out = await geminiCorrect(gkey, { audio, mime, heard: nova.text, unsure: nova.unsure, ...args }); await bump(env, user.id, 'hear-gemini'); await bump(env, user.id, 'ms-gemini-hear', Date.now() - t1); } catch (e) { await bump(env, user.id, 'hear-gemini-failed'); await noteGemini(env, e); }
     }
     if (!out) {
       via = 'nova-3 + llama';
@@ -561,12 +568,13 @@ Task: ${clean(title, 160)}. Kind: ${clean(kind, 20) || 'task'}.${/^\d{4}-\d{2}-\
     const schema = { type: 'object', properties: { steps: { type: 'array', items: { type: 'string' } } }, required: ['steps'] };
     const tidy = l => (Array.isArray(l) ? l : []).map(x => String(x || '').replace(/[<>]/g, '').replace(/^\s*\d+[.)]\s*/, '').trim().slice(0, 80)).filter(Boolean).slice(0, 6);
     const gkey = await geminiKeyFor(env, user, await accountData(env, user.id));
-    if (gkey) { try { const out = await geminiJson(gkey, prompt, schema, { temperature: 0.3, timeout: 15000 }); const st = tidy(out.steps); if (st.length >= 2) { await bump(env, user.id, 'steps-gemini'); return json({ steps: st, via: 'gemini' }); } } catch { await bump(env, user.id, 'steps-gemini-failed'); } }
+    let geminiNote = gkey ? '' : 'no key';
+    if (gkey) { try { const out = await geminiJson(gkey, prompt, schema, { temperature: 0.3, timeout: 15000 }); const st = tidy(out.steps); if (st.length >= 2) { await bump(env, user.id, 'steps-gemini'); return json({ steps: st, via: 'gemini' }); } geminiNote = 'too few steps'; } catch (e) { geminiNote = String(e?.message || e).replace(/AIza[\w-]+/g, '[key]').slice(0, 200); await bump(env, user.id, 'steps-gemini-failed'); await noteGemini(env, e); } }
     try {
       const out = await env.AI.run(SPLIT_MODEL, { messages: [{ role: 'user', content: `${prompt}\nReply with JSON {"steps":[...]} only.` }], response_format: { type: 'json_schema', json_schema: schema }, temperature: 0.3, max_tokens: 500 });
       let d = out?.response ?? out; if (typeof d === 'string') d = JSON.parse(d.match(/\{[\s\S]*\}/)?.[0] || '{}');
       await bump(env, user.id, 'steps-llama');
-      return json({ steps: tidy(d.steps), via: 'llama' });
+      return json({ steps: tidy(d.steps), via: 'llama', geminiNote });
     } catch { return fail(502, 'Steps could not be written right now.'); }
   }
   // --- notifications on laptops and phones (Web Push; see push.js) ---
@@ -624,7 +632,7 @@ ${text}`;
     const data = await accountData(env, user.id);
     const gkey = await geminiKeyFor(env, user, data);
     if (gkey) {
-      try { const out = await geminiJson(gkey, prompt, schema); await bump(env, user.id, 'next-gemini'); return json({ ideas: tidy(out.ideas), via: 'gemini' }); } catch { await bump(env, user.id, 'next-gemini-failed'); }
+      try { const out = await geminiJson(gkey, prompt, schema); await bump(env, user.id, 'next-gemini'); return json({ ideas: tidy(out.ideas), via: 'gemini' }); } catch (e) { await bump(env, user.id, 'next-gemini-failed'); await noteGemini(env, e); }
     }
     try {
       const out = await env.AI.run(SPLIT_MODEL, { messages: [{ role: 'user', content: `${prompt}\nReply with JSON {"ideas":[...]} only.` }], response_format: { type: 'json_schema', json_schema: schema }, temperature: 0.6, max_tokens: 1200 });
@@ -757,8 +765,10 @@ ${text}`;
     const ownerData = users.find(x => x.role === 'owner');
     let ownerKey = false; try { ownerKey = keyShapeOk(tidyKey(JSON.parse(ownerData?.data || '{}')?.digest?.geminiKey)); } catch { /* none */ }
     const gemini = keyShapeOk(tidyKey(env.GEMINI_API_KEY)) ? 'server' : ownerKey ? 'owner' : 'none';
+    let geminiError = null;
+    try { const r = await env.DB.prepare("SELECT value FROM app_keys WHERE name = 'gemini_last_error'").first(); geminiError = r ? JSON.parse(r.value) : null; } catch { /* none */ }
     return json({
-      training: { ...training, optedOut }, push: devices, gemini,
+      training: { ...training, optedOut }, push: devices, gemini, geminiError,
       at: now(), days: 7, limitBytes: MAX_DATA_BYTES, people,
       voice: Object.entries(voice).map(([where, v]) => ({ where, ...v })),
       errors: Object.values(errors).sort((a, b) => b.n - a.n).slice(0, 40),

@@ -4548,3 +4548,5 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 /* The notifications switch is a full pill everywhere, even inside square-cornered Settings. */
 .set .set-page button.you-switch, .set button.you-switch, .is-settings button.you-switch, .adm-set button.you-switch, button.you-switch { border-radius: 999px !important; }
 .set .set-page button.you-switch i, button.you-switch i { border-radius: 50% !important; }
+.adm-callout-bad { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
+.adm-callout code { font-size: 12.5px; overflow-wrap: anywhere; }
