@@ -401,7 +401,7 @@ await check('push: a reminder 10 minutes before, once; nothing for done or pendi
   const d = new Date(); const day = d.toISOString().slice(0, 10);
   const at = new Date(d.getTime() + 7 * 60e3); const hhmm = `${String(at.getUTCHours()).padStart(2, '0')}:${String(at.getUTCMinutes()).padStart(2, '0')}`;
   if (at.toISOString().slice(0, 10) !== day) return; // too close to midnight to test today
-  const data = { tasks: [
+  const data = { planner: { brief: false }, tasks: [
     { id: 'a', title: 'Chem Lab', date: day, time: hhmm },
     { id: 'b', title: 'Done Thing', date: day, time: hhmm, done: true },
     { id: 'c', title: 'Pending Thing', date: day, time: hhmm, pending: true },
