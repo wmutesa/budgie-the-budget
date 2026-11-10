@@ -120,6 +120,13 @@ async function keepSample(env, userId, x) {
       .bind(userId, now(), x.heard.slice(0, 8000), x.transcript.slice(0, 8000), JSON.stringify(x.items.slice(0, 100)), x.via, Math.round(x.ms), x.confidence).run();
   } catch { /* never in the way */ }
 }
+// Notifications for the owner's devices (new people, failures). Never blocks the request.
+async function alertOwner(env, key, title, body, url = '/') {
+  try {
+    const owner = await env.DB.prepare("SELECT id FROM users WHERE role = 'owner' LIMIT 1").first();
+    if (owner && await queue(env, owner.id, `admin:${key}`, title, body, url)) await wake(env, owner.id);
+  } catch { /* alerts are best effort */ }
+}
 async function countFailure(env, key) {
   await env.DB.prepare(
     `INSERT INTO attempts (key, count, window_start) VALUES (?1, 1, ?2)
@@ -305,6 +312,7 @@ async function routes(request, env, url) {
     // New people get recovery codes straight away; so does anyone who has none left.
     const left = (await env.DB.prepare('SELECT COUNT(*) AS n FROM recovery_codes WHERE user_id = ? AND used_at IS NULL').bind(userId).first()).n;
     const recoveryCodes = !invite.user_id || left === 0 ? await issueRecoveryCodes(env, userId) : null;
+    if (!invite.user_id) await alertOwner(env, `join:${userId}`, `${invite.name} joined Taskie 🎉`, 'Their invite was used. See them on the People page.', '/#people');
     return json({ user, recoveryCodes }, 200, { 'Set-Cookie': cookie });
   }
 
@@ -518,6 +526,8 @@ async function routes(request, env, url) {
       nova = await novaHear(env, bytes, String(mime).split(';')[0], strings(terms, 50, 40));
     } catch (e) {
       await bump(env, user.id, 'hear-nova-failed');
+      // The owner hears about it, at most once an hour.
+      await alertOwner(env, `nova-fail:${new Date().toISOString().slice(0, 13)}`, 'A recording could not be heard', `Deepgram Nova-3 failed for ${user.name}: ${String(e?.message || e).slice(0, 90)}`, '/');
       return fail(502, `Deepgram could not hear it (${String(e?.message || e).slice(0, 140)}). Tap Speak and try again.`);
     }
     const novaMs = Date.now() - t0;

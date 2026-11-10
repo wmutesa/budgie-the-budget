@@ -31,7 +31,7 @@ export async function setupPush() {
 export async function enablePush() {
   push.note = '';
   if (!push.supported) {
-    push.note = isIOS() && !standalone() ? 'On iPhone and iPad: tap Share, then Add to Home Screen, open Taskie from there and turn this on.' : 'This browser cannot show notifications from Taskie.';
+    push.note = isIOS() && !standalone() ? 'On iPhone and iPad, Apple only allows notifications for apps on the Home Screen: tap Share, then Add to Home Screen, open Taskie from that icon and turn this on there.' : 'This browser cannot show notifications from Taskie.';
     return false;
   }
   push.busy = true;

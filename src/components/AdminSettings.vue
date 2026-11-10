@@ -32,7 +32,8 @@ async function copy() { try { await navigator.clipboard.writeText(link.value); c
 const notifyOn = computed(() => (push.supported ? push.on : !!store.planner.remind));
 async function toggleNotify() {
   if (notifyOn.value) { if (push.supported) await disablePush(); store.planner.remind = false; return; }
-  if (push.supported) { if (await enablePush()) store.planner.remind = true; }
+  // enablePush explains what to do where it cannot work (iPhone outside the Home Screen).
+  if (await enablePush()) store.planner.remind = true;
 }
 const leaveEverywhere = () => act(async () => { if (!confirm('Sign out on every device, including this one? You will need your passkey to sign in again.')) return; await signOutEverywhere(); });
 </script>
@@ -74,7 +75,7 @@ const leaveEverywhere = () => act(async () => { if (!confirm('Sign out on every 
 
     <div class="adm-two">
       <section class="adm-card" data-test="admin-notify">
-        <div class="adm-card-head"><div><h2>Notifications on this device</h2><p class="adm-note">Reminders, the 8 AM brief and deadlines, even with Taskie closed</p></div><button type="button" class="you-switch" role="switch" :aria-checked="notifyOn" :disabled="push.busy" aria-label="Notifications on this device" @click="toggleNotify"><i /></button></div>
+        <div class="adm-card-head"><div><h2>Notifications on this device</h2><p class="adm-note">New people joining, recordings that fail, plus your own reminders, even with Taskie closed</p></div><button type="button" class="you-switch" role="switch" :aria-checked="notifyOn" :disabled="push.busy" aria-label="Notifications on this device" @click="toggleNotify"><i /></button></div>
         <p v-if="push.note" class="adm-note">{{ push.note }}</p>
         <button v-if="push.on" type="button" class="adm-btn" @click="testPush"><Icon name="bell" :size="14" />Send a test</button>
       </section>

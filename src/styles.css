@@ -4371,3 +4371,27 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .hp2-signin .si-card button { border-radius: 999px !important; }
 .hp2-hero { padding-left: max(18px, calc((100% - 1240px) / 2)) !important; padding-right: max(18px, calc((100% - 1240px) / 2)) !important; max-width: none !important; }
 .hp2-foot { max-width: none !important; padding-left: max(18px, calc((100% - 1240px) / 2)) !important; padding-right: max(18px, calc((100% - 1240px) / 2)) !important; }
+
+/* ---------- Phone fixes (from real iPhone screenshots) ---------- */
+/* Switches are always a pill with a round knob, whatever square rule is around them. */
+.you-switch, .set .you-switch, .adm-set .you-switch { width: 42px !important; height: 24px !important; padding: 2px !important; border-radius: 999px !important; border: 0 !important; }
+.you-switch i { border-radius: 50% !important; width: 20px !important; height: 20px !important; }
+/* Admin top bar: the wordmark first, no empty block before it on phones. */
+@media (max-width: 760px) { .nav-bar:not(.nb-user) .nb-spacer { display: none; } .nav-bar:not(.nb-user) .nb-brand { order: -1; flex: 1; border-right: 0; } }
+/* Admin cards never grow wider than the screen. */
+.adm-main .adm > * { min-width: 0; }
+.adm-ai, .adm-ai .acct-sec { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.adm-ai .acct-sec-head { flex-wrap: wrap; gap: 4px 12px; }
+.adm-ai .you-key { flex-wrap: wrap; }
+.adm-ai .you-key input { flex: 1 1 180px; }
+/* Notifications list: inside the screen on phones. */
+@media (max-width: 640px) { .bell-pop { position: fixed !important; left: 12px !important; right: 12px !important; top: 64px !important; width: auto !important; max-height: calc(100dvh - 90px); overflow: auto !important; } }
+/* Schedule list on phones: the title gets the whole width; time and actions on the line below. */
+@media (max-width: 640px) {
+  .sch-row { grid-template-columns: auto minmax(0, 1fr) !important; }
+  .sch-row > .sch-row-main { grid-column: 2; }
+  .sch-row > .sch-dur { grid-column: 2; justify-self: start; }
+  .sch-row > .sch-row-acts { grid-column: 2; justify-self: start; position: static !important; opacity: 1 !important; background: none !important; padding: 0 !important; margin-left: -4px; }
+  .sch-row > .sch-steps { grid-column: 2; }
+  .sch-row-t { word-break: normal; overflow-wrap: break-word; }
+}
