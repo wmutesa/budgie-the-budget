@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { account } from '../lib/account';
 import SignIn from './SignIn.vue';
 
 // Taskie's home page for anyone not signed in: one dark section on one screen.
@@ -15,6 +16,8 @@ onUnmounted(() => clearInterval(t));
 const menu = ref(false);
 const toSignIn = () => { menu.value = true; };
 const esc = e => { if (e.key === 'Escape') menu.value = false; };
+// An invite link that did not work: open the panel so its message is seen.
+watch(() => account.invite?.error, e => { if (e) menu.value = true; }, { immediate: true });
 onMounted(() => window.addEventListener('keydown', esc));
 onUnmounted(() => window.removeEventListener('keydown', esc));
 const FACTS = [

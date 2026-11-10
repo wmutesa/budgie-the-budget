@@ -132,6 +132,7 @@ async function main() {
     const alex = await personPage(browser);
     // The link's code can be lost by apps that drop the part after #; pasting the link works.
     await alex.page.goto(base);
+    await openSignIn(alex.page);
     await alex.page.click('[data-test="have-invite"]');
     await alex.page.fill('[data-test="invite-input"]', inviteLink.replace(/^https?:\/\/[^/]+/, base));
     await alex.page.click('[data-test="invite-use"]');
@@ -185,6 +186,7 @@ async function main() {
     // Lost every device: a recovery code leads to a new passkey.
     const lost = await personPage(browser);
     await lost.page.goto(base);
+    await openSignIn(lost.page);
     await lost.page.click('[data-test="lost-device"]');
     await lost.page.fill('[data-test="recovery-input"]', 'AAAAA-BBBBB');
     await lost.page.click('[data-test="recovery-use"]');
@@ -305,6 +307,7 @@ async function main() {
     // Sign out everywhere ends every session for that person.
     const second = await personPage(browser);
     await second.page.goto(base);
+    await openSignIn(second.page).catch(() => {});
     await second.page.click('[data-test="sign-in"]').catch(() => {});
     await owner.page.evaluate(async () => fetch('/api/sessions', { method: 'DELETE' }));
     assert.equal((await getJSON(owner.page, '/api/data')).status, 401, 'signing out everywhere ends this session too');
