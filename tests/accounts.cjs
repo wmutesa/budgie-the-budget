@@ -46,6 +46,17 @@ async function personPage(browser) {
 }
 const getJSON = (page, url) => page.evaluate(async u => { const r = await fetch(u); return { status: r.status, body: await r.json() }; }, url);
 
+const inviteFromAdmin = async (page, name) => {
+  // Inviting lives on the Admin view's People page.
+  await page.click('[data-test="account"]');
+  if (await page.$('[data-test="view-admin"]')) await page.click('[data-test="view-admin"]'); else await page.keyboard.press('Escape');
+  await page.click('[data-test="nav-people"]');
+  await page.fill('[data-test="admin-invite-name"]', name);
+  await page.click('[data-test="admin-invite"]');
+  await page.waitForSelector(`[data-test="admin-pending"]:has-text("${name}")`);
+  return page.inputValue('[data-test="admin-invite-link"]');
+};
+const userView = async page => { await page.click('[data-test="account"]'); await page.click('[data-test="view-user"]'); await page.waitForSelector('.nb-pages'); };
 async function main() {
   execFileSync(wrangler, ['d1', 'migrations', 'apply', 'budgie', '--local', '--persist-to', state], { cwd: root, stdio: 'pipe' });
   const ownerToken = b64url(crypto.randomBytes(32));
@@ -112,15 +123,9 @@ async function main() {
     await owner.page.waitForSelector('[data-test="schedule"]');
 
     // The owner invites someone.
-    await owner.page.click('[data-test="account"]');
-    await owner.page.click('[data-test="menu-settings"]');
-    await owner.page.click('[data-test="acct-tab-people"]');
-    await owner.page.fill('.acct-invite .field', 'Alex');
-    await owner.page.click('.acct-invite button');
-    await owner.page.waitForSelector('.acct-link .field');
-    const inviteLink = await owner.page.inputValue('.acct-link .field');
-    assert.match(inviteLink, /\/invite#/, 'an invite link is created');
-    await owner.page.waitForSelector('.acct-list li.pending:has-text("Alex")');
+    const inviteLink = await inviteFromAdmin(owner.page, 'Alex');
+    assert.match(inviteLink, /\/invite#/, 'an invite link is created, and Alex is listed as invited');
+    await userView(owner.page);
 
     // Alex joins with their own passkey and sees only their own data.
     const alex = await personPage(browser);
@@ -158,6 +163,8 @@ async function main() {
     await late.context.close();
 
     // The owner adds a second device to their own account.
+    await owner.page.click('[data-test="account"]');
+    await owner.page.click('[data-test="menu-settings"]');
     await owner.page.click('[data-test="acct-tab-security"]');
     await owner.page.click('.acct-sec-head button:has-text("Add a device")');
     await owner.page.waitForFunction(old => { const v = document.querySelector('.acct-link .field')?.value; return v && v !== old; }, inviteLink);
@@ -220,7 +227,10 @@ async function main() {
     assert.equal(await owner.page.$('[data-test="menu-privacy"]'), null, 'there is no separate Privacy page');
     await owner.page.click('[data-test="menu-settings"]');
     assert.ok(await owner.page.$('.adm-side'), 'Settings opens inside the Admin view, with its sidebar');
-    assert.deepEqual(await owner.page.$$eval('[data-test="settings-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Devices & security', 'People'], 'Settings in the Admin view: people and devices only');
+    await owner.page.waitForSelector('[data-test="settings-page"].adm-set [data-test="admin-devices"]');
+    assert.equal(await owner.page.$('[data-test="settings-page"] .set-nav'), null, 'Settings in the Admin view is laid out like the Admin pages');
+    assert.match(await owner.page.textContent('[data-test="settings-page"]'), /Your devices[\s\S]*Recovery codes[\s\S]*Notifications[\s\S]*Sessions/, 'with devices, recovery codes, AI, notifications and sessions');
+    assert.doesNotMatch(await owner.page.textContent('[data-test="settings-page"]'), /How passkeys work/, 'and no passkey explainer');
     await owner.page.click('[data-test="nav-people"]');
     for (const t of ['dashboard', 'voice', 'models', 'training', 'errors', 'sync', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-card`); }
     const memberAdmin = await alex.page.evaluate(async () => (await fetch('/api/admin/summary')).status);
@@ -232,9 +242,9 @@ async function main() {
     assert.equal(await owner.page.$('[data-test="admin-people"]'), null, 'and the Admin pages are gone');
     // The owner removes Alex, whose session stops working.
     await owner.page.click('[data-test="account"]');
-    await owner.page.click('[data-test="menu-settings"]');
-    await owner.page.click('[data-test="acct-tab-people"]');
-    const alexRow = owner.page.locator('[data-test="settings-page"] .acct-list li', { hasText: 'Alex' }).getByRole('button', { name: 'Remove' });
+    await owner.page.click('[data-test="view-admin"]');
+    await owner.page.click('[data-test="nav-people"]');
+    const alexRow = owner.page.locator('[data-test="remove-Alex"]');
     await alexRow.waitFor();
     // Click until the server sees the removal (a click during a re-render can miss).
     let removed = false;
@@ -244,7 +254,8 @@ async function main() {
       removed = await seen;
     }
     assert.ok(removed, 'the owner can remove a person');
-    await owner.page.waitForFunction(() => !document.querySelector('[data-test="settings-page"]').textContent.includes('Alex'));
+    await owner.page.waitForFunction(() => !document.querySelector('[data-test="admin-people"] .adm-table').textContent.includes('Alex'));
+    await userView(owner.page);
     assert.equal((await getJSON(alex.page, '/api/data')).status, 401, 'a removed person is signed out');
 
     // The owner cannot delete their own account; a member can delete theirs.
@@ -265,14 +276,8 @@ async function main() {
 
     const ownerDelete = await owner.page.evaluate(async () => (await fetch('/api/me', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: 'DELETE' }) })).status);
     assert.equal(ownerDelete, 400, 'the owner account cannot be deleted from the app');
-    await owner.page.click('[data-test="account"]');
-    await owner.page.click('[data-test="menu-settings"]');
-    await owner.page.click('[data-test="acct-tab-people"]');
-    await owner.page.waitForSelector('.acct-invite .field');
-    await owner.page.fill('.acct-invite .field', 'Sam');
-    await owner.page.click('.acct-invite button');
-    await owner.page.waitForFunction(() => /Sam/.test(document.querySelector('.acct-link p')?.textContent || ''));
-    const samLink = await owner.page.inputValue('.acct-link .field');
+    const samLink = await inviteFromAdmin(owner.page, 'Sam');
+    await userView(owner.page);
     const sam = await personPage(browser);
     await sam.page.goto(samLink.replace(/^https?:\/\/[^/]+/, base));
     await sam.page.click('[data-test="create-passkey"]');

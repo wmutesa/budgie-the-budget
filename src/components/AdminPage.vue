@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { adminSummary, invitePerson } from '../lib/account';
+import { adminSummary, invitePerson, listPeople, cancelInvite, removePerson } from '../lib/account';
+import QrCode from './QrCode.vue';
 import { toast } from '../lib/toast';
 import Icon from './Icon.vue';
 
@@ -83,11 +84,20 @@ const calHealth = computed(() => {
 const tr = computed(() => data.value?.training || {});
 
 // Invite someone from here.
-const inviteName = ref(''); const inviteLink = ref('');
+// Inviting and removing people lives here (not in Settings).
+const inviteName = ref(''); const inviteLink = ref(''); const invites = ref([]); const copied = ref(false);
+const loadInvites = async () => { try { invites.value = (await listPeople()).invites || []; } catch { /* owner only */ } };
+onMounted(loadInvites);
 async function invite() {
   const name = inviteName.value.trim(); if (!name) return;
-  try { const r = await invitePerson(name); inviteLink.value = r.link; inviteName.value = ''; toast(`Invite for ${name} ready. It works once and expires in ${r.expiresInDays} days.`, { kind: 'success' }); }
+  try { const r = await invitePerson(name); inviteLink.value = r.link; inviteName.value = ''; toast(`Invite for ${name} ready. It works once and expires in ${r.expiresInDays} days.`, { kind: 'success' }); await loadInvites(); }
   catch (e) { toast(e.message || 'The invite could not be made.', { kind: 'error' }); }
+}
+async function copyInvite() { try { await navigator.clipboard.writeText(inviteLink.value); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* select it */ } }
+async function dropInvite(i) { try { await cancelInvite(i.id); await loadInvites(); } catch (e) { toast(e.message, { kind: 'error' }); } }
+async function dropPerson(p) {
+  if (!confirm(`Remove ${p.name}? Their account and all of their Taskie data will be deleted. This cannot be undone.`)) return;
+  try { await removePerson(p.id); await load(); toast(`${p.name} was removed.`, { kind: 'success' }); } catch (e) { toast(e.message, { kind: 'error' }); }
 }
 function csv() {
   const rows = {
@@ -173,8 +183,19 @@ const DESC = {
       <!-- People -->
       <template v-else-if="section === 'People'">
         <section class="adm-card adm-invite">
-          <form @submit.prevent="invite"><input v-model="inviteName" class="adm-input" placeholder="Name of someone to invite" aria-label="Name to invite" maxlength="60" data-test="admin-invite-name" /><button class="adm-btn dark" :disabled="!inviteName.trim()" data-test="admin-invite"><Icon name="plus" :size="14" />Invite</button></form>
-          <p v-if="inviteLink" class="small adm-link"><span class="muted">Send this link (it works once):</span> <code>{{ inviteLink }}</code></p>
+          <div class="adm-card-head"><div><h2>Invite someone</h2><p class="adm-note">Taskie is invite-only. A link works once and expires in 7 days.</p></div></div>
+          <form @submit.prevent="invite"><input v-model="inviteName" class="adm-input" placeholder="Name of someone to invite" aria-label="Name to invite" maxlength="60" data-test="admin-invite-name" /><button class="adm-btn dark" :disabled="!inviteName.trim()" data-test="admin-invite"><Icon name="plus" :size="14" />Create invite link</button></form>
+          <div v-if="inviteLink" class="adm-linkbox">
+            <div class="adm-linkrow"><input class="adm-input" :value="inviteLink" readonly aria-label="Invite link" data-test="admin-invite-link" @focus="e => e.target.select()" /><button type="button" class="adm-btn" @click="copyInvite"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button></div>
+            <QrCode :text="inviteLink" :size="110" />
+          </div>
+          <ul v-if="invites.length" class="adm-rows">
+            <li v-for="i in invites" :key="i.id" class="pending" data-test="admin-pending">
+              <span class="adm-av">{{ initials(i.name) }}</span>
+              <span><b>{{ i.name }}</b><span class="adm-note">Invited · expires {{ new Date(i.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) }}</span></span>
+              <button type="button" class="adm-btn" title="Cancel the invite" @click="dropInvite(i)"><Icon name="x" :size="14" />Cancel</button>
+            </li>
+          </ul>
         </section>
         <section class="adm-card adm-box">
           <div class="adm-tools"><span class="adm-search"><Icon name="search" :size="14" /><input v-model="q" placeholder="Filter people…" aria-label="Filter people" /></span><span class="adm-note">{{ shownPeople.length }} of {{ people.length }}</span></div>
@@ -189,6 +210,7 @@ const DESC = {
                 <th><button type="button" @click="sortOn('focusMins')">Locked in</button></th>
                 <th><button type="button" @click="sortOn('recordings')">Recordings</button></th>
                 <th>Notifications</th>
+                <th />
               </tr></thead>
               <tbody>
                 <tr v-for="p in shownPeople" :key="p.id">
@@ -200,6 +222,7 @@ const DESC = {
                   <td>{{ p.focusMins }} min</td>
                   <td>{{ p.recordings }}</td>
                   <td><span class="adm-pill" :class="p.pushOn ? 'ok' : ''">{{ p.pushOn ? 'On' : 'Off' }}</span></td>
+                  <td><button v-if="p.role !== 'owner'" type="button" class="adm-btn small" :data-test="`remove-${p.name}`" @click="dropPerson(p)"><Icon name="trash" :size="13" />Remove</button></td>
                 </tr>
               </tbody>
             </table>

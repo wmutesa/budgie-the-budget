@@ -19,6 +19,7 @@ import Toasts from './components/Toasts.vue';
 import { toast } from './lib/toast';
 import { nav, PAGES, ADMIN_PAGES, go } from './lib/nav';
 import AdminPage from './components/AdminPage.vue';
+import AdminSettings from './components/AdminSettings.vue';
 import { refreshFeeds } from './lib/calendar';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
@@ -152,7 +153,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </aside>
         <div class="adm-main">
           <AdminPage v-if="ADMIN_PAGES.includes(active)" :section="active" />
-          <AccountPage v-else kind="settings" />
+          <AdminSettings v-else />
         </div>
       </div>
       <template v-else-if="active === 'Overview'">

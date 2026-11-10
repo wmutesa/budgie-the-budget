@@ -17,7 +17,6 @@ import { DIGESTS_LIVE } from '../lib/digest';
 import { nav } from '../lib/nav';
 import {
   account, signOutEverywhere, deleteMyAccount, listPasskeys, removePasskey, deviceLink, recoveryStatus, newRecoveryCodes,
-  listPeople, invitePerson, cancelInvite, removePerson,
 } from '../lib/account';
 
 // Settings and Privacy, each a page of its own, opened from the avatar menu.
@@ -31,17 +30,15 @@ const SETTINGS = computed(() => [
   ['digests', DIGESTS_LIVE ? 'Digests & AI' : 'AI', 'sparkle', 'The brains of the operation. Pick how much thinking happens on your device.'],
   ['calendars', 'Calendars', 'calendar', 'Every calendar you brought along, in one tidy drawer.'],
   ['security', 'Devices & security', 'shield', 'Passkeys, devices and a spare key under the mat (recovery codes).'],
-  ...(isOwner.value ? [['people', 'People', 'list', 'Who else gets to use your Taskie.']] : []),
 ]);
 const PRIVACY = [
   ['data', 'Your data', 'download', 'It is yours. Take a copy, fill it with samples, or clear them out.'],
   ['sessions', 'Sessions', 'logout', 'Everywhere you are signed in, and the big red button for all of them.'],
   ['delete', 'Delete account', 'trash', 'The nuclear option. We will miss you, quietly.'],
 ];
-// In the Admin view, Settings shows only what is about running Taskie: people and devices.
 const adminView = computed(() => nav.mode === 'admin' && isOwner.value);
 // One Settings page: your settings, then privacy (your data, sessions, deleting the account).
-const tabs = computed(() => (adminView.value ? SETTINGS.value.filter(t => ['people', 'security'].includes(t[0])) : [...SETTINGS.value, ...PRIVACY]));
+const tabs = computed(() => [...SETTINGS.value, ...PRIVACY]); // the Admin view has its own Settings page (AdminSettings)
 watch(tabs, t => { if (!t.some(x => x[0] === tab.value)) tab.value = t[0][0]; });
 const tab = ref(nav.anchor === '#calendars' ? 'calendars' : props.kind === 'privacy' ? 'data' : tabs.value[0][0]);
 watch(() => props.kind, k => { tab.value = k === 'privacy' ? 'data' : tabs.value[0][0]; });
@@ -55,9 +52,6 @@ function clearSample() { const n = removeSample(); toast(`${n} sample items remo
 const passkeys = ref([]);
 const codesLeft = ref(null);
 const freshCodes = ref(null);
-const people = ref([]);
-const invites = ref([]);
-const inviteName = ref('');
 const link = ref(null);
 const copied = ref(false);
 const error = ref('');
@@ -79,11 +73,10 @@ async function load() {
   error.value = '';
   const seq = ++loadSeq;
   try {
-    const [pk, rc, pp] = await Promise.all([listPasskeys(), recoveryStatus(), isOwner.value ? listPeople() : null]);
+    const [pk, rc] = await Promise.all([listPasskeys(), recoveryStatus()]);
     if (seq !== loadSeq) return;
     passkeys.value = pk.passkeys;
     codesLeft.value = rc.left;
-    if (pp) ({ people: people.value, invites: invites.value } = pp);
   } catch (e) { if (seq === loadSeq) error.value = e.message; }
 }
 watch(() => props.kind, load, { immediate: true });
@@ -97,21 +90,12 @@ async function act(fn) {
   try { await fn(); } catch (e) { error.value = e.message; } finally { busy.value = false; }
 }
 const makeDeviceLink = () => act(async () => { const r = await deviceLink(); link.value = { kind: 'device', label: 'Open this on your other device within 24 hours to add it', url: r.link }; });
-const sendInvite = () => act(async () => {
-  if (!inviteName.value.trim()) return;
-  const r = await invitePerson(inviteName.value.trim());
-  link.value = { kind: 'invite', label: `Send this to ${inviteName.value.trim()}. It works once and expires in ${r.expiresInDays} days`, url: r.link };
-  inviteName.value = '';
-  await load();
-});
 const makeCodes = () => act(async () => {
   if (codesLeft.value > 0 && !confirm('Make new recovery codes? Your current codes will stop working.')) return;
   freshCodes.value = (await newRecoveryCodes()).recoveryCodes;
   codesLeft.value = freshCodes.value.length;
 });
-const dropInvite = id => act(async () => { await cancelInvite(id); await load(); });
 const dropPasskey = p => act(async () => { if (!confirm(`Remove the passkey "${p.label}"? That device will not be able to sign in.`)) return; await removePasskey(p.id); await load(); });
-const dropPerson = p => act(async () => { if (!confirm(`Remove ${p.name}? Their account and all of their Taskie data will be deleted. This cannot be undone.`)) return; await removePerson(p.id); await load(); });
 async function copy() { try { await navigator.clipboard.writeText(link.value.url); copied.value = true; setTimeout(() => (copied.value = false), 1500); } catch { /* select it by hand */ } }
 function downloadData() {
   const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), app: 'Taskie', user: account.user?.name, data: snapshot() }, null, 2)], { type: 'application/json' });
@@ -184,33 +168,6 @@ const removeMe = () => act(async () => { const typed = prompt('This deletes your
           <RecoveryCodes v-if="freshCodes" :codes="freshCodes" :name="account.user?.name" :confirm="false" />
         </section>
         <PasskeyNote :owner="isOwner" />
-      </template>
-
-      <template v-else-if="tab === 'people'">
-        <section class="set-sec">
-          <div class="set-sec-head acct-sec-head"><h2>People</h2><span class="muted small">{{ people.length }} with access</span></div>
-          <ul class="set-list acct-list">
-            <li v-for="p in people" :key="p.id">
-              <span>{{ p.name }}<span v-if="p.id === account.user.id" class="muted small"> · you</span></span>
-              <span class="muted small">{{ p.role === 'owner' ? 'Owner' : 'Member' }} · last seen {{ date(p.last_seen) }}</span>
-              <button v-if="p.role !== 'owner'" class="btn small" :disabled="busy" @click="dropPerson(p)"><Icon name="trash" :size="14" />Remove</button>
-            </li>
-            <li v-for="i in invites" :key="i.id" class="pending">
-              <span>{{ i.name }}</span>
-              <span class="muted small">Invited · expires {{ date(i.expires_at) }}</span>
-              <button class="btn small btn-icon" :disabled="busy" title="Cancel" aria-label="Cancel" @click="dropInvite(i.id)"><Icon name="x" :size="14" /></button>
-            </li>
-          </ul>
-          <form class="acct-invite set-invite" @submit.prevent="sendInvite">
-            <input v-model="inviteName" class="field" placeholder="Name of the person to invite" aria-label="Name of the person to invite" maxlength="60" />
-            <button class="btn primary small" type="submit" :disabled="busy || !inviteName.trim()"><Icon name="plus" :size="14" />Create invite link</button>
-          </form>
-          <div v-if="link?.kind === 'invite'" class="set-link acct-link">
-            <p class="small">{{ link.label }}</p>
-            <div class="set-link-row"><input class="field" :value="link.url" readonly aria-label="Link" @focus="e => e.target.select()" /><button class="btn primary small" type="button" @click="copy"><Icon name="copy" :size="14" />{{ copied ? 'Copied' : 'Copy' }}</button></div>
-            <div class="set-qr acct-qr"><QrCode :text="link.url" :size="110" /><p class="small muted">Or scan it with the other device's camera.</p></div>
-          </div>
-        </section>
       </template>
 
       <template v-else-if="tab === 'data'">

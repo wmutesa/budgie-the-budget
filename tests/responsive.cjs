@@ -76,7 +76,6 @@ const SCREENS = [
   ['settings-ai', async p => { await p.click('[data-test="acct-tab-digests"]'); }],
   ['settings-security', async p => { await p.click('[data-test="acct-tab-security"]'); }],
   ['settings-calendars', async p => { await p.click('[data-test="acct-tab-calendars"]'); }],
-  ['settings-people', async p => { await p.click('[data-test="acct-tab-people"]'); }],
   ['privacy-data', async p => { await p.click('[data-test="account"]'); await p.click('[data-test=\"menu-settings\"]'); await p.click('[data-test=\"acct-tab-data\"]'); }],
   ['privacy-sessions', async p => { await p.click('[data-test="acct-tab-sessions"]'); }],
 ];
