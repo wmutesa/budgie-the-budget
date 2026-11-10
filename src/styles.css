@@ -4046,3 +4046,22 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .sch-when > .wf-field { grid-column: 1 / -1 !important; }
 .sch-when > .sch-when-min { grid-column: 1 !important; max-width: 140px; }
 .sch-when > .sch-icon { grid-column: 2 !important; }
+
+/* ---------- Add: recording view (no live text; Nova-3 + Gemini hear it on Stop) ---------- */
+.cap-sheet.is-recording, .cap-sheet.is-hearing { width: min(520px, 100%); }
+.rec { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 14px 6px 6px; }
+.rec-kicker { margin: 0; display: inline-flex; align-items: center; gap: 10px; font: 600 11px var(--mono, ui-monospace, monospace); letter-spacing: .08em; text-transform: uppercase; color: #6d28d9; }
+.rec-clock { font-variant-numeric: tabular-nums; color: #18181b; background: #f5f3ff; padding: 2px 8px; border-radius: 999px !important; letter-spacing: 0; }
+.rec-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; color: #18181b; }
+.rec-sub { margin: 0; max-width: 40ch; font-size: 13.5px; line-height: 1.5; }
+.rec-wave { display: flex; align-items: center; justify-content: center; gap: 4px; height: 72px; width: 100%; margin: 6px 0 4px; }
+.rec-wave i { width: 5px; border-radius: 999px !important; background: linear-gradient(180deg, #a78bfa, #7c3aed); height: calc(6px + var(--lv, 0) * var(--h) * 62px); transition: height .09s linear; opacity: calc(.45 + var(--lv, 0) * .55); }
+.rec-wave.hearing i { height: 10px; opacity: .8; animation: rec-think 1.1s ease-in-out infinite; animation-delay: calc(var(--i) * 45ms); }
+@keyframes rec-think { 0%, 100% { height: 8px; } 50% { height: 34px; } }
+.rec-stop { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 132px; height: 48px; padding: 0 22px; border: 0; background: #18181b; color: #fff; font: 600 15px var(--sans); cursor: pointer; border-radius: 999px !important; box-shadow: 0 10px 26px -12px rgba(24, 24, 27, .6); }
+.rec-stop:hover { background: #6d28d9; }
+.rec-busy { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; font: 600 14px var(--sans); color: #6d28d9; background: #f5f3ff; border-radius: 999px !important; }
+.rec-busy .ico { animation: ispin 1s linear infinite; }
+.rec .cap-note { justify-content: center; text-align: left; max-width: 44ch; }
+.cap-note .linkish { margin-left: 6px; background: none; border: 0; padding: 0; color: #6d28d9; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .rec-wave.hearing i { animation: none; height: 18px; } .rec-busy .ico { animation: none; } }

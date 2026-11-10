@@ -8,8 +8,9 @@ import {
 import { fetchFeed } from './ical.js';
 import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
-import { cloudSplit } from './cloudai.js';
-import { geminiResearch, geminiSplit, geminiVoice, geminiWords, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
+import { cloudSplit, SPLIT_MODEL } from './cloudai.js';
+import { novaHear, geminiCorrect, geminiJson } from './hear.js';
+import { geminiResearch, geminiSplit, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
 const SESSION_DAYS = 30;
@@ -95,6 +96,28 @@ async function bump(env, userId, key, by = 1) {
     if (!usageReady) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS usage_daily (day TEXT NOT NULL, user_id TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (day, user_id, key))').run(); usageReady = true; }
     await env.DB.prepare('INSERT INTO usage_daily (day, user_id, key, n) VALUES (?, ?, ?, ?) ON CONFLICT(day, user_id, key) DO UPDATE SET n = n + excluded.n').bind(new Date().toISOString().slice(0, 10), userId, key, Math.round(by)).run();
   } catch { /* counting never gets in the way */ }
+}
+// The Gemini key to use for someone: their own, else the server's (GEMINI_API_KEY secret),
+// else the owner's saved key, so Gemini is used for everyone whenever there is a key.
+async function geminiKeyFor(env, user, data) {
+  const own = tidyKey(data?.digest?.geminiKey);
+  if (keyShapeOk(own)) return own;
+  const server = tidyKey(env.GEMINI_API_KEY);
+  if (keyShapeOk(server)) return server;
+  if (user.role === 'owner') return '';
+  const row = await env.DB.prepare("SELECT d.data FROM user_data d JOIN users u ON u.id = d.user_id WHERE u.role = 'owner' LIMIT 1").first().catch(() => null);
+  let owner = {}; try { owner = row ? JSON.parse(row.data) : {}; } catch { /* none */ }
+  const k = tidyKey(owner?.digest?.geminiKey);
+  return keyShapeOk(k) && owner?.planner?.shareGemini !== false ? k : '';
+}
+// Help Taskie hear better: text pairs (what Nova-3 heard, what it really was) for training. No audio.
+let samplesReady = false;
+async function keepSample(env, userId, x) {
+  try {
+    if (!samplesReady) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS voice_samples (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT NOT NULL, created_at INTEGER NOT NULL, heard TEXT, transcript TEXT, items TEXT, kept TEXT, via TEXT, ms INTEGER, confidence REAL)').run(); samplesReady = true; }
+    await env.DB.prepare('INSERT INTO voice_samples (user_id, created_at, heard, transcript, items, via, ms, confidence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(userId, now(), x.heard.slice(0, 8000), x.transcript.slice(0, 8000), JSON.stringify(x.items.slice(0, 100)), x.via, Math.round(x.ms), x.confidence).run();
+  } catch { /* never in the way */ }
 }
 async function countFailure(env, key) {
   await env.DB.prepare(
@@ -431,22 +454,6 @@ async function routes(request, env, url) {
     const st = { id: stream.id, name: String(stream.name || '').slice(0, 60), focus: String(stream.focus || '').slice(0, 120) };
     return json(await writeDigestFor(env, user.id, data, st, typeof timeZone === 'string' ? timeZone.slice(0, 60) : ''));
   }
-  // Break a recording into planner items with the person's own Gemini key (kept in their data, sent only to Google).
-  if (path === '/api/gemini/breakdown' && method === 'POST') {
-    const data = await accountData(env, user.id);
-    const gkey = tidyKey(data?.digest?.geminiKey);
-    if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
-    const key = `gemini-split:${user.id}`;
-    if (await tooManyAttempts(env, key, 120)) return fail(429, 'Many breakdowns this hour. Taskie used its own rules instead.');
-    await countFailure(env, key);
-    const { text, today, weekday, timeZone, categories, hints, existing, vocab } = await body(request);
-    const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
-    const said = String(text || '').slice(0, 12000);
-    if (!said.trim()) return fail(400, 'Nothing to break down.');
-    try {
-      return json({ items: await geminiSplit(gkey, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) }) });
-    } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
-  }
   // Taskie's own AI breaks what was said into separate items: for everyone, no key needed.
   if (path === '/api/voice/breakdown' && method === 'POST') {
     const key = `voice-split:${user.id}`;
@@ -456,12 +463,19 @@ async function routes(request, env, url) {
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
     const said = String(text || '').slice(0, 12000);
     if (!said.trim()) return fail(400, 'Nothing to break down.');
+    const args = { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) };
+    // Gemini first whenever there is a key (it understands context best); Taskie's own Llama otherwise.
+    const gkey = await geminiKeyFor(env, user, await accountData(env, user.id));
+    if (gkey) {
+      const tg = Date.now();
+      try { const items = await geminiSplit(gkey, args); await bump(env, user.id, 'split-gemini'); await bump(env, user.id, 'ms-split-gemini', Date.now() - tg); return json({ items, via: 'gemini' }); } catch { await bump(env, user.id, 'split-gemini-failed'); }
+    }
     try {
       const ts = Date.now();
       const items = await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) });
       await bump(env, user.id, 'split-budgie');
       await bump(env, user.id, 'ms-split-budgie', Date.now() - ts);
-      return json({ items });
+      return json({ items, via: 'llama' });
     } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Taskie AI could not be reached.').slice(0, 200)); }
   }
   // Diagnostics from the Add card (states and counts, never words), so a
@@ -483,80 +497,94 @@ async function routes(request, env, url) {
     await env.DB.prepare('DELETE FROM diag_logs WHERE created_at < ?').bind(now() - 30 * 86400e3).run();
     return json({ ok: true });
   }
-  // Live words as you speak: a WebSocket straight through to Deepgram Nova-3 on
-  // Workers AI. The app sends 16 kHz 16-bit mono PCM and gets words back in
-  // pieces (interim) that become final at each pause. Audio is not kept.
-  if (path === '/api/voice/stream' && method === 'GET') {
-    if (request.headers.get('Upgrade') !== 'websocket') return fail(426, 'Live words need a WebSocket.');
-    if (!env.AI) return fail(503, 'Live words are not available on this server.');
-    const key = `voice-stream:${user.id}`;
-    if (await tooManyAttempts(env, key, 300)) return fail(429, 'Many live sessions this hour. Phrase-by-phrase still works.');
+  // Hear a recording: Deepgram Nova-3 writes it down, then Gemini corrects it
+  // from the sound and the person's context and lists every item (see hear.js).
+  // Nova-3 always does the hearing. The audio is never kept.
+  if (path === '/api/voice/hear' && method === 'POST') {
+    const key = `voice-hear:${user.id}`;
+    if (await tooManyAttempts(env, key, 200)) return fail(429, 'A lot of recordings this hour. Try again in a little while.');
     await countFailure(env, key);
-    await bump(env, user.id, 'stream-nova');
-    try {
-      return await env.AI.run('@cf/deepgram/nova-3', {
-        encoding: 'linear16', sample_rate: '16000', channels: '1',
-        interim_results: 'true', smart_format: 'true', punctuate: 'true', endpointing: '400', // the WebSocket wants every value as text
-      }, { websocket: true });
-    } catch (e) {
-      await bump(env, user.id, 'stream-nova-failed');
-      return fail(502, String(e?.message || 'Live words could not start.').slice(0, 200));
-    }
-  }
-  // Live words while recording: one short piece of audio (16 kHz WAV) at a time.
-  // Cloudflare's Whisper first (free, no key); the person's Gemini key otherwise.
-  if (path === '/api/voice/live' && method === 'POST') {
-    const key = `voice-live:${user.id}`;
-    if (await tooManyAttempts(env, key, 2000)) return fail(429, 'A lot of talking this hour. Live words pause; Stop still works.');
-    await countFailure(env, key);
-    const { audio, prompt, terms, partial: partialReq } = await body(request);
-    const t0 = Date.now();
-    // Keyterms (the person's categories, course codes and task names) help the model spell them their way.
-    const words = (Array.isArray(terms) ? terms : []).filter(x => typeof x === 'string').slice(0, 50).map(x => x.replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(Boolean);
-    if (typeof audio !== 'string' || !audio || audio.length > 3 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That piece of audio could not be read.');
-    const before = String(prompt || '').replace(/[<>\n]/g, ' ').slice(-200);
-    // Whisper sometimes "hears" these in silence.
-    const ghost = t => /^(?:thank you\.?|thanks for watching!?|you|bye\.?|\.+|\s*)$/i.test(t.trim());
-    let lastErr = '';
-    if (env.AI) {
-      try {
-        // Whisper reads its prompt as earlier text: the glossary first, then what was just said (about 200 tokens in all).
-        const glossary = words.length ? `${words.join(', ')}. ` : '';
-        const initial = `${glossary}${before}`.slice(-700).trim();
-        const out = await env.AI.run('@cf/openai/whisper-large-v3-turbo', { audio, vad_filter: true, ...(initial ? { initial_prompt: initial } : {}) });
-        const text = String(out?.text || '').trim();
-        // Whisper sometimes hands back its own prompt (what was said before): not new words.
-        const flat = x => x.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-        const echo = text && flat(text).length > 6 && flat(initial).includes(flat(text));
-        await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-whisper${text && !ghost(text) && !echo ? '' : '-empty'}`);
-        await bump(env, user.id, 'ms-whisper', Date.now() - t0);
-        return json({ text: ghost(text) || echo ? '' : text, via: 'whisper' });
-      } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
-    }
-    const data = await accountData(env, user.id);
-    const gkey = tidyKey(data?.digest?.geminiKey);
-    if (keyShapeOk(gkey)) {
-      try { const text = await geminiWords(gkey, { audio, prompt: before, terms: words }); await bump(env, user.id, `live-${partialReq ? 'partial' : 'final'}-gemini`); await bump(env, user.id, 'ms-gemini-live', Date.now() - t0); return json({ text: ghost(text) ? '' : text, via: 'gemini' }); } catch (e) { lastErr = String(e?.message || e).slice(0, 160); }
-    }
-    await bump(env, user.id, 'live-failed');
-    return fail(503, lastErr ? `Live words are not available right now (${lastErr}).` : 'Live words are not available right now.');
-  }
-  // Hear a recording with the person's own Gemini key: what was said, word for word, and every item in it.
-  if (path === '/api/gemini/voice' && method === 'POST') {
-    const data = await accountData(env, user.id);
-    const gkey = tidyKey(data?.digest?.geminiKey);
-    if (!keyShapeOk(gkey)) return fail(404, 'No Gemini key saved.');
-    if (data?.planner?.geminiAudio === false) return fail(403, 'Sending recordings to Gemini is turned off.');
-    const key = `gemini-voice:${user.id}`;
-    if (await tooManyAttempts(env, key, 60)) return fail(429, 'Many recordings this hour. Taskie used the live text instead.');
-    await countFailure(env, key);
-    const { audio, mime, typed, today, weekday, timeZone, categories, existing } = await body(request);
+    if (!env.AI) return fail(503, 'Hearing is not set up on this server.');
+    const { audio, mime, today, weekday, timeZone, categories, existing, vocab, terms } = await body(request);
     if (typeof audio !== 'string' || !audio || audio.length > 18 * 1024 * 1024 || !/^[A-Za-z0-9+/=]+$/.test(audio.slice(0, 200))) return fail(400, 'That recording could not be read.');
     if (!audioTypeOk(mime)) return fail(400, 'That kind of recording is not supported.');
     const strings = (list, n, len) => (Array.isArray(list) ? list.filter(x => typeof x === 'string').slice(0, n).map(x => x.replace(/[<>\n]/g, ' ').slice(0, len).trim()).filter(Boolean) : []);
+    const args = { today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) };
+    const t0 = Date.now();
+    let nova;
     try {
-      return json(await geminiVoice(gkey, { audio, mime, typed: String(typed || '').slice(0, 6000), today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), existing: strings(existing, 120, 80) }));
-    } catch (e) { return fail(502, String(e?.message || 'Gemini could not be reached.').slice(0, 200)); }
+      const bytes = Uint8Array.from(atob(audio), c => c.charCodeAt(0));
+      nova = await novaHear(env, bytes, String(mime).split(';')[0], strings(terms, 50, 40));
+    } catch (e) {
+      await bump(env, user.id, 'hear-nova-failed');
+      return fail(502, `Deepgram could not hear it (${String(e?.message || e).slice(0, 140)}). Tap Speak and try again.`);
+    }
+    const novaMs = Date.now() - t0;
+    await bump(env, user.id, 'hear-nova'); await bump(env, user.id, 'ms-nova', novaMs);
+    if (!nova.text) { await bump(env, user.id, 'hear-empty'); return json({ transcript: '', heard: '', items: [], via: 'nova-3' }); }
+    const data = await accountData(env, user.id);
+    const gkey = await geminiKeyFor(env, user, data);
+    let out = null, via = 'nova-3 + gemini';
+    if (gkey) {
+      const t1 = Date.now();
+      try { out = await geminiCorrect(gkey, { audio, mime, heard: nova.text, unsure: nova.unsure, ...args }); await bump(env, user.id, 'hear-gemini'); await bump(env, user.id, 'ms-gemini-hear', Date.now() - t1); } catch (e) { await bump(env, user.id, 'hear-gemini-failed'); }
+    }
+    if (!out) {
+      via = 'nova-3 + llama';
+      try { out = { transcript: nova.text, items: await cloudSplit(env, { text: nova.text, ...args }) }; await bump(env, user.id, 'split-budgie'); } catch { out = { transcript: nova.text, items: [] }; }
+    }
+    // Help Taskie hear better (on unless turned off in Settings): what Nova-3 heard and what it became, as text only.
+    if (data?.planner?.helpHear !== false) await keepSample(env, user.id, { heard: nova.text, transcript: out.transcript, items: out.items.map(x => x.title), via, ms: Date.now() - t0, confidence: nova.confidence });
+    return json({ transcript: out.transcript, heard: nova.text, items: out.items, via, ms: Date.now() - t0 });
+  }
+  // Break one task (or one step of it) into small, clear steps: Gemini, else Taskie's own Llama.
+  if (path === '/api/ai/steps' && method === 'POST') {
+    const key = `ai-steps:${user.id}`;
+    if (await tooManyAttempts(env, key, 200)) return fail(429, 'Many breakdowns this hour.');
+    await countFailure(env, key);
+    const { title, kind, date, notes, parent, have } = await body(request);
+    const clean = (x, n) => String(x || '').replace(/[<>\n]/g, ' ').slice(0, n).trim();
+    if (!clean(title, 160)) return fail(400, 'Which task?');
+    const prompt = `Break this ${parent ? `step of the task "${clean(parent, 160)}"` : 'task'} into 3 to 6 small, concrete steps a student can do in order and tick off. Each step: starts with a verb, is specific to this exact work (name the real thing: the reading, the section, the problem set), under 60 characters, Title Case not needed. No generic filler like "get started" or "review".${Array.isArray(have) && have.length ? ` Steps already listed (do not repeat them): ${have.slice(0, 20).map(x => clean(x, 80)).join('; ')}.` : ''}
+Task: ${clean(title, 160)}. Kind: ${clean(kind, 20) || 'task'}.${/^\d{4}-\d{2}-\d{2}$/.test(date || '') ? ` Due ${date}.` : ''}${notes ? ` Notes: ${clean(notes, 400)}` : ''}`;
+    const schema = { type: 'object', properties: { steps: { type: 'array', items: { type: 'string' } } }, required: ['steps'] };
+    const tidy = l => (Array.isArray(l) ? l : []).map(x => String(x || '').replace(/[<>]/g, '').replace(/^\s*\d+[.)]\s*/, '').trim().slice(0, 80)).filter(Boolean).slice(0, 6);
+    const gkey = await geminiKeyFor(env, user, await accountData(env, user.id));
+    if (gkey) { try { const out = await geminiJson(gkey, prompt, schema, { temperature: 0.3, timeout: 15000 }); const st = tidy(out.steps); if (st.length >= 2) { await bump(env, user.id, 'steps-gemini'); return json({ steps: st, via: 'gemini' }); } } catch { await bump(env, user.id, 'steps-gemini-failed'); } }
+    try {
+      const out = await env.AI.run(SPLIT_MODEL, { messages: [{ role: 'user', content: `${prompt}\nReply with JSON {"steps":[...]} only.` }], response_format: { type: 'json_schema', json_schema: schema }, temperature: 0.3, max_tokens: 500 });
+      let d = out?.response ?? out; if (typeof d === 'string') d = JSON.parse(d.match(/\{[\s\S]*\}/)?.[0] || '{}');
+      await bump(env, user.id, 'steps-llama');
+      return json({ steps: tidy(d.steps), via: 'llama' });
+    } catch { return fail(502, 'Steps could not be written right now.'); }
+  }
+  // What's next: a few fresh, specific ideas from the person's own planner (Gemini; Taskie's own AI otherwise).
+  if (path === '/api/ai/next' && method === 'POST') {
+    const key = `ai-next:${user.id}`;
+    if (await tooManyAttempts(env, key, 60)) return fail(429, 'Ideas refresh a little later.');
+    await countFailure(env, key);
+    const { facts } = await body(request);
+    const text = String(facts || '').replace(/[<>]/g, ' ').slice(0, 6000);
+    if (!text.trim()) return fail(400, 'Nothing to think about yet.');
+    const prompt = `You are Taskie, a warm, sharp planner for a student. From their planner below, suggest 3 specific next moves that would help most right now. Each is something they can do or add today or this week: start an assignment early, prepare for an exam, split a big task, protect time for a goal, rest when the week is heavy, clear what is overdue. Refer to their real items by name. No generic advice. Title: an action in Title Case, at most 8 words. Why: one short sentence with the reason (dates, counts). If it should become a task, fill task with a title, a date (YYYY-MM-DD, today or later), minutes, and kind; otherwise leave task.title empty. "action" is "add" for a new task, "overdue" to bring every overdue item to today, or "none".
+${text}`;
+    const schema = { type: 'object', properties: { ideas: { type: 'array', items: { type: 'object', properties: { title: { type: 'string' }, why: { type: 'string' }, action: { type: 'string', enum: ['add', 'overdue', 'none'] }, task: { type: 'object', properties: { title: { type: 'string' }, date: { type: 'string' }, time: { type: 'string' }, minutes: { type: 'integer' }, kind: { type: 'string', enum: ['task', 'assignment', 'exam', 'routine', 'event'] } } } }, required: ['title', 'why', 'action'] } } }, required: ['ideas'] };
+    const tidy = list => (Array.isArray(list) ? list : []).slice(0, 4).map(x => ({
+      title: String(x?.title || '').replace(/[<>]/g, '').slice(0, 80).trim(), why: String(x?.why || '').replace(/[<>]/g, '').slice(0, 200).trim(),
+      action: ['add', 'overdue'].includes(x?.action) ? x.action : 'none',
+      task: x?.task?.title ? { title: String(x.task.title).slice(0, 80), date: /^\d{4}-\d{2}-\d{2}$/.test(x.task.date || '') ? x.task.date : '', time: /^([01]\d|2[0-3]):[0-5]\d$/.test(x.task.time || '') ? x.task.time : '', mins: Number.isInteger(x.task.minutes) && x.task.minutes > 0 && x.task.minutes <= 600 ? x.task.minutes : 30, kind: ['task', 'assignment', 'exam', 'routine', 'event'].includes(x.task.kind) ? x.task.kind : 'task' } : null,
+    })).filter(x => x.title);
+    const data = await accountData(env, user.id);
+    const gkey = await geminiKeyFor(env, user, data);
+    if (gkey) {
+      try { const out = await geminiJson(gkey, prompt, schema); await bump(env, user.id, 'next-gemini'); return json({ ideas: tidy(out.ideas), via: 'gemini' }); } catch { await bump(env, user.id, 'next-gemini-failed'); }
+    }
+    try {
+      const out = await env.AI.run(SPLIT_MODEL, { messages: [{ role: 'user', content: `${prompt}\nReply with JSON {"ideas":[...]} only.` }], response_format: { type: 'json_schema', json_schema: schema }, temperature: 0.6, max_tokens: 1200 });
+      let d = out?.response ?? out; if (typeof d === 'string') d = JSON.parse(d.match(/\{[\s\S]*\}/)?.[0] || '{}');
+      await bump(env, user.id, 'next-llama');
+      return json({ ideas: tidy(d.ideas), via: 'llama' });
+    } catch { return fail(502, 'Ideas could not be written right now.'); }
   }
   if (path === '/api/gemini/check' && method === 'POST') {
     const key = `gemini-check:${user.id}`;

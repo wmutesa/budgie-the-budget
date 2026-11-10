@@ -1,214 +1,162 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue';
-import { capture, sortAndPlace, hear } from '../lib/capture';
+import { capture, sortAndPlace } from '../lib/capture';
 import { routeAll, splitSpoken, DESTS } from '../lib/router';
 import { useDictation, canDictate } from '../lib/dictation';
 import { tidyDictation } from '../lib/tidy';
-import { store } from '../lib/store';
-import { canCapture, prime, createLive } from '../lib/livevoice';
-import { liveWords, account } from '../lib/account';
+import { canCapture, prime, createRecorder } from '../lib/recorder';
+import { account } from '../lib/account';
 import Icon from './Icon.vue';
-import { spokenMarks, newWords, applyVocab, learnCorrections } from '../lib/titles';
+import { spokenMarks } from '../lib/titles';
 import { diag, from, flush } from '../lib/diag';
 
-// The one way to add anything. Tap Add and talk: Taskie listens to the
-// microphone itself and your words appear in the card as you speak (written
-// down by Taskie's server at each pause), and you can edit them while it
-// listens. Only Stop, on the card, ends it: Taskie then breaks what you said
-// into separate things and puts each one in place. Typed text is added line by line.
-const micNote = ref('');
-// Everything Taskie wrote down this time, before your edits: comparing it with what you
-// keep teaches Taskie your names and your accent.
-let heardRaw = '';
-function learnFromEdits() {
-  const pairs = learnCorrections(heardRaw.trim(), capture.text);
-  heardRaw = '';
-  if (!pairs.length) return;
-  const list = store.vocab || (store.vocab = []);
-  for (const p of pairs) { const i = list.findIndex(v => (v.heard || '').toLowerCase() === p.heard.toLowerCase()); if (i >= 0) list.splice(i, 1); list.push({ ...p, learned: new Date().toISOString().slice(0, 10) }); }
-  if (list.length > 300) list.splice(0, list.length - 300);
-}
-// The words so far in the phrase you are saying, faded until you pause.
-const partial = ref('');
-// Keyterms (as ElevenLabs calls them): your categories, course codes and open task names,
-// so the speech model spells them your way. At most 50, each short.
-function keyterms() {
-  const out = new Set();
-  for (const v of store.vocab || []) out.add(v.word);
-  if (store.me?.location) out.add(store.me.location);
-  if (store.me?.school) out.add(store.me.school);
-  for (const p of Object.keys(store.projects || {})) out.add(p);
-  for (const t of store.tasks || []) { if (t.project) out.add(t.project); }
-  for (const t of (store.tasks || []).filter(x => !x.done).slice(0, 80)) { const m = t.title.match(/\b[A-Z]{2,5}\s?\d{2,4}[A-Z]?\b/g); if (m) m.forEach(x => out.add(x)); }
-  for (const t of (store.tasks || []).filter(x => !x.done && !x.repeat).slice(0, 40)) out.add(t.title);
-  if (store.me?.name) out.add(store.me.name);
-  return [...out].map(x => String(x).replace(/[<>\n]/g, ' ').trim().slice(0, 40)).filter(x => x.length > 1).slice(0, 50);
-}
-const spoken = ref(false);
+// The one way to add anything. Tap Add and talk: Taskie records, and when you
+// tap Stop it hears the whole recording at once (Deepgram Nova-3 writes it
+// down, Gemini fixes names and words from your context), breaks it into
+// separate things and puts each in place for a quick review. You can also type.
+const note = ref('');
 const level = ref(0);
-// New words go after what is there, with a space only when both sides have text.
-const join = (a, b) => { const t = (b || '').trimStart(); return !t ? a : !a || /\s$/.test(a) ? `${a}${t}` : `${a} ${t}`; };
-const hasKey = computed(() => !!store.digest?.geminiKey);
-// With a Gemini key the whole recording also goes to Gemini on Stop: it reads it in full.
-const geminiAudio = computed(() => canCapture && hasKey.value && store.planner?.geminiAudio !== false);
-
-// Taskie's own listening (every modern browser).
-const recLive = ref(false);
-let liveFailed = false;
-const live = createLive({
-  send: (audio, prompt, isPartial) => liveWords(audio, prompt, keyterms(), Boolean(isPartial)),
-  onPartial: t => { partial.value = t; },
-  // Live words over one connection (Deepgram Nova-3 through Taskie's server); phrase by phrase if that cannot start.
-  streamUrl: () => (typeof location !== 'undefined' && store.planner?.liveStream !== false ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/voice/stream` : null),
+const secs = ref(0);
+const phase = ref('idle'); // idle | recording | hearing
+let lastAudio = null;       // kept until it is heard, so a failed try can be retried
+const rec = createRecorder({
   onLevel: v => { level.value = v; },
-  onText: t => { spoken.value = true; liveFailed = false; const fresh = newWords(capture.text, applyVocab(spokenMarks(t), store.vocab)); heardRaw += ` ${fresh}`; capture.text = join(capture.text, fresh); nextTick(() => { if (box.value && document.activeElement !== box.value) box.value.scrollTop = box.value.scrollHeight; }); },
+  onTime: s => { secs.value = s; },
   onError: (m, code) => {
-    diag('live-error', { code, msg: m.slice(0, 160) });
-    if (code === 'silent') { micNote.value = m; return; }
-    if (code === 'mic' || code === 'unsupported') { recLive.value = false; micNote.value = `${m} You can type instead.`; return; }
-    liveFailed = true;
-    micNote.value = hasKey.value
-      ? `${m} Keep talking: Taskie is still recording, and Gemini writes it all down when you tap Stop.`
-      : `${m} Keep talking: Taskie is still recording and tries each phrase again. You can also type.`;
+    diag('rec-error', { code, msg: m.slice(0, 160) });
+    note.value = m;
+    if (code === 'mic' || code === 'unsupported') { phase.value = 'idle'; note.value = `${m} You can type instead.`; }
   },
 });
-// Older browsers without audio capture: their own dictation, if they have it.
+// Very old browsers without audio capture: their own dictation, if they have it.
+let base = '';
+const join = (a, b) => { const t = (b || '').trimStart(); return !t ? a : !a || /\s$/.test(a) ? `${a}${t}` : `${a} ${t}`; };
 const dict = useDictation({
   continuous: true,
-  onError: m => { diag('dict-error', { msg: m.slice(0, 160) }); micNote.value = `${m} You can type instead.`; },
-  onText: t => { spoken.value = true; capture.text = join(base, spokenMarks(t)); },
+  onError: m => { note.value = `${m} You can type instead.`; },
+  onText: t => { capture.text = join(base, spokenMarks(t)); },
   onFinal: t => { capture.text = join(base, spokenMarks(t)).trim(); },
 });
-let base = '';
 const canSpeak = computed(() => canCapture || canDictate);
-const listening = computed(() => recLive.value || dict.listening.value);
+const recording = computed(() => phase.value === 'recording' || dict.listening.value);
+const clock = computed(() => `${Math.floor(secs.value / 60)}:${String(secs.value % 60).padStart(2, '0')}`);
 const box = ref(null);
-// Editing while it listens is fine: new words are added at the end.
-function onEdit() { if (dict.listening.value) { base = capture.text; dict.commit(); } }
 
 async function listen() {
-  diag('listen', { canCapture, canDictate });
-  micNote.value = ''; liveFailed = false;
-  if (capture.text && !capture.text.endsWith('\n')) capture.text += '\n';
+  note.value = '';
   if (canCapture) {
-    recLive.value = true;
-    const ok = await live.start();
-    diag('started', { ok, open: capture.open });
-    if (!ok) recLive.value = false;
+    phase.value = 'recording'; secs.value = 0;
+    const ok = await rec.start();
+    if (!ok) phase.value = 'idle';
     return;
   }
   base = capture.text;
   dict.start();
 }
-watch(listening, v => { if (!v) partial.value = ''; });
-const stopAll = () => { if (recLive.value) live.cancel(); recLive.value = false; if (dict.listening.value) dict.stop(); };
-
-// Open: start listening straight away when the browser can. Called from the tap,
-// so the microphone can start (Safari only allows sound to start inside a tap).
-function openSheet({ voice = canSpeak.value } = {}) {
-  diag('open-sheet', { voice, already: capture.open, at: capture.at, sorting: capture.sorting });
-  if (capture.open) { box.value?.focus(); return; }
-  if (voice) prime();
-  capture.open = true; spoken.value = false; micNote.value = ''; heardRaw = '';
-  nextTick(() => { if (voice && !listening.value) listen(); else box.value?.focus(); });
+// Stop: hear the whole recording and put everything in place.
+async function stopAndHear() {
+  if (dict.listening.value) { dict.stop(); return; }
+  phase.value = 'hearing';
+  const audio = await rec.stop();
+  if (!audio) { phase.value = 'idle'; note.value = 'Nothing was heard. Check that the microphone is allowed and not muted, then tap Speak again, or type instead.'; return; }
+  lastAudio = audio;
+  await heard();
 }
-// While recording, the card stays open: only Stop ends it.
-function close() { diag('close-asked', { listening: listening.value }); if (listening.value) return; capture.open = false; }
-// How it will be split (the rules; the AI may tidy the wording), shown as you go.
-const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
-const NOTHING = 'Nothing was heard. Check that the microphone is allowed for this site and not muted, then tap Speak again, or type instead.';
-async function sortIt() {
-  diag('sort', { listening: listening.value, chars: capture.text.length, spoken: spoken.value });
-  if (capture.sorting) return;
-  const wasListening = listening.value;
-  capture.sorting = true; // Stop shows at once that it is working
+async function heard() {
+  phase.value = 'hearing'; note.value = '';
   try {
-    let audio = null;
-    if (recLive.value) { recLive.value = false; audio = await live.stop(); } // waits for the last words
-    if (dict.listening.value) {
-      dict.stop();
-      for (let i = 0; i < 30 && dict.listening.value; i++) await new Promise(r => setTimeout(r, 50));
-    }
-    // Live words failed but Gemini can hear: it writes the recording down first, so you can check and edit it.
-    if (wasListening && audio && hasKey.value && (liveFailed || !spoken.value)) {
-      let said = '';
-      try { said = await hear(audio); } catch (e) { micNote.value = `Gemini could not write it down (${e.message || 'no answer'}). Type it instead, or try again.`; return; }
-      if (!said) { micNote.value = NOTHING; return; }
-      capture.text = join(capture.text.trim() ? `${capture.text.trim()}\n` : '', spokenMarks(said));
-      micNote.value = 'Here is what Gemini heard. Fix any word, then tap Add.';
-      nextTick(() => box.value?.focus());
-      return;
-    }
-    if (!capture.text.trim()) { if (wasListening) micNote.value = liveFailed ? `${micNote.value.split(' Keep talking')[0]} Nothing could be written down. Add a free Gemini key in Profile, or type instead.` : NOTHING; return; }
-    capture.sorting = false;
-    if (heardRaw.trim()) learnFromEdits();
-    const n = await sortAndPlace(capture.text, { spoken: spoken.value, audio: geminiAudio.value ? audio : null });
-    if (!n && capture.open) micNote.value = 'Nothing to add was found in that. Edit the words and tap Add again.';
+    const n = await sortAndPlace(capture.text, { audio: lastAudio });
+    lastAudio = null;
+    if (!n && capture.open) note.value = capture.heard ? `Taskie heard “${capture.heard.slice(0, 140)}” but found nothing to add. Say it again, or type it.` : 'Nothing was heard in that. Speak a little closer to the microphone and try again.';
+  } catch (e) {
+    note.value = `${e?.message || 'Taskie could not hear that right now.'}`;
   } finally {
-    capture.sorting = false;
+    phase.value = 'idle';
   }
 }
-// The mic on the card: Speak starts listening; Stop ends it and sorts what was said.
-const micTap = () => { if (listening.value) return sortIt(); prime(); spoken.value = true; return listen(); };
+const stopAll = () => { if (phase.value === 'recording') rec.cancel(); phase.value = 'idle'; if (dict.listening.value) dict.stop(); };
+
+// Open: start recording straight away when the browser can. Called from the tap,
+// so the microphone can start (Safari only allows sound to start inside a tap).
+function openSheet({ voice = canSpeak.value } = {}) {
+  diag('open-sheet', { voice, already: capture.open });
+  if (capture.open) { box.value?.focus(); return; }
+  if (voice) prime();
+  capture.open = true; note.value = ''; lastAudio = null;
+  nextTick(() => { if (voice) listen(); else box.value?.focus(); });
+}
+// While recording or hearing, the card stays open.
+function close() { if (phase.value !== 'idle' || dict.listening.value) return; capture.open = false; }
+const rows = computed(() => routeAll(tidyDictation(splitSpoken(capture.text).join('\n'))));
+async function addTyped() {
+  if (!capture.text.trim() || capture.sorting) return;
+  const n = await sortAndPlace(capture.text);
+  if (!n && capture.open) note.value = 'Nothing to add was found in that. Edit the words and tap Add again.';
+}
+const micTap = () => (recording.value ? stopAndHear() : (prime(), listen()));
 const onKey = e => {
   if (e.key === 'Escape' && capture.open) close();
-  // "N" anywhere (not while typing) opens it.
   if (!capture.open && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.target.closest('input, textarea, select, [contenteditable]')) { e.preventDefault(); openSheet({ voice: false }); }
 };
-onMounted(() => window.addEventListener('keydown', onKey));
-onUnmounted(() => { diag('unmounted', { open: capture.open, listening: listening.value }); stopAll(); capture.open = false; flush(); window.removeEventListener('keydown', onKey); });
-// Who opens and closes the card, as it happens.
-watch(() => capture.open, v => diag(v ? 'card-open' : 'card-closed', { listening: listening.value, from: from() }), { flush: 'sync' });
-watch(listening, v => diag(v ? 'listening-on' : 'listening-off', { open: capture.open }), { flush: 'sync' });
-watch(() => [account.status, account.sync, account.note], ([status, sync, note]) => diag('account', { status, sync, note: note || '' }), { flush: 'sync' });
-onMounted(() => diag('mounted', { canCapture, canDictate, secure: window.isSecureContext }));
-watch(() => capture.open, v => { if (!v && listening.value) stopAll(); });
+onMounted(() => { window.addEventListener('keydown', onKey); diag('mounted', { canCapture, canDictate, secure: window.isSecureContext }); });
+onUnmounted(() => { stopAll(); capture.open = false; flush(); window.removeEventListener('keydown', onKey); });
+watch(() => capture.open, v => { diag(v ? 'card-open' : 'card-closed', { phase: phase.value, from: from() }); if (!v && phase.value === 'recording') stopAll(); }, { flush: 'sync' });
+watch(() => [account.status, account.sync], ([status, sync]) => diag('account', { status, sync }), { flush: 'sync' });
 defineExpose({ openSheet });
 const EXAMPLES = ['Essay due Friday 5pm #English', 'Gym Mon Wed Fri 6pm', 'I want to run a 10K by March', 'Mark the lab report as done', 'Call mom tomorrow 📞'];
+const BARS = 24;
 </script>
 
 <template>
-  <button type="button" class="cap-fab" :class="{ live: listening, busy: capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="listening ? 'Recording: open the card' : 'Add anything (N)'" :title="listening ? 'Recording: open the card' : 'Add anything (N)'" data-test="capture" @click="openSheet()">
-    <span v-if="listening" class="cap-live" aria-hidden="true" data-test="capture-live"><i class="cap-rec" /></span>
+  <button type="button" class="cap-fab" :class="{ live: recording, busy: phase === 'hearing' || capture.sorting, open: capture.open, away: capture.at >= 0 }" :aria-label="recording ? 'Recording: open the card' : 'Add anything (N)'" :title="recording ? 'Recording: open the card' : 'Add anything (N)'" data-test="capture" @click="openSheet()">
+    <span v-if="recording" class="cap-live" aria-hidden="true" data-test="capture-live"><i class="cap-rec" /></span>
     <span v-else class="cap-glyph"><Icon name="capture" :size="15" /></span>
-    <span class="cap-word">{{ listening ? 'Recording' : 'Add' }}</span>
+    <span class="cap-word">{{ recording ? 'Recording' : 'Add' }}</span>
   </button>
 
   <Teleport to="body">
     <div v-if="capture.open" class="cap-scrim" @click.self="close">
-      <section class="cap-sheet" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
-        <header class="cap-head">
-          <div>
-            <h2>{{ capture.sorting ? (hasKey ? 'Sorting it out with Gemini…' : 'Sorting it out…') : listening ? 'Listening. Go on…' : 'Add anything' }}</h2>
-            <p class="muted small">{{ listening ? 'Say everything on your mind. Your words appear here as you speak, and you can fix any of them. Tap Stop when you are done: Taskie splits it into tasks, routines, events and goals.' : 'Say or type several things. Taskie sorts them into tasks, routines, events and goals, then shows you each one to keep or change.' }}</p>
+      <section class="cap-sheet" :class="`is-${phase}`" role="dialog" aria-modal="true" aria-label="Add anything" data-test="capture-sheet">
+        <!-- Recording and hearing: one calm view, no text to read while you talk. -->
+        <div v-if="phase !== 'idle' || dict.listening.value" class="rec" data-test="capture-recording">
+          <p class="rec-kicker">{{ phase === 'hearing' ? 'Taskie is listening back' : 'Recording' }}<span v-if="phase === 'recording'" class="rec-clock">{{ clock }}</span></p>
+          <h2 class="rec-title">{{ phase === 'hearing' ? 'Turning it into your plan…' : 'Say everything on your mind.' }}</h2>
+          <p class="rec-sub muted">{{ phase === 'hearing' ? 'Deepgram writes it down, Gemini checks every name, course and date against your planner.' : 'Assignments, exams, errands, plans, goals: all at once, in any order. Tap Stop when you are done.' }}</p>
+          <div class="rec-wave" :class="{ hearing: phase === 'hearing' }" aria-hidden="true" :style="{ '--lv': level }">
+            <i v-for="n in BARS" :key="n" :style="{ '--i': n, '--h': (0.35 + 0.65 * Math.abs(Math.sin(n * 1.7))).toFixed(2) }" />
           </div>
-          <button v-if="!listening" type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
-        </header>
-
-        <div class="cap-pad" :class="{ live: listening }">
-          <textarea ref="box" v-model="capture.text" rows="4" placeholder="“Essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March”" aria-label="What to add" data-test="capture-text" @input="onEdit" @keydown.meta.enter.prevent="sortIt" @keydown.ctrl.enter.prevent="sortIt" />
-          <div class="cap-wave" aria-hidden="true" :style="{ '--lv': level }"><i v-for="n in 5" :key="n" /></div>
-          <p v-if="listening && partial" class="cap-partial" aria-live="polite" data-test="capture-partial">{{ partial }}…</p>
+          <p v-if="note" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ note }}</p>
+          <button v-if="phase === 'recording' || dict.listening.value" type="button" class="rec-stop" data-test="capture-mic" @click="stopAndHear"><Icon name="stop" :size="18" /><span>Stop</span></button>
+          <span v-else class="rec-busy" data-test="capture-hearing"><Icon name="refresh" :size="16" />Hearing</span>
         </div>
 
-        <p v-if="micNote" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ micNote }}</p>
-        <ul v-if="rows.length" class="cap-rows" aria-label="How Taskie will sort it">
-          <li v-for="r in rows" :key="r.id" :class="`to-${r.dest}`"><Icon :name="DESTS[r.dest].icon" :size="13" /><b>{{ DESTS[r.dest].label }}</b><span>{{ r.task.title }}</span></li>
-        </ul>
-        <div v-else class="cap-examples">
-          <span class="muted small">Try:</span>
-          <button v-for="x in EXAMPLES" :key="x" type="button" class="chip-btn" @click="capture.text = capture.text ? `${capture.text}\n${x}` : x">{{ x }}</button>
-        </div>
-
-        <footer class="cap-foot">
-          <button v-if="canSpeak" type="button" class="cap-mic" :class="{ on: listening }" :aria-pressed="listening" :disabled="capture.sorting" data-test="capture-mic" @click="micTap">
-            <Icon :name="listening ? 'stop' : 'mic'" :size="16" />{{ listening ? 'Stop' : 'Speak' }}
-          </button>
-          <span class="muted small cap-keys">{{ listening ? 'Stop sorts it for you' : 'Ctrl or ⌘ + Enter' }}</span>
-          <button v-if="!listening" type="button" class="btn primary" :disabled="!capture.text.trim() || capture.sorting" data-test="capture-sort" @click="sortIt">
-            <Icon :name="capture.sorting ? 'refresh' : 'plus'" :size="15" />{{ capture.sorting ? 'Breaking it down…' : rows.length > 1 ? `Add ${rows.length} things` : 'Add' }}
-          </button>
-        </footer>
+        <template v-else>
+          <header class="cap-head">
+            <div>
+              <h2>Add anything</h2>
+              <p class="muted small">Talk or type several things at once. Taskie sorts them into tasks, routines, events and goals, and shows you each one.</p>
+            </div>
+            <button type="button" class="sch-icon" aria-label="Close" title="Close (Esc)" @click="close"><Icon name="x" :size="18" /></button>
+          </header>
+          <div class="cap-pad">
+            <textarea ref="box" v-model="capture.text" rows="4" placeholder="“Essay due Friday at 5, gym Monday Wednesday Friday at 6, and I want to run a 10K by March”" aria-label="What to add" data-test="capture-text" @keydown.meta.enter.prevent="addTyped" @keydown.ctrl.enter.prevent="addTyped" />
+          </div>
+          <p v-if="note" class="cap-note small" role="status" data-test="capture-note"><Icon name="help" :size="14" />{{ note }}<button v-if="lastAudio" type="button" class="linkish" data-test="capture-retry" @click="heard">Try again</button></p>
+          <ul v-if="rows.length" class="cap-rows" aria-label="How Taskie will sort it">
+            <li v-for="r in rows" :key="r.id" :class="`to-${r.dest}`"><Icon :name="DESTS[r.dest].icon" :size="13" /><b>{{ DESTS[r.dest].label }}</b><span>{{ r.task.title }}</span></li>
+          </ul>
+          <div v-else class="cap-examples">
+            <span class="muted small">Try:</span>
+            <button v-for="x in EXAMPLES" :key="x" type="button" class="chip-btn" @click="capture.text = capture.text ? `${capture.text}\n${x}` : x">{{ x }}</button>
+          </div>
+          <footer class="cap-foot">
+            <button v-if="canSpeak" type="button" class="cap-mic" :disabled="capture.sorting" data-test="capture-mic" @click="micTap"><Icon name="mic" :size="16" />Speak</button>
+            <span class="muted small cap-keys">Ctrl or ⌘ + Enter</span>
+            <button type="button" class="btn primary" :disabled="!capture.text.trim() || capture.sorting" data-test="capture-sort" @click="addTyped">
+              <Icon :name="capture.sorting ? 'refresh' : 'plus'" :size="15" />{{ capture.sorting ? 'Breaking it down…' : rows.length > 1 ? `Add ${rows.length} things` : 'Add' }}
+            </button>
+          </footer>
+        </template>
       </section>
     </div>
   </Teleport>

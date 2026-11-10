@@ -66,13 +66,11 @@ window.webkitSpeechRecognition = FakeRec;
 // tests/accounts.cjs tests the real server.
 const geminiCalls = [];
 const voiceCalls = [];
-// Live words: each piece of audio the page sends gets the next scripted phrase ('' once they run out; 503 means unavailable).
-const liveScript = [];
-let partialCalls = 0; // quick guesses while talking (they do not use up the script)
+let typedGemini = false; // the server answers a typed note with Gemini's items
+let hearFails = 0;       // the next N recordings fail to be heard
 // Taskie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
 let budgieItems = null;
 const budgieCalls = [];
-let liveCalls = 0;
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Taskie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
@@ -119,7 +117,7 @@ async function fakeApi(page, account = fakeAccount) {
     }
     // Gemini with the person's own key: a canned answer, as Google would send it through the server.
     if (p === '/api/gemini/check') return route.fulfill({ json: { ok: true, message: 'Google accepted the key. What you say in Add will be broken down by Gemini.' } });
-    if (p === '/api/gemini/breakdown') { geminiCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { items: [
+    if (p === '/api/voice/breakdown' && typedGemini) { geminiCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { via: 'gemini', items: [
       { title: 'Stats problem set', kind: 'assignment', date: inDays(2), time: '17:00', minutes: 60, repeat: '', days: [], course: 'Statistics' },
       { title: 'Biology midterm', kind: 'exam', date: inDays(5), time: '', minutes: 0, repeat: '', days: [], course: 'Biology' },
       { title: 'Swim', kind: 'routine', date: '', time: '07:00', minutes: 45, repeat: 'weekly', days: ['tue', 'thu'], course: '' },
@@ -128,8 +126,8 @@ async function fakeApi(page, account = fakeAccount) {
     ] } }); }
     // Gemini hears a recording: what was said, and the items in it.
     if (p === '/api/voice/breakdown') { budgieCalls.push(JSON.parse(req.postData() || '{}')); return budgieItems ? route.fulfill({ json: { items: budgieItems } }) : route.fulfill({ status: 503, json: { error: 'busy' } }); }
-    if (p === '/api/voice/live') { const body = JSON.parse(req.postData() || '{}'); if (body.partial) { partialCalls++; return route.fulfill({ json: { text: typeof liveScript[0] === 'string' ? liveScript[0].split(' ').slice(0, 2).join(' ') : '' } }); } liveCalls++; if (!/^UklGR/.test(body.audio || '')) return route.fulfill({ status: 400, json: { error: 'not wav' } }); const t = liveScript.length ? liveScript.shift() : ''; return t === 503 ? route.fulfill({ status: 503, json: { error: 'Live words are not available right now.' } }) : route.fulfill({ json: { text: t } }); }
-    if (p === '/api/gemini/voice') { voiceCalls.push(JSON.parse(req.postData() || '{}')); return route.fulfill({ json: { transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
+    // A recording: Deepgram Nova-3 hears it, Gemini corrects it and lists the items (worker/hear.js).
+    if (p === '/api/voice/hear') { const body = JSON.parse(req.postData() || '{}'); voiceCalls.push(body); if (hearFails > 0) { hearFails--; return route.fulfill({ status: 502, json: { error: 'Deepgram could not hear it (busy). Tap Speak and try again.' } }); } return route.fulfill({ json: { via: 'nova-3 + gemini', heard: 'lab report three due friday at five for chem', transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
       { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
       { title: 'History quiz', kind: 'exam', date: inDays(10), time: '', minutes: 0, repeat: '', days: [], course: 'History' },
       { title: 'Gym', kind: 'routine', date: '', time: '07:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' },
@@ -442,11 +440,13 @@ async function run(url) {
   assert.equal(await page.$('[data-test="calendars"] [data-test="feed-list"]'), null, 'the Calendars button is only for adding');
   assert.match(await page.textContent('[data-test="calendars"]'), /already in[\s\S]*Settings/, 'it points to Settings for the ones already added');
   await page.click('[data-test="calendars-open"]');
+  typedGemini = true;
   await page.locator('body').press('n'); // opens Add for typing
   await page.fill('[data-test="capture-text"]', 'stats problem set due tuesday at five for statistics and the bio midterm on friday swim tuesdays and thursdays at seven call grandma tomorrow and I want to learn guitar');
   await page.click('[data-test="capture-sort"]');
   await page.waitForSelector('[data-test="capture-review"]');
-  assert.equal(geminiCalls.length, 1, 'Gemini is asked once, with the whole note');
+  typedGemini = false;
+  assert.equal(geminiCalls.length, 1, 'the server (Gemini) is asked once, with the whole note');
   assert.match(geminiCalls[0].today || '', /^\d{4}-\d{2}-\d{2}$/, "today's date goes with it, so Gemini can work out \"tuesday\"");
   // Walk the review: each of Gemini's items is there, with its date, time, repeat and course.
   const reviewed = [];
@@ -509,90 +509,44 @@ async function run(url) {
   await page.waitForSelector('[data-test="schedule"]');
   assert.equal(await page.$('[data-test="bell-pop"]'), null, 'the list closes');
 
-  // Voice: tap Add and Taskie listens to the microphone itself; words appear in the card as they are written down.
+  // Voice: tap Add and Taskie records. Nothing is written while you talk; Stop sends
+  // the whole recording to be heard (Nova-3, then Gemini) and each item is placed for review.
   const voice = await context.newPage();
   await fakeNetwork(voice);
   await voice.goto(url, { waitUntil: 'load' });
   assert.equal(await voice.$('[data-test="voice"]'), null, 'there is no microphone in the top bar');
-  liveScript.length = 0; liveScript.push('essay due friday at 5pm', 'then gym every monday at 6', 'and I want to read 12 books this year');
-  const live0 = liveCalls;
   await voice.click('[data-test="capture"]');
-  await voice.waitForFunction(() => /essay due friday/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 20000 });
-  assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'it listens as soon as Add opens');
+  await voice.waitForSelector('[data-test="capture-recording"]');
+  await voice.waitForFunction(() => /0:0[2-9]/.test(document.querySelector('.rec-clock')?.textContent || ''), null, { timeout: 15000 });
+  assert.equal(await voice.$('[data-test="capture-text"]'), null, 'no live text while recording: just the recording');
   assert.match(await voice.textContent('[data-test="capture"]'), /Recording/, 'the Add button shows it is recording');
   assert.ok(await voice.$('[data-test="capture"] .cap-rec'), 'with a recording dot');
-  // The top button only opens the card; Esc, the backdrop and the X do not end it: only Stop does.
+  // The top button only opens the card; Esc and the backdrop do not end it: only Stop does.
   await voice.evaluate(() => document.querySelector('[data-test="capture"]').click());
   await voice.keyboard.press('Escape');
   await voice.mouse.click(5, 300);
-  assert.ok(await voice.$('[data-test="capture-sheet"]'), 'the card stays open while recording');
-  assert.equal(await voice.getAttribute('[data-test="capture-mic"]', 'aria-pressed'), 'true', 'and it keeps listening');
+  assert.ok(await voice.$('[data-test="capture-recording"]'), 'the card stays open while recording');
   assert.equal(await voice.$('[data-test="capture-sheet"] [aria-label="Close"]'), null, 'no X while recording');
-  // Edit while listening: what you type stays, and later words follow it.
-  await voice.focus('[data-test="capture-text"]');
-  await voice.keyboard.press('End');
-  await voice.keyboard.type(' soon');
-  await voice.waitForFunction(() => /books/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 25000 });
-  { const v = await voice.inputValue('[data-test="capture-text"]'); assert.match(v, /soon[\s\S]*books this year$/, `what you type while listening is kept, and later words follow it (${JSON.stringify(v)})`); }
-  assert.ok(liveCalls - live0 >= 3, 'each phrase went to the server as audio');
-  assert.equal(await voice.$('[data-test="capture-sort"]'), null, 'no Sort button while listening: Stop sorts it');
-  if (process.env.SHOTS) { await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` }); await voice.locator('header').first().screenshot({ path: `${process.env.SHOTS}/recording-bar.png` }); }
-  // Stop: Taskie's server AI breaks what was said into separate things, and each is placed.
-  budgieItems = [
-    { title: 'Essay', kind: 'assignment', date: '', time: '17:00', minutes: 0, repeat: 'none', days: ['fri'].slice(0, 0), course: '', priority: '', action: 'add', target: '' },
-    { title: 'Gym', kind: 'routine', date: '', time: '18:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '', priority: '', action: 'add', target: '' },
-    { title: 'Read 12 books this year', kind: 'goal', date: '', time: '', minutes: 0, repeat: 'none', days: [], course: '', priority: '', action: 'add', target: '' },
-  ];
-  const bc0 = budgieCalls.length;
+  if (process.env.SHOTS) await voice.screenshot({ path: `${process.env.SHOTS}/recording.png` });
+  // Stop: the first try fails (busy), the recording is kept and Try again hears it.
+  hearFails = 1;
+  const v0 = voiceCalls.length;
   await voice.click('[data-test="capture-mic"]');
+  await voice.waitForSelector('[data-test="capture-retry"]');
+  assert.match(await voice.textContent('[data-test="capture-note"]'), /Deepgram could not hear it/, 'a failure says so, plainly');
+  await voice.click('[data-test="capture-retry"]');
   await voice.waitForSelector('[data-test="capture-review"]');
-  budgieItems = null;
-  assert.equal(budgieCalls.length, bc0 + 1, 'what was said went to Taskie\'s AI once');
-  assert.match(budgieCalls[bc0].text, /essay due friday[\s\S]*books this year/, 'with the edited live words');
-  assert.match(await voice.textContent('.cr-count'), /of 3/, 'three separate things come back and are sorted');
-  { const titles = []; for (let i = 0; i < 3; i++) { titles.push(await voice.inputValue('.cr-title')); if (i < 2) { await voice.click('[data-test="review-keep"]'); await voice.waitForTimeout(150); } } assert.deepEqual(titles.map(t => t.toLowerCase()), ['essay', 'gym', 'read 12 books'], `each is its own item (${titles})`); }
-  await voice.click('[data-test="review-keep"]');
-  assert.equal(await voice.$('[data-test="capture-review"]'), null, 'the review ends after the last one');
-  await voice.close();
-
-  // With a Gemini key, the recording itself goes to Gemini on Stop; what it hears is what gets added.
-  const hearAcct = { data: { ...JSON.parse(JSON.stringify(fakeAccount.data)), digest: { ...(fakeAccount.data.digest || {}), geminiKey: 'AIzaSyFakeKeyForTheTest_1234567890' } }, version: fakeAccount.version };
-  const hear = await context.newPage();
-  await fakeNetwork(hear, hearAcct);
-  liveScript.length = 0; liveScript.push('lab report three due friday at five for chemistry');
-  await hear.goto(url, { waitUntil: 'load' });
-  await hear.click('[data-test="capture"]');
-  await hear.waitForFunction(() => /chemistry/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 20000 });
-  await hear.click('[data-test="capture-mic"]');
-  await hear.waitForSelector('[data-test="capture-review"]');
-  assert.equal(voiceCalls.length, 1, 'the recording is sent to Gemini once');
-  assert.ok(voiceCalls[0].audio && voiceCalls[0].mime === 'audio/wav', 'the whole recording goes, as WAV');
-  assert.match(voiceCalls[0].typed || '', /lab report three/, 'the live text goes too, for spellings');
+  assert.equal(voiceCalls.length, v0 + 2, 'the same recording was sent again, once');
+  const sent = voiceCalls[v0 + 1];
+  assert.ok(/^UklGR/.test(sent.audio || '') && sent.mime === 'audio/wav', 'the whole recording goes, as WAV');
+  assert.match(sent.today || '', /^\d{4}-\d{2}-\d{2}$/, 'with today, so dates can be worked out');
+  assert.ok(Array.isArray(sent.terms) && Array.isArray(sent.existing), 'with the person\'s own words and open items, so names are heard right');
   const heardItems = [];
-  for (let i = 0; i < 8 && await hear.$('[data-test="capture-review"]'); i++) { heardItems.push(`${await hear.inputValue('.cr-title')} | ${await hear.textContent('.cr-where')}`); await hear.click('[data-test="review-keep"]'); await hear.waitForTimeout(150); }
-  assert.ok(heardItems.some(x => /^Lab Report 3 \| Schedule · Assignment · .*5 PM · #Chemistry/.test(x)), `Gemini's spelling and details are used (${heardItems.join(' ;; ')})`);
-  assert.ok(heardItems.some(x => /^History Quiz \| Schedule · Exam/.test(x)), 'what only Gemini heard is added too');
+  for (let i = 0; i < 8 && await voice.$('[data-test="capture-review"]'); i++) { heardItems.push(`${await voice.inputValue('.cr-title')} | ${await voice.textContent('.cr-where')}`); await voice.click('[data-test="review-keep"]'); await voice.waitForTimeout(150); }
+  assert.ok(heardItems.some(x => /^Lab Report 3 \| Schedule · Assignment · .*5 PM · #Chemistry/.test(x)), `the corrected spelling and details are used (${heardItems.join(' ;; ')})`);
+  assert.ok(heardItems.some(x => /^History Quiz \| Schedule · Exam/.test(x)), 'every item is added');
   assert.ok(heardItems.some(x => /^Gym \| Schedule · Routine/.test(x)), 'the weekly gym is a routine');
-  await hear.close();
-
-  // Live text fails (Safari with Dictation off): it keeps recording, Stop writes it down for checking, then Add sorts it once.
-  const deaf = await context.newPage();
-  await fakeNetwork(deaf, hearAcct);
-  liveScript.length = 0; for (let i = 0; i < 40; i++) liveScript.push(503);
-  await deaf.goto(url, { waitUntil: 'load' });
-  const calls0 = voiceCalls.length;
-  await deaf.click('[data-test="capture"]');
-  await deaf.waitForSelector('[data-test="capture-note"]:has-text("still recording")', { timeout: 20000 });
-  assert.match(await deaf.textContent('[data-test="capture-note"]'), /not available[\s\S]*Gemini writes it all down/, 'it says live words are down and the recording is kept');
-  await deaf.click('[data-test="capture-mic"]');
-  await deaf.waitForFunction(() => /Lab Report 3 due Friday/.test(document.querySelector('[data-test="capture-text"]').value), null, { timeout: 8000 });
-  assert.match(await deaf.textContent('[data-test="capture-note"]'), /what Gemini heard/, 'Stop shows what was heard, to check and edit');
-  assert.equal(await deaf.$('[data-test="capture-review"]'), null, 'nothing is added before you check it');
-  await deaf.click('[data-test="capture-sort"]');
-  await deaf.waitForSelector('[data-test="capture-review"]');
-  assert.equal(voiceCalls.length, calls0 + 1, 'the recording went to Gemini once, not again on Add');
-  liveScript.length = 0;
-  await deaf.close();
+  await voice.close();
 
   // First-time guide, once per person, on an empty account.
   const fresh = { data: null, version: 0 };

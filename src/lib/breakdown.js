@@ -1,12 +1,23 @@
-// Turn a task into steps: the on-device AI when it is ready, rules otherwise.
+// Turn a task into steps: Taskie's server AI (Gemini, or its own Llama), then the
+// on-device AI, then rules when offline.
 import { newId } from './store';
 import { ruleSteps } from './tasks';
 import { ai, aiBreakdown } from './ai';
+import { aiSteps } from './account';
+
+async function serverSteps(t, parent = '') {
+  try {
+    const r = await aiSteps({ title: t.title, kind: t.kind, date: t.date, notes: t.notes, parent, have: (t.subtasks || []).map(s => s.title) });
+    return r?.steps?.length >= 2 ? { steps: r.steps, by: r.via === 'gemini' ? 'Gemini' : 'Taskie AI' } : null;
+  } catch { return null; }
+}
 
 export async function breakDown(t) {
   let steps = null;
   let by = 'Built-in rules';
-  if (ai.enabled && ai.ready) {
+  const fromServer = t.subtasks?.length ? null : await serverSteps(t);
+  if (fromServer) ({ steps, by } = fromServer);
+  if (!steps && ai.enabled && ai.ready) {
     steps = await aiBreakdown(t).catch(() => null);
     if (steps) by = ai.used.plan || 'AI';
   }
@@ -23,7 +34,9 @@ export async function breakDown(t) {
   if (i < 0) return by;
   const step = t.subtasks[i];
   let smaller = null;
-  if (ai.enabled && ai.ready) smaller = await aiBreakdown({ ...t, title: step.title, subtasks: [] }).catch(() => null);
+  const deeper = await serverSteps({ ...t, title: step.title, subtasks: [] }, t.title);
+  if (deeper) ({ steps: smaller, by } = deeper);
+  if (!smaller && ai.enabled && ai.ready) smaller = await aiBreakdown({ ...t, title: step.title, subtasks: [] }).catch(() => null);
   if (!smaller) smaller = finer(step.title);
   const known = new Set(t.subtasks.map(s => s.title.toLowerCase()));
   const add = smaller.map(x => `${step.title}: ${x}`).filter(x => !known.has(x.toLowerCase())).slice(0, 4);

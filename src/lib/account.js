@@ -287,14 +287,13 @@ export const readDigests = () => api('/api/digests');
 export const readDigest = (stream, id) => api(`/api/digests/${encodeURIComponent(stream)}/${encodeURIComponent(id)}`);
 export const writeDigest = (stream, timeZone) => api('/api/digests', { method: 'POST', body: { stream, timeZone } });
 export const checkGeminiKey = key => api('/api/gemini/check', { method: 'POST', body: { key } });
-// Gemini (the person's own key, kept server-side) breaks a recording into planner items.
-// Gemini hears a recording (base64 audio) and returns { transcript, items }.
-export const geminiHear = payload => api('/api/gemini/voice', { method: 'POST', body: payload });
-// Live words: one short piece of a recording, written down by Taskie's server.
-// terms: the person's own words (categories, course codes, task names), to help the speech model spell them.
+// Hear a recording: Deepgram Nova-3 writes it down, Gemini corrects it from context and lists the items.
+export const hearRecording = payload => api('/api/voice/hear', { method: 'POST', body: payload });
 export const adminSummary = () => api('/api/admin/summary');
-export const liveWords = (audio, prompt, terms = [], partial = false) => api('/api/voice/live', { method: 'POST', body: { audio, prompt, terms, partial } }).then(r => r.text || '');
-export const geminiBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/gemini/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
+// Small, clear steps for one task (or one step of it), from Gemini or Taskie's own AI.
+export const aiSteps = task => api('/api/ai/steps', { method: 'POST', body: task });
+// What's next: fresh ideas from the planner, written by Gemini.
+export const aiNext = facts => api('/api/ai/next', { method: 'POST', body: { facts } });
 // Taskie's own server AI: the same breakdown, for everyone, without a key.
 export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/voice/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });
