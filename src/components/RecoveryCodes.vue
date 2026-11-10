@@ -25,7 +25,7 @@ async function copy() {
 function download() {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text()], { type: 'text/plain' }));
-  a.download = 'budgie-recovery-codes.txt';
+  a.download = 'taskie-recovery-codes.txt';
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }

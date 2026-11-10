@@ -295,5 +295,5 @@ export const aiSteps = task => api('/api/ai/steps', { method: 'POST', body: task
 // What's next: fresh ideas from the planner, written by Gemini.
 export const aiNext = facts => api('/api/ai/next', { method: 'POST', body: { facts } });
 // Taskie's own server AI: the same breakdown, for everyone, without a key.
-export const budgieBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/voice/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
+export const serverBreakdown = (text, today, weekday, timeZone, categories = [], hints = [], existing = [], vocab = []) => api('/api/voice/breakdown', { method: 'POST', body: { vocab, text, today, weekday, timeZone, categories, hints, existing } });
 export const dropDigest = stream => api(`/api/digests/${encodeURIComponent(stream)}`, { method: 'DELETE' });

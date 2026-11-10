@@ -2,7 +2,7 @@
 
 ## Our pledge
 
-We want Budgie to be a welcoming project for everyone, whatever their background, identity or experience. We pledge to make taking part a harassment-free experience.
+We want Taskie to be a welcoming project for everyone, whatever their background, identity or experience. We pledge to make taking part a harassment-free experience.
 
 ## What we expect
 

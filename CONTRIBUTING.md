@@ -1,4 +1,4 @@
-# Contributing to Budgie
+# Contributing to Taskie
 
 Thanks for helping. This guide covers how to propose a change and what a change needs before it can merge.
 
@@ -10,8 +10,8 @@ Thanks for helping. This guide covers how to propose a change and what a change 
 ## Set up
 
 ```bash
-git clone https://github.com/wmutesa/budgie-the-budget
-cd budgie-the-budget
+git clone https://github.com/wmutesa/taskie-the-task
+cd taskie-the-task
 npm install
 npm run dev
 ```

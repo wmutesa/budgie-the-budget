@@ -1,33 +1,36 @@
 # Features
 
-## Today
-Your day in a sentence: how many things are planned, what is next, deadlines this week, anything overdue and your best streak, with a one-line note from the on-device AI when it is ready. Below it: today's list to tick off, progress for the day, this week's deadlines, your goals and the latest digest.
+## Add: talk to Taskie
+Tap **Add** (or press `N`) and say everything on your mind, in any order: "essay due Friday at 5 for English, gym Monday Wednesday Friday at 6, call mom tomorrow and I want to run a 10K by March". Nothing is written while you talk. On **Stop**:
+1. **Deepgram Nova-3** (Cloudflare Workers AI) writes the recording down, boosted with your own words: course codes, names, places, categories.
+2. **Gemini 2.5 Flash** listens to the same recording with Nova-3's text, the words it was unsure of and your planner, fixes what was misheard from context (accents, names that sound like common words) and lists every item with its title, kind, date, time, repeat and course. Without Gemini, Taskie's own Llama 3.3 splits Nova-3's text.
+3. Each item is placed as pending, and a short review walks you through them: keep, switch (task, routine, goal) or drop.
 
-## Planner
-One place for school, work, projects, events and daily life.
-- **Four views.** Tasks (grouped by when), Agenda (the next two weeks), Calendar (day, week and month with a time grid; click an empty slot to add, click an item for its actions, drag to move) and Focus (progress today, what is on now, your top three and a 25-minute focus timer).
-- **Calendars.** Paste the iCal link from Canvas, Google Calendar, Apple iCloud or Outlook. Canvas items become assignments under their course; repeating classes stay repeating. Calendars refresh every few hours, and your ticks and notes are kept.
-- **Suggestions.** Work sessions before deadlines, daily review before exams, a next step for goals that have none this week, gaps in your routine and a weekly review. Ask the on-device AI for more ideas.
-- **Steps.** Break any task into steps with the AI (or Budgie's rules when the AI is not ready).
-- **Reminders.** The bell lists what is due today, what is overdue, deadlines tomorrow, goal dates coming up and new digests. Optional reminders on this device ten minutes before timed items, while Budgie is open.
+You can also type. Titles are written in Title Case, emojis and spoken punctuation ("comma", "question mark", "heart emoji") are understood, and chit-chat and half sentences are left out.
 
-## Digests (coming soon)
-Digests are on hold while they are finished. What follows is how they will work.
+## Overview
+- **The brief:** your day in a sentence, with a ring for how much of today is done.
+- **What's next:** ideas written by AI from your planner (start an assignment early, prepare for an exam, bring overdue things to today), refreshed by themselves as your planner changes, then today's things and this week's deadlines, each with one action.
+- **Goals** with milestones, **how things are going** (things done over a week, month or three months) and **how your month went**.
 
-Short newspapers to read, kept up to date on their own: a new edition every Monday and Thursday, and a digest that is behind catches up when you open it. No topic to choose:
-- **My brief** follows your goals, your projects and classes, and what you study (from **You** in your profile).
-- **More digests:** add one with just a name, like "Robotics internships" or "AI policy news", and an optional line on what it should follow. Each has its own tab and archive.
-- **Sources:** Google News searches, open student roles on the careers boards of companies you name (Greenhouse and Lever) and feeds you add, all free.
-- **Gemini (optional, free):** add your own key under **You** in your profile, and every edition is also researched by Gemini with Google Search as it is written. Researched stories are marked. If Gemini is busy or over its free limit, the edition is written from the free sources and says so. The key is saved in your account and sent only to Google.
-- **The edition:** a lead story, new finds tagged Internship, Program, Event, Research, Ambassador or Perk with a note on fit, the next 14 days of deadlines (yours from the Planner too), outreach drafts with **Copy subject** and **Copy email**, a watch box, one thing to do this week, and its sources. Stories are not repeated, and draft numbers keep going up.
-- **Into your Planner:** deadlines in the next two weeks become Planner tasks (you can turn this off in your profile); any story can be added with one tap.
+## Schedule
+- **Day, week and month**, with one header. Click an empty slot to add at that time.
+- **Each activity is edited in place:** rename it, pick its day and time in one card (a month and phone-style wheels with a soft click), **Lock In** (a full-screen focus timer in the task's colour), **Break down** into small steps (Gemini first) as many times as you like, or delete it.
+- **Calendars:** Canvas, Google, Apple and Outlook links, plus about 80 public calendars (holidays, sports, school terms).
+- **Priority** is set by the AI from what you said.
 
-## Playground
-- **Inbox:** write or say anything. Budgie tells tasks (with dates, times and #projects), routines (anything that repeats) and goals ("I want to run a 10K by March") apart. Speaking adds everything as soon as you stop; typing adds on **Add**. Every added item has Task, Routine and Goal chips to switch it afterwards, and the whole batch can be undone.
-- **Goals:** each goal gets milestones spread out up to its date, as Planner tasks, from the AI or Budgie's rules. Ticking them moves the goal forward; link any other task to a goal from its editor.
-- **Routine:** give your wake and sleep times and a few words about your week; Budgie drafts a daily routine and you choose what to keep. Repeating items keep a streak.
-- **Projects:** every #project from your tasks, with a colour and a one-click rename.
+## Notifications
+Turn them on for each laptop and phone in **Settings, Profile**. Taskie's server checks every 5 minutes and sends:
+- a reminder **10 minutes before** anything with a time,
+- a short **brief at 8 AM** (things today, the first one, anything overdue),
+- **deadlines the evening before**.
+They arrive even when Taskie is closed. On iPhone and iPad, add Taskie to the Home Screen first (Share, Add to Home Screen). During Lock In, what gets through follows your Lock In settings.
 
-## Voice and search
-- **Voice:** tap the microphone in the Playground inbox and say one or more things ("essay due Friday at 5, then gym every Monday at 6, and I want to read 12 books this year"). When you stop, Budgie splits what you said, adds each one as a task, routine or goal, and lets you switch any of them or undo.
-- **Search:** finds tasks, goals, digest stories, calendars and pages, and turns typed text into "add to Planner" or "set a goal". Press `/` to jump to it.
+## Help Taskie hear better
+On unless you turn it off in **Settings, AI**. After each recording Taskie keeps the text of what Nova-3 heard and what it became after Gemini's correction (never the audio). These pairs are the training data for the daily training runs (see the training issue) and for each person's keyterms.
+
+## Admin (owner)
+A dashboard with a sidebar: Dashboard (people, recordings, Gemini share, errors, a week of activity), People (filter, sort, invite), Voice (by device and browser), Models (Nova-3, Gemini, Llama, Qwen, rules: calls, misses, speed), Training, Errors and app versions, Sync and Calendars. Counts and states only: nobody's tasks or words.
+
+## Search
+Finds tasks, goals, calendars and pages, and turns typed text into an action. Press `/` to jump to it.

@@ -474,10 +474,10 @@ async function routes(request, env, url) {
     try {
       const ts = Date.now();
       const items = await cloudSplit(env, { text: said, today: /^\d{4}-\d{2}-\d{2}$/.test(today || '') ? today : new Date().toISOString().slice(0, 10), weekday: String(weekday || '').slice(0, 12), timeZone: String(timeZone || '').slice(0, 60), categories: strings(categories, 60, 40), hints: strings(hints, 200, 160), existing: strings(existing, 120, 80), vocab: strings(vocab, 100, 40) });
-      await bump(env, user.id, 'split-budgie');
-      await bump(env, user.id, 'ms-split-budgie', Date.now() - ts);
+      await bump(env, user.id, 'split-llama');
+      await bump(env, user.id, 'ms-split-llama', Date.now() - ts);
       return json({ items, via: 'llama' });
-    } catch (e) { await bump(env, user.id, 'split-budgie-failed'); return fail(502, String(e?.message || 'Taskie AI could not be reached.').slice(0, 200)); }
+    } catch (e) { await bump(env, user.id, 'split-llama-failed'); return fail(502, String(e?.message || 'Taskie AI could not be reached.').slice(0, 200)); }
   }
   // Diagnostics from the Add card (states and counts, never words), so a
   // problem on one device can be traced. The newest 50 per person are kept.
@@ -532,7 +532,7 @@ async function routes(request, env, url) {
     }
     if (!out) {
       via = 'nova-3 + llama';
-      try { out = { transcript: nova.text, items: await cloudSplit(env, { text: nova.text, ...args }) }; await bump(env, user.id, 'split-budgie'); } catch { out = { transcript: nova.text, items: [] }; }
+      try { out = { transcript: nova.text, items: await cloudSplit(env, { text: nova.text, ...args }) }; await bump(env, user.id, 'split-llama'); } catch { out = { transcript: nova.text, items: [] }; }
     }
     // Help Taskie hear better (on unless turned off in Settings): what Nova-3 heard and what it became, as text only.
     if (data?.planner?.helpHear !== false) await keepSample(env, user.id, { heard: nova.text, transcript: out.transcript, items: out.items.map(x => x.title), via, ms: Date.now() - t0, confidence: nova.confidence });

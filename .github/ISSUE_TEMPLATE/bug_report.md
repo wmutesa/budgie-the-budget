@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Something in Budgie is not working as expected
+about: Something in Taskie is not working as expected
 labels: bug
 ---
 

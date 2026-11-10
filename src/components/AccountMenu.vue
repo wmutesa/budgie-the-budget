@@ -13,7 +13,7 @@ const root = ref(null);
 const initial = computed(() => (account.user?.name || '?').trim()[0]?.toUpperCase() || '?');
 const isOwner = computed(() => account.user?.role === 'owner');
 // Going to the page you are on reloads it, so lists are fresh.
-const to = page => { open.value = false; go(page); window.dispatchEvent(new CustomEvent('budgie:account-page', { detail: page })); };
+const to = page => { open.value = false; go(page); window.dispatchEvent(new CustomEvent('taskie:account-page', { detail: page })); };
 const tour = () => { open.value = false; emit('tour'); };
 const busy = ref(false);
 async function leave() { busy.value = true; try { await signOut(); } finally { busy.value = false; open.value = false; } }

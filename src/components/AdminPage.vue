@@ -38,7 +38,7 @@ const avg = (msKey, keys) => { const n = sum(...keys); return n ? Math.round((u.
 // ---------- dashboard ----------
 const activeWeek = computed(() => people.value.filter(p => p.lastSeen && Date.now() - p.lastSeen < 7 * 86400e3).length);
 const recordings = computed(() => sum('hear-nova', 'hear-nova-failed'));
-const geminiShare = computed(() => { const g = sum('hear-gemini', 'split-gemini', 'next-gemini', 'steps-gemini'); const all = g + sum('hear-gemini-failed', 'split-budgie', 'next-llama', 'steps-llama'); return all ? pct(g, all) : null; });
+const geminiShare = computed(() => { const g = sum('hear-gemini', 'split-gemini', 'next-gemini', 'steps-gemini'); const all = g + sum('hear-gemini-failed', 'split-llama', 'split-budgie', 'next-llama', 'steps-llama'); return all ? pct(g, all) : null; });
 const errorsWeek = computed(() => (data.value?.errors || []).reduce((n, e) => n + e.n, 0));
 const stats = computed(() => [
   { label: 'People', value: people.value.length, note: `${activeWeek.value} active this week`, icon: 'user' },
@@ -47,7 +47,7 @@ const stats = computed(() => [
   { label: 'Errors', value: errorsWeek.value, note: `${(data.value?.errors || []).length} different messages`, icon: 'help', bad: errorsWeek.value > 0 },
 ]);
 // A week of activity per day: recordings, typed notes and AI ideas.
-const SERIES = [['Recordings', ['hear-nova'], '#7c3aed'], ['Typed notes', ['split-gemini', 'split-budgie'], '#a78bfa'], ['Ideas and steps', ['next-gemini', 'next-llama', 'steps-gemini', 'steps-llama'], '#ddd6fe']];
+const SERIES = [['Recordings', ['hear-nova'], '#7c3aed'], ['Typed notes', ['split-gemini', 'split-llama', 'split-budgie'], '#a78bfa'], ['Ideas and steps', ['next-gemini', 'next-llama', 'steps-gemini', 'steps-llama'], '#ddd6fe']];
 const week = computed(() => {
   const days = [];
   for (let i = 6; i >= 0; i--) { const d = new Date(Date.now() - i * 86400e3); days.push(d.toISOString().slice(0, 10)); }
@@ -71,7 +71,7 @@ const shownPeople = computed(() => {
 const models = computed(() => [
   { name: 'Deepgram Nova-3', job: 'Hears every recording, boosted with each person’s own words', where: 'Cloudflare Workers AI', calls: sum('hear-nova', 'hear-nova-failed'), misses: sum('hear-nova-failed', 'hear-empty'), ms: avg('ms-nova', ['hear-nova']), state: 'Always · the only transcriber' },
   { name: 'Gemini 2.5 Flash', job: 'Fixes what Nova-3 misheard from the sound and context; splits notes; ideas; steps', where: 'Google', calls: sum('hear-gemini', 'hear-gemini-failed', 'split-gemini', 'split-gemini-failed', 'next-gemini', 'next-gemini-failed', 'steps-gemini', 'steps-gemini-failed'), misses: sum('hear-gemini-failed', 'split-gemini-failed', 'next-gemini-failed', 'steps-gemini-failed'), ms: avg('ms-gemini-hear', ['hear-gemini']), state: data.value?.gemini === 'none' ? 'Waiting for a key' : 'First choice' },
-  { name: 'Llama 3.3 70B', job: 'Splits and suggests when Gemini is unavailable; teacher for training', where: 'Cloudflare Workers AI', calls: sum('split-budgie', 'split-budgie-failed', 'next-llama', 'steps-llama'), misses: sum('split-budgie-failed'), ms: avg('ms-split-budgie', ['split-budgie']), state: 'Backup' },
+  { name: 'Llama 3.3 70B', job: 'Splits and suggests when Gemini is unavailable; teacher for training', where: 'Cloudflare Workers AI', calls: sum('split-llama', 'split-budgie', 'split-llama-failed', 'split-budgie-failed', 'next-llama', 'steps-llama'), misses: sum('split-llama-failed', 'split-budgie-failed'), ms: avg('ms-split-llama', ['split-llama']), state: 'Backup' },
   { name: 'Qwen 2.5 (0.5B, 1.5B)', job: 'On-device splitting when the server cannot be reached', where: 'The person’s browser', calls: null, misses: null, ms: null, state: 'Offline backup · fine-tuned daily' },
   { name: 'Taskie rules', job: 'Title Case, nonsense filter, spoken punctuation, no repeats', where: 'The app', calls: null, misses: null, ms: null, state: 'Always on' },
 ]);

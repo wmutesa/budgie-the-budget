@@ -150,7 +150,7 @@ let note = null;
 function notifyEnd() {
   try {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-    note = new Notification('Focus session done', { body: `${focus.task?.title || 'Your session'} · time for a short break`, tag: 'budgie-focus', requireInteraction: true, renotify: true });
+    note = new Notification('Focus session done', { body: `${focus.task?.title || 'Your session'} · time for a short break`, tag: 'taskie-focus', requireInteraction: true, renotify: true });
     note.onclick = () => { window.focus(); note?.close(); };
   } catch { /* notifications off */ }
 }

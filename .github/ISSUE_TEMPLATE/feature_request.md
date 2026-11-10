@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement to Budgie
+about: Suggest an improvement to Taskie
 labels: enhancement
 ---
 

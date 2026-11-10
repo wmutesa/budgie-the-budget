@@ -89,7 +89,7 @@ async function load() {
 watch(() => props.kind, load, { immediate: true });
 // Fresh each time a tab opens: someone may have joined, or a device been added, since.
 watch(tab, load);
-if (typeof window !== 'undefined') { const again = () => load(); window.addEventListener('budgie:account-page', again); onUnmounted(() => window.removeEventListener('budgie:account-page', again)); }
+if (typeof window !== 'undefined') { const again = () => load(); window.addEventListener('taskie:account-page', again); onUnmounted(() => window.removeEventListener('taskie:account-page', again)); }
 
 async function act(fn) {
   busy.value = true;

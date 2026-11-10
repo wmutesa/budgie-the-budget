@@ -6,12 +6,13 @@
 | --- | --- | --- |
 | Source code | This GitHub repository | Anyone |
 | Your tasks, routines, goals, calendar links, digest profile, digests and settings | Your account in Cloudflare D1, plus a copy in your browser | Only you |
-| Passkeys | Your device or password manager | Only you (Budgie keeps the public half) |
-| AI | Your device | Nobody: no cloud AI, no API keys |
+| Passkeys | Your device or password manager | Only you (Taskie keeps the public half) |
+| Recordings | Heard once by Deepgram Nova-3 (Cloudflare) and Gemini; never stored | Nobody keeps them |
+| Training text (Help Taskie hear better) | Your account's server, as text | Used only to train Taskie; you can turn it off |
 
 Never commit personal details, private links, tokens, invite links or the address of a private deployment.
 
-## How Budgie protects accounts
+## How Taskie protects accounts
 
 - Invite-only sign-in with passkeys; invite and device links work once and expire.
 - Optional single-use recovery codes, rate-limited.
@@ -23,7 +24,7 @@ Never commit personal details, private links, tokens, invite links or the addres
 
 ## How the site is protected
 
-- A Content Security Policy that allows only the services Budgie uses, with jsDelivr limited to the exact package versions it loads.
+- A Content Security Policy that allows only the services Taskie uses, with jsDelivr limited to the exact package versions it loads.
 - No framing, `nosniff`, a strict referrer policy, HSTS and a minimal Permissions Policy.
 - Text from files, the web and dictation is always shown as text, never as HTML.
 

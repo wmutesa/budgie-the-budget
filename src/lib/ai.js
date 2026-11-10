@@ -131,7 +131,7 @@ const modelId = (key, info) => (info?.f16 ? MODELS[key].id : MODELS[key].id32);
 // Hugging Face and GitHub), so content blockers, private relays and strict
 // networks that block those sites do not stop the AI.
 const viaTaskie = url => url.replace('https://huggingface.co/', `${location.origin}/api/model/hf/`).replace('https://raw.githubusercontent.com/', `${location.origin}/api/model/gh/`);
-function budgieAppConfig(webllm) {
+function taskieAppConfig(webllm) {
   const base = webllm.prebuiltAppConfig;
   return { ...base, model_list: base.model_list.map(m => ({ ...m, model: viaTaskie(m.model), model_lib: viaTaskie(m.model_lib) })) };
 }
@@ -171,7 +171,7 @@ export function loadModel(key) {
         worker.addEventListener('error', ev => { ev.preventDefault?.(); reject(new Error(ev.message || 'the AI worker stopped')); });
       });
       const engine = webllm.CreateWebWorkerMLCEngine(worker, modelId(key, info), {
-        appConfig: budgieAppConfig(webllm),
+        appConfig: taskieAppConfig(webllm),
         initProgressCallback: p => { last = Date.now(); Object.assign(ai[key], { progress: Math.round((p.progress || 0) * 100), text: p.text || '' }); },
       });
       engines[key] = await Promise.race([engine, watchdog]);

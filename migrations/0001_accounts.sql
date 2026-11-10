@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 
--- Each person's Budgie data as one JSON document, with a version for safe syncing.
+-- Each person's Taskie data as one JSON document, with a version for safe syncing.
 CREATE TABLE IF NOT EXISTS user_data (
   user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   data TEXT NOT NULL,

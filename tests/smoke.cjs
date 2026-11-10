@@ -69,8 +69,8 @@ const voiceCalls = [];
 let typedGemini = false; // the server answers a typed note with Gemini's items
 let hearFails = 0;       // the next N recordings fail to be heard
 // Taskie's server AI: answers only while a test sets these items (otherwise it is busy and the rules take over).
-let budgieItems = null;
-const budgieCalls = [];
+let llamaItems = null;
+const llamaCalls = [];
 const inDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 // Money data saved by an older version of Taskie: it must be dropped.
 const fakeAccount = { data: { guide: { done: true }, transactions: [{ id: 't1', date: inDays(0), merchant: 'Old shop', amount: -10, currency: 'USD', category: 'Shopping' }], subscriptions: [{ id: 's1', name: 'Old sub', amount: 5, currency: 'USD', cycle: 'monthly', next: inDays(3) }], goals: [{ id: 'g0', name: 'Emergency fund', saved: 1200, target: 5000 }], base: 'USD' }, version: 1 };
@@ -125,7 +125,7 @@ async function fakeApi(page, account = fakeAccount) {
       { title: 'Learn to play guitar', kind: 'goal', date: '', time: '', minutes: 0, repeat: '', days: [], course: '' },
     ] } }); }
     // Gemini hears a recording: what was said, and the items in it.
-    if (p === '/api/voice/breakdown') { budgieCalls.push(JSON.parse(req.postData() || '{}')); return budgieItems ? route.fulfill({ json: { items: budgieItems } }) : route.fulfill({ status: 503, json: { error: 'busy' } }); }
+    if (p === '/api/voice/breakdown') { llamaCalls.push(JSON.parse(req.postData() || '{}')); return llamaItems ? route.fulfill({ json: { items: llamaItems } }) : route.fulfill({ status: 503, json: { error: 'busy' } }); }
     // A recording: Deepgram Nova-3 hears it, Gemini corrects it and lists the items (worker/hear.js).
     if (p === '/api/voice/hear') { const body = JSON.parse(req.postData() || '{}'); voiceCalls.push(body); if (hearFails > 0) { hearFails--; return route.fulfill({ status: 502, json: { error: 'Deepgram could not hear it (busy). Tap Speak and try again.' } }); } return route.fulfill({ json: { via: 'nova-3 + gemini', heard: 'lab report three due friday at five for chem', transcript: 'Lab Report 3 due Friday at 5 pm for chemistry, the history quiz on the 18th, and gym every Monday at 7', items: [
       { title: 'Lab Report 3', kind: 'assignment', date: inDays(3), time: '17:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },

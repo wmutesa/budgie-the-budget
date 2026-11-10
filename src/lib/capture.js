@@ -7,7 +7,7 @@ import { store } from './store';
 import { route, routeAll, splitSpoken, sendAll, undoSend, DESTS } from './router';
 import { ai, aiExtractItems } from './ai';
 import { tidyDictation } from './tidy';
-import { hearRecording, budgieBreakdown } from './account';
+import { hearRecording, serverBreakdown } from './account';
 import { itemLine, localLine, withKind, saidIn as said } from './itemline';
 import { today, addDays, isoDay, occursOn, dayLabel, timeLabel, KINDS, DAY_SHORT } from './tasks';
 import { placeFree } from './schedule';
@@ -93,7 +93,7 @@ export async function breakDown(text) {
   // Taskie's server AI: Gemini whenever there is a key, its own Llama otherwise.
   try {
     const w = when();
-    const r = await budgieBreakdown(text, w.today, w.weekday, w.timeZone, myCategories(), all.slice(0, 200), myOpen(), myVocab());
+    const r = await serverBreakdown(text, w.today, w.weekday, w.timeZone, myCategories(), all.slice(0, 200), myOpen(), myVocab());
     const items = r?.items || [];
     const cmds = items.map(fromItem).filter(Boolean);
     const ok = items.filter(x => x.action === 'add' || !x.action).filter(x => real(x.title));

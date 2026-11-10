@@ -1,4 +1,4 @@
-**Budgie**
+**Taskie**
 
 - [Home](Home)
 - [Getting started](Getting-started)

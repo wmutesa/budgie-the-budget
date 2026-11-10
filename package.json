@@ -1,8 +1,8 @@
 {
-  "name": "budgie",
+  "name": "taskie",
   "version": "0.1.0",
   "private": true,
-  "description": "Budgie: planner, life goals and a twice-weekly digest of opportunities. Vue + Vite, deployed on Cloudflare Workers.",
+  "description": "Taskie: say everything on your mind and get a planned schedule. Vue + Vite on Cloudflare Workers, with Deepgram Nova-3 and Gemini.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
