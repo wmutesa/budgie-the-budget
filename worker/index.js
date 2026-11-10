@@ -713,8 +713,8 @@ ${text}`;
       for (const e of ev) {
         if (e.what === 'mounted') p.opens++;
         if (e.what === 'listening') { p.recordings++; v.recordings++; }
-        if (e.what === 'piece-text') { if (e.chars) { p.heard++; v.heard++; } else { p.empty++; v.empty++; } }
-        if (e.what === 'piece-failed') v.failed++;
+        if (e.what === 'heard' || e.what === 'piece-text') { if (e.chars) { p.heard++; v.heard++; } else { p.empty++; v.empty++; } }
+        if (e.what === 'heard-failed' || e.what === 'piece-failed') v.failed++;
         if (e.what === 'mic-failed') { p.micBlocked++; v.micBlocked++; }
         if (e.what === 'silent') { p.silent++; v.silent++; }
         if (e.what === 'stop-send-all') v.quietRescued++;
@@ -730,11 +730,24 @@ ${text}`;
       const added = tasks.filter(t => String(t.createdAt || '') >= weekAgo).length;
       const feeds = (Array.isArray(data.feeds) ? data.feeds : []).map(f => ({ name: String(f.name || 'Calendar').slice(0, 60), kind: f.kind || '', count: f.count || 0, error: f.error ? String(f.error).slice(0, 80) : '', at: f.lastSync || f.at || null }));
       const p = per[u.id] || {};
-      return { id: u.id, name: u.name, role: u.role, created: u.created_at, passkeys: u.passkeys, sessions: u.sessions, lastSeen: Math.max(u.last_signin || 0, p.lastSeen || 0, u.updated_at || 0) || null, bytes: u.bytes || 0, version: u.version || 0, tasks: tasks.length, open: tasks.filter(t => !t.done).length, added, goals: Array.isArray(data.goals) ? data.goals.length : 0, focusMins, vocab: Array.isArray(data.vocab) ? data.vocab.length : 0, learned: Array.isArray(data.vocab) ? data.vocab.filter(v => v.heard).length : 0, feeds, recordings: p.recordings || 0, heard: p.heard || 0, empty: p.empty || 0, micBlocked: p.micBlocked || 0, silent: p.silent || 0, conflicts: p.conflicts || 0 };
+      return { id: u.id, name: u.name, role: u.role, created: u.created_at, passkeys: u.passkeys, sessions: u.sessions, lastSeen: Math.max(u.last_signin || 0, p.lastSeen || 0, u.updated_at || 0) || null, bytes: u.bytes || 0, version: u.version || 0, tasks: tasks.length, open: tasks.filter(t => !t.done).length, added, goals: Array.isArray(data.goals) ? data.goals.length : 0, focusMins, vocab: Array.isArray(data.vocab) ? data.vocab.length : 0, learned: Array.isArray(data.vocab) ? data.vocab.filter(v => v.heard).length : 0, feeds, helpHear: data?.planner?.helpHear !== false, pushOn: data?.planner?.remind === true, recordings: p.recordings || 0, heard: p.heard || 0, empty: p.empty || 0, micBlocked: p.micBlocked || 0, silent: p.silent || 0, conflicts: p.conflicts || 0 };
     });
     const totals = {};
     for (const r of usage) totals[r.key] = (totals[r.key] || 0) + r.n;
+    // Help Taskie hear better: how much training text there is, and how often Gemini had to fix Nova-3 (never the words themselves).
+    let training = { samples: 0, week: 0, people: 0, changed: 0, confidence: null, ms: null };
+    try {
+      const t = await env.DB.prepare('SELECT COUNT(*) AS n, COUNT(DISTINCT user_id) AS people, SUM(CASE WHEN created_at > ?1 THEN 1 ELSE 0 END) AS week, SUM(CASE WHEN created_at > ?1 AND lower(heard) <> lower(transcript) THEN 1 ELSE 0 END) AS changed, AVG(CASE WHEN created_at > ?1 THEN confidence END) AS conf, AVG(CASE WHEN created_at > ?1 THEN ms END) AS ms FROM voice_samples').bind(since).first();
+      training = { samples: t.n || 0, week: t.week || 0, people: t.people || 0, changed: t.changed || 0, confidence: t.conf, ms: t.ms ? Math.round(t.ms) : null };
+    } catch { /* none yet */ }
+    const optedOut = people.filter(p => p.helpHear === false).length;
+    let devices = { devices: 0, people: 0 };
+    try { const d = await env.DB.prepare('SELECT COUNT(*) AS n, COUNT(DISTINCT user_id) AS people FROM push_subs').first(); devices = { devices: d.n || 0, people: d.people || 0 }; } catch { /* none yet */ }
+    const ownerData = users.find(x => x.role === 'owner');
+    let ownerKey = false; try { ownerKey = keyShapeOk(tidyKey(JSON.parse(ownerData?.data || '{}')?.digest?.geminiKey)); } catch { /* none */ }
+    const gemini = keyShapeOk(tidyKey(env.GEMINI_API_KEY)) ? 'server' : ownerKey ? 'owner' : 'none';
     return json({
+      training: { ...training, optedOut }, push: devices, gemini,
       at: now(), days: 7, limitBytes: MAX_DATA_BYTES, people,
       voice: Object.entries(voice).map(([where, v]) => ({ where, ...v })),
       errors: Object.values(errors).sort((a, b) => b.n - a.n).slice(0, 40),

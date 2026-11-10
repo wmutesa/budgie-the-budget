@@ -66,9 +66,11 @@ async function heard() {
   phase.value = 'hearing'; note.value = '';
   try {
     const n = await sortAndPlace(capture.text, { audio: lastAudio });
+    diag('heard', { items: n, chars: capture.heard.length, secs: lastAudio?.secs });
     lastAudio = null;
     if (!n && capture.open) note.value = capture.heard ? `Taskie heard “${capture.heard.slice(0, 140)}” but found nothing to add. Say it again, or type it.` : 'Nothing was heard in that. Speak a little closer to the microphone and try again.';
   } catch (e) {
+    diag('heard-failed', { status: e?.status, msg: String(e?.message || '').slice(0, 160) });
     note.value = `${e?.message || 'Taskie could not hear that right now.'}`;
   } finally {
     phase.value = 'idle';

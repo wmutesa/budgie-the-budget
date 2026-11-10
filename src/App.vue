@@ -34,10 +34,12 @@ import { store } from './lib/store';
 // from the avatar. The Add button adds anything from anywhere; Lock In (the
 // timer) starts from any activity.
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
-const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', People: 'user', Voice: 'mic', Errors: 'help', Sync: 'refresh', Models: 'trend', 'AI usage': 'sparkle', Calendars: 'calendar' };
+const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Dashboard: 'home', People: 'user', Voice: 'mic', Models: 'sparkle', Training: 'trend', Errors: 'help', Sync: 'refresh', Calendars: 'calendar', Settings: 'gear' };
+// The Admin sidebar, in groups like a dashboard's.
+const ADMIN_GROUPS = [['General', ['Dashboard', 'People']], ['AI', ['Voice', 'Models', 'Training']], ['Health', ['Errors', 'Sync', 'Calendars']], ['Account', ['Settings']]];
 // The owner can switch to the Admin view (from the avatar menu); everyone else sees their planner.
 const adminView = computed(() => nav.mode === 'admin' && account.user?.role === 'owner');
-const tabs = computed(() => (adminView.value ? ADMIN_PAGES : PAGES));
+const tabs = computed(() => (adminView.value ? [] : PAGES)); // the Admin view uses its own sidebar
 // The line between the views: each view opens only its own pages. Settings is shared (a reduced
 // version in the Admin view); Privacy belongs to the user view. Anything else lands on the view's first page.
 const ADMIN_OK = [...ADMIN_PAGES, 'Settings'];
@@ -123,13 +125,13 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
           <span v-if="adminView" class="nb-admin" data-test="admin-badge">Admin</span>
           <span v-else class="muted small nb-date">{{ today }}</span>
         </div>
-        <nav class="nb-pages" aria-label="Pages">
+        <nav v-if="tabs.length" class="nb-pages" aria-label="Pages">
           <button v-for="p in tabs" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase().replace(/\s+/g, '-')}`" @click="active = p">
             <Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}
           </button>
         </nav>
         <GlobalSearch v-if="!adminView" />
-        <span v-else class="nb-admin-note muted small">Counts and states only · no planner, no recording</span>
+        <span v-else class="nb-spacer" aria-hidden="true" />
         <div class="nb-actions">
           <!-- Lock In, minimised: a pill with the time left, like a status icon in a menu bar -->
           <button v-if="focus.task && !adminView" type="button" class="nb-focus" :class="{ paused: !focus.running && !focus.ended, ended: focus.ended }" :title="`Locked in on ${focus.task.title}`" :aria-label="focus.ended ? 'Lock In ended: open it' : `Locked in, ${mmss(focus.left)} left: open Lock In`" data-test="nb-focus" @click="focus.min = false"><Icon name="timer" :size="13" />{{ focus.ended ? 'Done' : mmss(focus.left) }}</button>
@@ -140,14 +142,24 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </div>
       </header>
 
-      <template v-if="active === 'Overview'">
+      <!-- The Admin view: a sidebar of its pages beside the page itself. -->
+      <div v-if="adminView" class="adm-shell span-12">
+        <aside class="adm-side" aria-label="Admin pages">
+          <template v-for="[group, pages] in ADMIN_GROUPS" :key="group">
+            <p class="adm-group">{{ group }}</p>
+            <button v-for="p in pages" :key="p" type="button" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase().replace(/\s+/g, '-')}`" @click="active = p"><Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}</button>
+          </template>
+        </aside>
+        <div class="adm-main">
+          <AdminPage v-if="ADMIN_PAGES.includes(active)" :section="active" />
+          <AccountPage v-else kind="settings" />
+        </div>
+      </div>
+      <template v-else-if="active === 'Overview'">
         <TodayView />
       </template>
       <template v-else-if="active === 'Schedule'">
         <PlannerView />
-      </template>
-      <template v-else-if="ADMIN_PAGES.includes(active)">
-        <AdminPage :section="active" />
       </template>
       <template v-else-if="active === 'Settings'">
         <AccountPage kind="settings" />

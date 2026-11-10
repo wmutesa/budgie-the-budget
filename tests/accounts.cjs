@@ -205,21 +205,24 @@ async function main() {
     // The owner can switch to the Admin view: counts and states for everyone, never their words.
     await owner.page.click('[data-test="account"]');
     await owner.page.click('[data-test="view-admin"]');
+    await owner.page.waitForSelector('[data-test="admin-dashboard"] .adm-stat');
+    assert.deepEqual(await owner.page.$$eval('.adm-side button', b => b.map(x => x.textContent.trim())), ['Dashboard', 'People', 'Voice', 'Models', 'Training', 'Errors', 'Sync', 'Calendars', 'Settings'], 'the Admin view has its own pages, in a sidebar');
+    assert.equal(await owner.page.$('.nb-pages'), null, 'and no planner pages in the top bar');
+    await owner.page.click('[data-test="nav-people"]');
     await owner.page.waitForSelector('[data-test="admin-people"] .adm-table');
-    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['People', 'Voice', 'Models', 'Errors', 'Sync', 'AI usage', 'Calendars'], 'the Admin view has its own pages');
     assert.match(await owner.page.textContent('[data-test="admin-people"]'), /Alex/, 'People lists everyone');
     // The line between the views: no planner tools in the Admin view.
     assert.ok(await owner.page.$('[data-test="admin-badge"]'), 'the Admin view is marked in the top bar');
     for (const [sel, what] of [['[data-test="capture"]', 'the Add and record button'], ['[data-test="search"]', 'search'], ['[data-test="bell"]', 'notifications']]) assert.equal(await owner.page.$(sel), null, `no ${what} in the Admin view`);
     await owner.page.locator('body').press('n');
     assert.equal(await owner.page.$('[data-test="capture-sheet"]'), null, 'the N shortcut does not open Add in the Admin view');
-    await owner.page.evaluate(() => { const b = [...document.querySelectorAll('.nb-pages button')]; return b.length; });
     await owner.page.click('[data-test="account"]');
     assert.equal(await owner.page.$('[data-test="menu-privacy"]'), null, 'there is no separate Privacy page');
     await owner.page.click('[data-test="menu-settings"]');
+    assert.ok(await owner.page.$('.adm-side'), 'Settings opens inside the Admin view, with its sidebar');
     assert.deepEqual(await owner.page.$$eval('[data-test="settings-page"] .set-nav button', b => b.map(x => x.textContent.trim())), ['Devices & security', 'People'], 'Settings in the Admin view: people and devices only');
     await owner.page.click('[data-test="nav-people"]');
-    for (const t of ['voice', 'models', 'errors', 'sync', 'ai-usage', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-box`); }
+    for (const t of ['dashboard', 'voice', 'models', 'training', 'errors', 'sync', 'calendars']) { await owner.page.click(`[data-test="nav-${t}"]`); await owner.page.waitForSelector(`[data-test="admin-${t}"] .adm-card`); }
     const memberAdmin = await alex.page.evaluate(async () => (await fetch('/api/admin/summary')).status);
     assert.equal(memberAdmin, 403, 'members cannot see the Admin view');
     await owner.page.click('[data-test="account"]');
