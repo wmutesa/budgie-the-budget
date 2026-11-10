@@ -9,6 +9,7 @@ import PlanCalendars from './PlanCalendars.vue';
 import { breakDown } from '../lib/breakdown';
 import { deleteTask } from '../lib/undo';
 import WhenField from './WhenField.vue';
+import LinkField from './LinkField.vue';
 import { startFocus } from '../lib/focus';
 import PlanCalendar from './PlanCalendar.vue';
 import Icon from './Icon.vue';
@@ -216,6 +217,14 @@ function pick(x, then) {
 // The title is renamed where it sits; date, time and length come from the
 // calendar icon; steps from the break-down icon. Priority is not set by hand:
 // the AI decides it from what was said and from the deadline.
+// Linked titles open their link; double-click (or the link card) to rename.
+const editKey = ref('');
+async function startRename(x) {
+  editKey.value = x.key;
+  await nextTick();
+  const el = document.querySelector(`[data-edit="${x.key}"]`);
+  if (el) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+}
 function rename(x, e) {
   const v = e.target.innerText.replace(/\s+/g, ' ').trim();
   if (v && v !== x.task.title) x.task.title = v; else e.target.innerText = x.task.title;
@@ -362,18 +371,20 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
               <span v-if="x.summary" class="sch-count" :title="`Done ${x.timesDone} of ${x.times} times`">{{ x.timesDone }}/{{ x.times }}</span>
               <button v-else type="button" class="sch-check" role="checkbox" :aria-checked="x.done" :aria-label="`${x.done ? 'Undo' : 'Done'}: ${x.task.title}`" @click="tickX(x)"><Icon v-if="x.done" name="check" :size="12" /></button>
               <span class="sch-row-main">
-                <span class="sch-row-t" :contenteditable="x.summary ? 'false' : 'plaintext-only'" spellcheck="false" role="textbox" :aria-label="`Title of ${x.task.title}`" title="Click to rename" data-test="row-title" @keydown.enter.prevent="$event.target.blur()" @keydown.esc="$event.target.innerText = x.task.title; $event.target.blur()" @blur="rename(x, $event)">{{ x.task.title }}</span>
+                <a v-if="x.task.link && editKey !== x.key" class="sch-row-t sch-link" :href="x.task.link" target="_blank" rel="noopener noreferrer" :title="`Open ${x.task.link} · double-click to rename`" data-test="row-title" @dblclick.prevent="startRename(x)">{{ x.task.title }}</a>
+                <span v-else class="sch-row-t" :data-edit="x.key" :contenteditable="x.summary ? 'false' : 'plaintext-only'" spellcheck="false" role="textbox" :aria-label="`Title of ${x.task.title}`" title="Click to rename" data-test="row-title" @keydown.enter.prevent="$event.target.blur()" @keydown.esc="$event.target.innerText = x.task.title; $event.target.blur()" @blur="rename(x, $event); editKey = ''">{{ x.task.title }}</span>
                 <span class="sch-tags"><span v-if="range !== 'day'" class="sch-tag">{{ x.summary ? 'Repeats' : rowDate(x) }}</span><span class="sch-tag">{{ KINDS[x.task.kind]?.label }}</span><span v-if="x.task.project" class="sch-tag c">{{ x.task.project }}</span><span v-if="x.task.priority === 'high'" class="sch-tag hi">High</span></span>
               </span>
               <span class="sch-dur">{{ x.task.time ? x.task.time : '' }}<template v-if="x.task.time && x.task.mins"> · </template>{{ dur(x.task.mins) }}</span>
               <span class="sch-row-acts">
                 <button v-if="!x.summary && !x.done" type="button" class="sch-icon" :aria-label="`Lock in on ${x.task.title}`" title="Lock In: a timer for just this" data-test="row-lockin" @click="startFocus(x.task)"><Icon name="timer" :size="15" /></button>
                 <WhenField v-if="!x.summary" icon :label="x.task.title" v-model:date="x.task.date" v-model:time="x.task.time" />
+                <LinkField v-if="!x.summary" :label="x.task.title" :model-value="x.task.link || ''" @update:model-value="v => (x.task.link = v || undefined)" />
                 <button v-if="!x.summary" type="button" class="sch-icon" :class="{ spin: splittingKey === x.key }" :aria-label="`Break ${x.task.title} into steps`" :title="x.task.subtasks?.length ? 'Break it down further' : 'Break it into steps'" data-test="row-split" @click="splitRow(x)"><Icon name="split" :size="15" /></button>
                 <button type="button" class="sch-icon danger" :aria-label="`Delete ${x.task.title}`" title="Delete" data-test="row-delete" @click="deleteTask(x.task)"><Icon name="trash" :size="15" /></button>
               </span>
               <ul v-if="x.task.subtasks?.length && !x.summary" class="sch-steps" data-test="row-steps">
-                <li v-for="st in x.task.subtasks" :key="st.id" :class="{ done: st.done }"><label><input v-model="st.done" type="checkbox" />{{ st.title }}</label></li>
+                <li v-for="st in x.task.subtasks" :key="st.id" :class="{ done: st.done }"><label><input v-model="st.done" type="checkbox" /><a v-if="st.link" class="sch-link" :href="st.link" target="_blank" rel="noopener noreferrer" :title="st.link">{{ st.title }}</a><template v-else>{{ st.title }}</template></label><LinkField small :label="st.title" :model-value="st.link || ''" @update:model-value="v => (st.link = v || undefined)" /></li>
               </ul>
             </li>
           </ul>

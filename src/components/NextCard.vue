@@ -64,7 +64,7 @@ function openDay() { store.planner.cal = 'day'; nav.day = ''; go('Schedule'); }
       <li v-for="r in rows" :key="r.key" class="nx-row" :class="`nx-${r.type}`" :style="r.color ? { '--k': r.color } : {}" :data-test="r.type === 'idea' ? 'suggestion' : 'task'">
         <span class="nx-main">
           <span class="nx-tag"><Icon v-if="r.type === 'idea'" name="sparkle" :size="11" />{{ r.tag }}<b v-if="r.hi" class="nx-hi">High</b></span>
-          <b class="nx-title">{{ r.title }}</b>
+          <a v-if="(r.x?.task || r.t)?.link" class="nx-title sch-link" :href="(r.x?.task || r.t).link" target="_blank" rel="noopener noreferrer">{{ r.title }}</a><b v-else class="nx-title">{{ r.title }}</b>
           <span v-if="r.meta" class="nx-meta">{{ r.meta }}</span>
         </span>
         <span class="nx-acts">

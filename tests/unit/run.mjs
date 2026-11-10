@@ -424,6 +424,15 @@ await check('Gemini: the newest stable Flash the key can use is picked by itself
   ] }) });
   try { assert.equal(await geminiModel('k'.repeat(30) + 'pick1234', { fresh: true }), 'gemini-3.8-flash'); } finally { globalThis.fetch = realFetch; }
 });
+const { makeTask: mkTask, cleanLink } = await import('../../src/lib/tasks.js');
+await check('links: a web address in a title becomes the task\'s link; only http(s) addresses are kept', () => {
+  const t = mkTask({ title: 'Read the brief https://canvas.school.edu/courses/1/assignments/9' });
+  assert.equal(t.title, 'Read the brief');
+  assert.equal(t.link, 'https://canvas.school.edu/courses/1/assignments/9');
+  assert.equal(cleanLink('docs.google.com/document/d/abc'), 'https://docs.google.com/document/d/abc');
+  assert.equal(cleanLink('javascript:alert(1)'), '');
+  assert.equal(cleanLink('not a link'), '');
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);

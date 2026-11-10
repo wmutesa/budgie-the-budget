@@ -51,7 +51,17 @@ export function dayLabel(iso, now = today()) {
 }
 
 // ---------- a new task ----------
+// A web address in a title becomes the task's link (the title keeps the words).
+export const URL_RE = /(https?:\/\/[^\s<>"']+)/i;
+export function cleanLink(raw) {
+  let u = String(raw || '').trim();
+  if (!u) return '';
+  if (!/^https?:\/\//i.test(u)) u = `https://${u}`;
+  try { const x = new URL(u); return /^https?:$/.test(x.protocol) && x.hostname.includes('.') ? x.href : ''; } catch { return ''; }
+}
 export function makeTask(fields = {}) {
+  const m = !fields.link && typeof fields.title === 'string' ? fields.title.match(URL_RE) : null;
+  if (m) fields = { ...fields, link: cleanLink(m[1]), title: fields.title.replace(m[1], '').replace(/\s{2,}/g, ' ').trim() || m[1] };
   return {
     id: newId(), title: 'New task', notes: '', kind: 'task', date: '', time: '', mins: null,
     priority: 'medium', project: '', repeat: null, done: false, doneAt: null, doneDates: [],
