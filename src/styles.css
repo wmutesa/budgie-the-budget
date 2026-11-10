@@ -4506,3 +4506,42 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .hp3-close i { background: #09090b; }
 .hp3-panel .hp3-signin { border: 1px solid #e4e4e7 !important; }
 .hp3-panel:not(.open) { box-shadow: none !important; visibility: hidden; transition: transform .32s cubic-bezier(.2, .8, .2, 1), visibility 0s .32s; }
+/* Schedule: its contents line up with the wordmark and the avatar; little space below. */
+.user-main { padding-bottom: 10px !important; }
+.user-page .pln { padding-bottom: 0 !important; }
+.user-page .sch-bar { padding-left: 0 !important; padding-right: 0 !important; }
+.user-page .sch-body { padding-right: 0 !important; }
+.user-page .sch-list { padding-left: 0 !important; }
+.user-page .sch-time { border-right: 0 !important; }
+
+/* ---------- Settings (user view): laid out exactly like the Admin view ---------- */
+.user-main.is-settings { padding: 0 !important; background: #fafafa; }
+.is-settings > .user-page { gap: 0 !important; }
+.is-settings .set { grid-template-columns: 220px minmax(0, 1fr) !important; min-height: calc(100dvh - 58px) !important; border: 0 !important; background: none !important; }
+.is-settings .set-rail { display: flex !important; flex-direction: column; flex-wrap: nowrap !important; align-items: stretch !important; gap: 2px !important; padding: 18px 12px !important; background: #fff !important; border: 0 !important; border-right: 1px solid #ececf0 !important; position: sticky; top: 58px; align-self: start; height: calc(100dvh - 58px); overflow: auto; }
+.is-settings .set-who { padding: 0 6px 14px !important; margin: 0 0 4px !important; border-bottom: 1px solid #f4f4f5 !important; }
+.is-settings .set-nav { display: flex !important; flex-direction: column !important; flex-wrap: nowrap !important; gap: 2px !important; overflow: visible !important; width: auto !important; }
+.is-settings .set-kicker, .is-settings .set-kicker-2 { display: block !important; margin: 14px 10px 6px !important; font: 600 11px var(--sans) !important; color: #a1a1aa !important; letter-spacing: .02em !important; text-transform: none !important; }
+.is-settings .set-nav button { display: flex !important; align-items: center; gap: 10px; height: 36px !important; padding: 0 12px !important; border: 0 !important; border-radius: 999px !important; background: none !important; box-shadow: none !important; font: 500 13.5px var(--sans) !important; color: #3f3f46 !important; }
+.is-settings .set-nav button .ico { color: #a1a1aa; }
+.is-settings .set-nav button:hover { background: #f4f4f5 !important; color: #18181b !important; }
+.is-settings .set-nav button.on { background: #f5f3ff !important; color: #5b21b6 !important; font-weight: 600 !important; }
+.is-settings .set-nav button.on .ico { color: #7c3aed; }
+.is-settings .set-page { padding: 24px 18px 40px !important; max-width: 1240px !important; gap: 16px !important; }
+.is-settings .set-head h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.is-settings .set-head p { margin: 4px 0 0; font-size: 14px; }
+.is-settings .set-sec, .is-settings .acct-sec { background: #fff !important; border: 1px solid #ececf0 !important; border-radius: 0 !important; padding: 18px 20px !important; box-shadow: 0 1px 2px rgba(24, 24, 27, .04) !important; margin: 0 !important; }
+.is-settings .set-sec h2, .is-settings .acct-sec-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
+.is-settings .acct-sec-head .kicker { font: 600 15px var(--sans) !important; letter-spacing: 0 !important; text-transform: none !important; color: #18181b !important; display: flex; align-items: center; gap: 8px; }
+.is-settings .set-page .btn, .is-settings .set-page button.btn { border-radius: 999px !important; height: 36px; padding: 0 16px; border: 1px solid #e4e4e7; background: #fff; font: 600 13px var(--sans); }
+.is-settings .set-page .btn.primary { background: #18181b; border-color: #18181b; color: #fff; }
+.is-settings .set-page .btn.primary:hover { background: #6d28d9; border-color: #6d28d9; }
+.is-settings .set-page input.field, .is-settings .set-page .tk-f input, .is-settings .set-page .tk-f textarea, .is-settings .you-key input { border: 1px solid #e4e4e7 !important; border-radius: 0 !important; background: #fff; }
+@media (max-width: 760px) {
+  .is-settings .set { grid-template-columns: minmax(0, 1fr) !important; min-height: 0 !important; }
+  .is-settings .set-rail { position: sticky; top: 0; z-index: 5; height: auto; flex-direction: row !important; overflow-x: auto; padding: 8px 12px !important; border-right: 0 !important; border-bottom: 1px solid #ececf0 !important; scrollbar-width: none; }
+  .is-settings .set-who, .is-settings .set-kicker, .is-settings .set-kicker-2 { display: none !important; }
+  .is-settings .set-nav { flex-direction: row !important; }
+  .is-settings .set-nav button { flex: none; }
+  .is-settings .set-page { padding: 16px 18px 28px !important; }
+}

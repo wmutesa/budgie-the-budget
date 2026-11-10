@@ -154,7 +154,7 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </div>
       </div>
       <!-- Your planner: pages in the top bar, cards in the dashboard style. -->
-      <div v-else class="user-main span-12">
+      <div v-else class="user-main span-12" :class="{ 'is-settings': active === 'Settings' || active === 'Privacy' }">
         <div v-if="active === 'Overview'" class="grid hl user-page"><TodayView /></div>
         <div v-else-if="active === 'Schedule'" class="grid hl user-page"><PlannerView /></div>
         <div v-else-if="active === 'Settings' || active === 'Privacy'" class="grid hl user-page"><AccountPage :kind="active === 'Privacy' ? 'privacy' : 'settings'" /></div>
