@@ -313,6 +313,12 @@ async function run(url) {
   assert.equal(await page.$('[data-test="cal-pop"], [data-test="sch-over"]'), null, 'a week item is shown in the list; no card opens by itself');
   await page.click('[data-test="cal-month"]');
   assert.equal(await page.locator('.cal-mcell').count(), 42, 'the month shows six weeks');
+  // Export: the calendar as PNG, JPG, JPEG or PDF, under the production security headers.
+  await page.click('[data-test="export-open"]');
+  assert.deepEqual(await page.$$eval('[data-test="export-menu"] b', b => b.map(x => x.textContent)), ['PNG', 'JPG', 'JPEG', 'PDF'], 'the calendar exports as PNG, JPG, JPEG or PDF');
+  { const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('[data-test="export-pdf"]')]); assert.match(dl.suggestedFilename(), /^taskie-(day|week|month)-\d{4}-\d{2}-\d{2}\.pdf$/, `a PDF is saved (${dl.suggestedFilename()})`); }
+  await page.click('[data-test="export-open"]');
+  { const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.click('[data-test="export-png"]')]); assert.match(dl.suggestedFilename(), /\.png$/, 'and a PNG'); }
   // Lock In: every activity has a timer icon; the timer takes over the page until it is minimised.
   await page.click('[data-test="cal-day"]');
   while (await page.locator('[data-test="toast"] .toast-x').count()) await page.locator('[data-test="toast"] .toast-x').first().click();

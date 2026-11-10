@@ -45,7 +45,7 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
       <div class="lf-foot">
         <a v-if="modelValue" class="lf-open" :href="modelValue" target="_blank" rel="noopener noreferrer"><Icon name="external" :size="13" />Open</a>
         <button v-if="modelValue" type="button" class="lf-remove" data-test="link-remove" @click="remove">Remove</button>
-        <button type="submit" class="tp-done" data-test="link-save">Save</button>
+        <button type="submit" class="lf-save" data-test="link-save">Save</button>
       </div>
     </form>
   </Teleport>

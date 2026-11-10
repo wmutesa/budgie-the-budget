@@ -229,6 +229,18 @@ function rename(x, e) {
   const v = e.target.innerText.replace(/\s+/g, ' ').trim();
   if (v && v !== x.task.title) x.task.title = v; else e.target.innerText = x.task.title;
 }
+// Export what the calendar shows (day, week or month) as PNG, JPG/JPEG or PDF.
+const exportOpen = ref(false);
+const exporting = ref(false);
+async function doExport(format) {
+  exportOpen.value = false; exporting.value = true;
+  try {
+    const node = document.querySelector('.sch-body .sch-time, .sch-body .sch-cal');
+    const title = `${range.value === 'day' ? 'Day' : range.value === 'week' ? 'Week' : 'Month'} · ${dateLabel.value}`;
+    const { exportCalendar } = await import('../lib/exportcal');
+    await exportCalendar(node, { format, title, file: `taskie-${range.value}-${day.value || today()}` });
+  } catch (e) { toast(`The calendar could not be exported (${e.message || 'unknown error'}).`, { kind: 'error' }); } finally { exporting.value = false; }
+}
 const splittingKey = ref('');
 async function splitRow(x) {
   splittingKey.value = x.key;
@@ -280,6 +292,7 @@ function outside(e) {
   const t = e.target;
   if (!(t instanceof Element) || t.closest('.pk-pop')) return;
   if (calOpen.value && calPopEl.value && !calPopEl.value.contains(t) && !t.closest('[data-test="calendars-open"]')) calOpen.value = false;
+  if (exportOpen.value && !t.closest('.sch-export')) exportOpen.value = false;
   if (pickOpen.value && pickEl.value && !pickEl.value.contains(t) && !t.closest('[data-test="sch-today"]')) pickOpen.value = false;
 }
 onMounted(() => document.addEventListener('mousedown', outside));
@@ -350,6 +363,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escFresh); document.
       <div class="sch-modes" role="group" aria-label="Range">
         <button v-for="[id, label] in [['day', 'Day'], ['week', 'Week'], ['month', 'Month']]" :key="id" type="button" :class="{ on: range === id }" :aria-pressed="range === id" :data-test="`cal-${id}`" @click="range = id; id === 'day' && nextTick(scrollToStart)">{{ label }}</button>
       </div>
+      <span class="sch-export" data-export="skip">
+        <button type="button" class="sch-cal-btn" :aria-expanded="exportOpen" aria-haspopup="menu" data-test="export-open" @click="exportOpen = !exportOpen"><Icon :name="exporting ? 'refresh' : 'download'" :size="15" />{{ exporting ? 'Exporting…' : 'Export' }}</button>
+        <span v-if="exportOpen" class="sch-export-menu" role="menu" data-test="export-menu">
+          <button v-for="f in ['png', 'jpg', 'jpeg', 'pdf']" :key="f" type="button" role="menuitem" :data-test="`export-${f}`" @click="doExport(f)"><b>{{ f.toUpperCase() }}</b><span>{{ f === 'pdf' ? 'One page, to print or send' : f === 'png' ? 'Sharp picture' : 'Smaller picture' }}</span></button>
+        </span>
+      </span>
       <button type="button" class="sch-cal-btn" :aria-expanded="calOpen" data-test="calendars-open" @click="calOpen = !calOpen"><Icon name="calendar" :size="15" />Calendars</button>
       <div v-if="calOpen" ref="calPopEl" class="sch-cal-pop"><PlanCalendars show="add" /><button type="button" class="sch-icon sch-cal-x" aria-label="Close" title="Close" @click="calOpen = false"><Icon name="x" :size="16" /></button></div>
     </div>
