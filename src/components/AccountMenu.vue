@@ -6,12 +6,13 @@ import { account, signOut } from '../lib/account';
 import { go, nav, setMode } from '../lib/nav';
 
 // The avatar in the top right (the one round thing in Taskie) and its menu:
-// Settings, Privacy, the tour, and Sign out.
+// the owner's Admin switch, Settings, the tour, and Sign out.
 const emit = defineEmits(['tour']);
 const open = ref(false);
 const root = ref(null);
 const initial = computed(() => (account.user?.name || '?').trim()[0]?.toUpperCase() || '?');
 const isOwner = computed(() => account.user?.role === 'owner');
+const admin = computed(() => nav.mode === 'admin');
 // Going to the page you are on reloads it, so lists are fresh.
 const to = page => { open.value = false; go(page); window.dispatchEvent(new CustomEvent('taskie:account-page', { detail: page })); };
 const tour = () => { open.value = false; emit('tour'); };
@@ -31,12 +32,12 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
     </button>
     <div v-if="open" class="am-menu" role="menu" data-test="account-menu">
       <div class="am-who">
-        <b>{{ account.user?.name }}</b>
-        <span class="muted small">{{ isOwner ? 'Owner' : 'Member' }} · {{ account.sync === 'offline' ? 'offline' : 'synced' }}</span>
-      </div>
-      <div v-if="isOwner" class="am-view" role="group" aria-label="View">
-        <button type="button" :class="{ on: nav.mode !== 'admin' }" :aria-pressed="nav.mode !== 'admin'" data-test="view-user" @click="open = false; setMode('user')"><Icon name="user" :size="14" />User view</button>
-        <button type="button" :class="{ on: nav.mode === 'admin' }" :aria-pressed="nav.mode === 'admin'" data-test="view-admin" @click="open = false; setMode('admin')"><Icon name="shield" :size="14" />Admin view</button>
+        <span class="am-id"><b>{{ account.user?.name }}</b><span class="muted small">{{ isOwner ? 'Owner' : 'Member' }} · {{ account.sync === 'offline' ? 'offline' : 'synced' }}</span></span>
+        <!-- The owner's switch between their planner and the Admin view -->
+        <label v-if="isOwner" class="am-toggle" :title="admin ? 'Switch to your planner' : 'Switch to the Admin view'">
+          <span>Admin</span>
+          <button type="button" role="switch" class="am-switch" :aria-checked="admin" :aria-label="admin ? 'Admin view on: switch to user view' : 'Switch to Admin view'" :data-test="admin ? 'view-user' : 'view-admin'" @click="open = false; setMode(admin ? 'user' : 'admin')"><i /></button>
+        </label>
       </div>
       <button type="button" role="menuitem" data-test="menu-settings" @click="to('Settings')"><Icon name="gear" :size="16" />Settings</button>
       <template v-if="nav.mode !== 'admin' || !isOwner">

@@ -4228,3 +4228,39 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .adm-ai .you-key .btn { height: 36px; padding: 0 16px; border-radius: 999px !important; border: 1px solid #e4e4e7; background: #fff; font: 600 13px var(--sans); white-space: nowrap; }
 .adm-ai .dgp-check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; margin: 8px 0; }
 .adm-ai .dgp-check input { accent-color: #7c3aed; }
+
+/* Avatar menu: the owner's Admin switch sits at the top right, beside the name. */
+.am-who { display: flex !important; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.am-id { display: grid; gap: 2px; min-width: 0; }
+.am-toggle { display: inline-flex; align-items: center; gap: 6px; font: 600 11.5px var(--sans); color: #52525b; flex: none; cursor: pointer; padding-top: 1px; }
+.am-menu .am-switch { width: 34px; height: 20px; padding: 2px; border: 0; background: #e4e4e7; border-radius: 999px !important; display: inline-flex; align-items: center; cursor: pointer; transition: background .15s; }
+.am-menu .am-switch:hover { background: #d4d4d8; }
+.am-switch i { width: 16px; height: 16px; background: #fff; border-radius: 50% !important; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .15s; }
+.am-menu .am-switch[aria-checked="true"] { background: #7c3aed; }
+.am-switch[aria-checked="true"] i { transform: translateX(14px); }
+.am-menu { width: 248px !important; }
+
+/* ---------- User pages in the dashboard shell (shadcn-inspired, Taskie's rules) ---------- */
+.adm-main > .user-page { margin: 0 auto !important; max-width: 1240px; background: none !important; border: 0 !important; gap: 16px !important; min-height: 0 !important; }
+.user-page > * { background: none !important; }
+.user-page .card, .user-page .cell.card, .user-page section.card { background: #fff !important; border: 1px solid #ececf0 !important; border-radius: 0 !important; box-shadow: 0 1px 2px rgba(24, 24, 27, .04) !important; }
+.user-page .td-brief, .user-page .td-progress, .user-page .td-side, .user-page .td-facts { padding: 0 !important; }
+.user-page .td-side { gap: 16px; }
+.user-shell .adm-main { padding-top: 20px; }
+/* Settings: one row of tabs under the page, not a second sidebar. */
+.user-page .set { grid-template-columns: 1fr !important; border: 0 !important; background: none !important; min-height: 0 !important; }
+.user-page .set-rail { display: flex !important; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 0 0 12px !important; border: 0 !important; border-bottom: 1px solid #ececf0 !important; background: none !important; }
+.user-page .set-who { border: 0 !important; padding: 0 !important; margin: 0 !important; }
+.user-page .set-nav { display: flex !important; flex-wrap: wrap; gap: 4px; }
+.user-page .set-kicker { display: none !important; }
+.user-page .set-nav button { height: 34px !important; padding: 0 14px !important; border-radius: 999px !important; font-size: 13.5px !important; }
+.user-page .set-page { padding: 20px 0 0 !important; max-width: none !important; }
+.user-page .set-sec, .user-page .acct-sec { background: #fff; border: 1px solid #ececf0 !important; box-shadow: 0 1px 2px rgba(24, 24, 27, .04); }
+.user-page .set-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+/* Phones: the sidebar is a row of pills, like the Admin view. */
+@media (max-width: 760px) { .user-shell .adm-main { padding: 12px 10px 28px; } .user-page .set-rail { gap: 10px; } .user-page .set-nav { flex-wrap: nowrap; overflow-x: auto; width: 100%; scrollbar-width: none; } .user-page .set-nav button { flex: none; } }
+/* The sidebar replaces the old page tabs: no mask or wrapping from them. */
+.adm-side.nb-pages { -webkit-mask-image: none !important; mask-image: none !important; order: 0 !important; min-height: 0 !important; border-top: 0 !important; flex: none !important; }
+.user-page .set { grid-template-columns: minmax(0, 1fr) !important; }
+.user-page .set-rail, .user-page .set-page, .user-page .set-nav { min-width: 0; max-width: 100%; }
+.adm-main { overflow-x: clip; }

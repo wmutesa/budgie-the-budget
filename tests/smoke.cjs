@@ -153,7 +153,7 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule'], 'two pages: Progress is part of the Overview');
+  assert.deepEqual(await page.$$eval('.adm-side.nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Settings'], 'two pages and Settings, in a sidebar: Progress is part of the Overview');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Taskie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');
@@ -585,7 +585,8 @@ async function run(url) {
   // Settings: square, with only the avatar round.
   await guide.click('[data-test="account"]');
   await guide.click('[data-test="menu-settings"]');
-  assert.equal(await guide.$eval('[data-test="settings-page"] .set-nav button.on', e => getComputedStyle(e).borderRadius), '0px', 'Settings is square');
+  assert.equal(await guide.$eval('[data-test="settings-page"] .set-nav button.on', e => getComputedStyle(e).borderRadius), '999px', 'Settings tabs are fully rounded buttons');
+  assert.equal(await guide.$eval('[data-test="settings-page"] .set-sec, [data-test="settings-page"] .acct-sec', e => getComputedStyle(e).borderRadius), '0px', 'and its cards are square');
   assert.equal(await guide.$eval('[data-test="account"]', e => getComputedStyle(e).borderRadius), '50%', 'the avatar stays round');
   // Avatar colour: picked at random, changed with the picker.
   await guide.click('[data-test="avatar"]');
