@@ -37,7 +37,6 @@ import { store } from './lib/store';
 const active = computed({ get: () => nav.page, set: v => { nav.page = v; } });
 const PAGE_ICONS = { Overview: 'home', Schedule: 'calendar', Dashboard: 'home', People: 'user', Voice: 'mic', Models: 'sparkle', Training: 'trend', Errors: 'help', Sync: 'refresh', Calendars: 'calendar', Settings: 'gear' };
 // The Admin sidebar, in groups like a dashboard's.
-const USER_GROUPS = [['Planner', ['Overview', 'Schedule']], ['Account', ['Settings']]];
 const ADMIN_GROUPS = [['General', ['Dashboard', 'People']], ['AI', ['Voice', 'Models', 'Training']], ['Health', ['Errors', 'Sync', 'Calendars']], ['Account', ['Settings']]];
 // The owner can switch to the Admin view (from the avatar menu); everyone else sees their planner.
 const adminView = computed(() => nav.mode === 'admin' && account.user?.role === 'owner');
@@ -126,6 +125,9 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
           <span v-if="adminView" class="nb-admin" data-test="admin-badge">Admin</span>
           <span v-else class="muted small nb-date">{{ today }}</span>
         </div>
+        <nav v-if="!adminView" class="nb-pages" aria-label="Pages">
+          <button v-for="p in PAGES" :key="p" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase()}`" @click="active = p"><Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}</button>
+        </nav>
         <GlobalSearch v-if="!adminView" />
         <span v-else class="nb-spacer" aria-hidden="true" />
         <div class="nb-actions">
@@ -138,23 +140,24 @@ onUnmounted(() => { clearInterval(timer); navRo?.disconnect(); });
         </div>
       </header>
 
-      <!-- One shell for both views: a sidebar of pages beside the page itself. -->
-      <div class="adm-shell span-12" :class="{ 'user-shell': !adminView }">
-        <aside class="adm-side" :class="{ 'nb-pages': !adminView }" :aria-label="adminView ? 'Admin pages' : 'Pages'">
-          <template v-for="[group, pages] in (adminView ? ADMIN_GROUPS : USER_GROUPS)" :key="group">
+      <!-- The Admin view: a sidebar of its pages beside the page itself. -->
+      <div v-if="adminView" class="adm-shell span-12">
+        <aside class="adm-side" aria-label="Admin pages">
+          <template v-for="[group, pages] in ADMIN_GROUPS" :key="group">
             <p class="adm-group">{{ group }}</p>
             <button v-for="p in pages" :key="p" type="button" :class="{ on: active === p }" :aria-current="active === p ? 'page' : undefined" :data-test="`nav-${p.toLowerCase().replace(/\s+/g, '-')}`" @click="active = p"><Icon :name="PAGE_ICONS[p]" :size="15" />{{ p }}</button>
           </template>
         </aside>
         <div class="adm-main">
-          <template v-if="adminView">
-            <AdminPage v-if="ADMIN_PAGES.includes(active)" :section="active" />
-            <AdminSettings v-else />
-          </template>
-          <div v-else-if="active === 'Overview'" class="grid hl user-page"><TodayView /></div>
-          <div v-else-if="active === 'Schedule'" class="grid hl user-page"><PlannerView /></div>
-          <div v-else-if="active === 'Settings' || active === 'Privacy'" class="grid hl user-page"><AccountPage :kind="active === 'Privacy' ? 'privacy' : 'settings'" /></div>
+          <AdminPage v-if="ADMIN_PAGES.includes(active)" :section="active" />
+          <AdminSettings v-else />
         </div>
+      </div>
+      <!-- Your planner: pages in the top bar, cards in the dashboard style. -->
+      <div v-else class="user-main span-12">
+        <div v-if="active === 'Overview'" class="grid hl user-page"><TodayView /></div>
+        <div v-else-if="active === 'Schedule'" class="grid hl user-page"><PlannerView /></div>
+        <div v-else-if="active === 'Settings' || active === 'Privacy'" class="grid hl user-page"><AccountPage :kind="active === 'Privacy' ? 'privacy' : 'settings'" /></div>
       </div>
     </main>
 

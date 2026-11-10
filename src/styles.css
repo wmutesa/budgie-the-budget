@@ -4346,3 +4346,7 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .hp2-dot, .hp2-ico, .hp2-demo-bar span i { border-radius: 50% !important; }
 .hp2-card, .hp2-demo, .hp2-items li { border-radius: 0 !important; }
 .hp2-signin > * { border: 0 !important; box-shadow: none !important; background: none !important; width: 100% !important; max-width: none !important; margin: 0 !important; }
+/* User view: pages in the top bar, no sidebar; the page itself on the soft dashboard background. */
+.user-main { background: #fafafa; padding: 20px 18px 40px; min-height: calc(100dvh - 58px); min-width: 0; overflow-x: clip; }
+.user-main > .user-page { margin: 0 auto !important; max-width: 1240px; background: none !important; border: 0 !important; gap: 16px !important; min-height: 0 !important; }
+@media (max-width: 760px) { .user-main { padding: 12px 10px 28px; } }

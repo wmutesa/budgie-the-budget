@@ -153,7 +153,8 @@ async function run(url) {
   await page.goto(url, { waitUntil: 'load' });
 
   // Two pages, starting with Today. No money side, digests or playground.
-  assert.deepEqual(await page.$$eval('.adm-side.nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule', 'Settings'], 'two pages and Settings, in a sidebar: Progress is part of the Overview');
+  assert.deepEqual(await page.$$eval('.nav-bar .nb-pages button', b => b.map(x => x.textContent.replace('Soon', '').trim())), ['Overview', 'Schedule'], 'two pages in the top bar: Progress is part of the Overview');
+  assert.equal(await page.$('.adm-side'), null, 'no sidebar in the user view');
   assert.ok(Object.keys(headers).length >= 5, 'security headers are configured');
   await page.waitForSelector('[data-test="today"]');
   assert.match(await page.textContent('[data-test="today"] .lede'), /Taskie starts empty|Today you have|Nothing is planned/, 'Today opens with your day');

@@ -237,7 +237,7 @@ async function main() {
     assert.equal(memberAdmin, 403, 'members cannot see the Admin view');
     await owner.page.click('[data-test="account"]');
     await owner.page.click('[data-test="view-user"]');
-    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['Overview', 'Schedule', 'Settings'], 'back to the user view, with its own sidebar');
+    assert.deepEqual(await owner.page.$$eval('.nb-pages button', b => b.map(x => x.textContent.trim())), ['Overview', 'Schedule'], 'back to the user view, pages in the top bar');
     assert.ok(await owner.page.$('[data-test="capture"]'), 'the Add and record button is back in the user view');
     assert.equal(await owner.page.$('[data-test="admin-people"]'), null, 'and the Admin pages are gone');
     // The owner removes Alex, whose session stops working.
