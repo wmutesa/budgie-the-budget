@@ -365,28 +365,51 @@ await check('a kind the model decided wins over a guess from the words', () => {
   const g = withKind(route('Read 24 books this year'), 'goal');
   assert.equal(g.dest, 'goal');
 });
-const { geminiVoice, audioTypeOk } = await import('../../worker/gemini.js');
-await check('a recording goes to Gemini with the live text, and its answer is checked', async () => {
+const { audioTypeOk } = await import('../../worker/gemini.js');
+const { geminiCorrect, novaHear } = await import('../../worker/hear.js');
+await check('Nova-3 hears the recording with keyterms; Gemini corrects it with the sound and the context', async () => {
+  let novaIn = null;
+  const env = { AI: { run: async (model, input) => { novaIn = { model, input }; return { results: { channels: [{ alternatives: [{ transcript: 'lab report three due friday for kem', confidence: 0.82, words: [{ word: 'kem', punctuated_word: 'kem', confidence: 0.31 }, { word: 'friday', confidence: 0.98 }] }] }] } }; } } };
+  const nova = await novaHear(env, new Uint8Array([82, 73, 70, 70]), 'audio/wav', ['CHEM 110', 'Chemistry']);
+  assert.equal(novaIn.model, '@cf/deepgram/nova-3');
+  assert.equal(novaIn.input.audio.contentType, 'audio/wav', 'the audio goes as a body with its type');
+  assert.match(novaIn.input.keyterm, /CHEM 110/, 'the person\'s words boost recognition');
+  assert.equal(nova.text, 'lab report three due friday for kem');
+  assert.deepEqual(nova.unsure, ['kem'], 'low-confidence words are flagged for Gemini');
   const realFetch = globalThis.fetch;
   let req = null;
-  globalThis.fetch = async (url, opts) => { req = JSON.parse(opts.body); return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ transcript: 'Lab report 3 due Friday <b>and</b> gym Mondays', items: [
-    { title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
-    { title: 'Gym', kind: 'routine', date: '', time: '25:00', minutes: 0, repeat: 'weekly', days: ['mon'], course: '' },
+  globalThis.fetch = async (url, opts) => { req = JSON.parse(opts.body); return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ transcript: 'Lab report 3 due Friday for <b>chem</b>', items: [
+    { title: 'Lab Report 3', kind: 'assignment', date: '2026-11-13', time: '25:00', minutes: 0, repeat: '', days: [], course: 'Chemistry' },
   ] }) }] } }] }) }; };
   try {
-    const out = await geminiVoice('k'.repeat(30), { audio: 'UklGRg==', mime: 'audio/wav', typed: 'lab report three due friday', today: '2026-11-08', weekday: 'Sunday', categories: ['Chemistry'] });
+    const out = await geminiCorrect('k'.repeat(30), { audio: 'UklGRg==', mime: 'audio/wav', heard: nova.text, unsure: nova.unsure, today: '2026-11-08', weekday: 'Sunday', categories: ['Chemistry'], vocab: ['CHEM 110'] });
     const parts = req.contents[0].parts;
-    assert.deepEqual(parts[0].inline_data, { mime_type: 'audio/wav', data: 'UklGRg==' }, 'the recording itself is sent');
-    assert.match(parts[1].text, /word for word/);
-    assert.match(parts[1].text, /prefer its spellings[\s\S]*lab report three due friday/, 'the live text helps with spellings');
-    assert.match(parts[1].text, /Chemistry/);
-    assert.equal(out.transcript, 'Lab report 3 due Friday band/b gym Mondays', 'what was heard comes back as plain text');
-    assert.ok(!/[<>]/.test(out.transcript), 'no markup in what was heard');
-    assert.equal(out.items.length, 2);
-    assert.equal(out.items[1].time, '', 'an impossible time is dropped');
+    assert.deepEqual(parts[0].inline_data, { mime_type: 'audio/wav', data: 'UklGRg==' }, 'Gemini listens to the recording too');
+    assert.match(parts[1].text, /Nova-3[\s\S]*for kem[\s\S]*unsure of these words: kem/, 'with Nova-3\'s text and its unsure words');
+    assert.match(parts[1].text, /CHEM 110/, 'and the person\'s own words');
+    assert.ok(!/[<>]/.test(out.transcript), 'no markup comes back');
+    assert.equal(out.items[0].time, '', 'an impossible time is dropped');
   } finally { globalThis.fetch = realFetch; }
   assert.ok(audioTypeOk('audio/wav') && audioTypeOk('audio/webm;codecs=opus') && audioTypeOk('audio/mp4'));
   assert.ok(!audioTypeOk('video/mp4') && !audioTypeOk('text/html'));
+});
+const { planFor } = await import('../../worker/push.js');
+await check('push: a reminder 10 minutes before, once; nothing for done or pending things', async () => {
+  const rows = [];
+  const env = { DB: { prepare: sql => ({ bind: (...a) => ({ run: async () => { if (/INSERT OR IGNORE INTO notify_queue/.test(sql)) { const dup = rows.some(r => r[0] === a[0] && r[1] === a[1]); if (!dup) rows.push(a); return { meta: { changes: dup ? 0 : 1 } }; } return { meta: { changes: 0 } }; }, first: async () => null, all: async () => ({ results: [] }) }), run: async () => ({}) }), batch: async () => [] } };
+  const tz = 'UTC';
+  const d = new Date(); const day = d.toISOString().slice(0, 10);
+  const at = new Date(d.getTime() + 7 * 60e3); const hhmm = `${String(at.getUTCHours()).padStart(2, '0')}:${String(at.getUTCMinutes()).padStart(2, '0')}`;
+  if (at.toISOString().slice(0, 10) !== day) return; // too close to midnight to test today
+  const data = { tasks: [
+    { id: 'a', title: 'Chem Lab', date: day, time: hhmm },
+    { id: 'b', title: 'Done Thing', date: day, time: hhmm, done: true },
+    { id: 'c', title: 'Pending Thing', date: day, time: hhmm, pending: true },
+    { id: 'e', title: 'Gym', date: '2020-01-01', time: hhmm, repeat: { every: 'day' } },
+  ] };
+  assert.equal(await planFor(env, 'u1', data, tz), 2, 'the lab and the daily gym');
+  assert.ok(rows.every(r => /in \d+ min|Starting now/.test(r[3])));
+  assert.equal(await planFor(env, 'u1', data, tz), 0, 'never twice');
 });
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {

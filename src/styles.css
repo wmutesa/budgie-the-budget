@@ -4065,3 +4065,19 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .rec .cap-note { justify-content: center; text-align: left; max-width: 44ch; }
 .cap-note .linkish { margin-left: 6px; background: none; border: 0; padding: 0; color: #6d28d9; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .rec-wave.hearing i { animation: none; height: 18px; } .rec-busy .ico { animation: none; } }
+
+/* ---------- What's next: one column per row, so long dates never overlap ---------- */
+.nx-head .nx-refresh { margin-left: auto; width: 28px; height: 28px; }
+.nx-refresh.spin .ico { animation: ispin 1s linear infinite; }
+.nx-row { grid-template-columns: minmax(0, 1fr) auto !important; gap: 8px !important; }
+.nx-main { border-left: 3px solid var(--k, #e4e4e7); padding-left: 12px !important; }
+.nx-idea .nx-main { border-left-color: #c4b5fd; }
+.nx-tag { display: inline-flex; align-items: center; gap: 5px; font: 600 11px var(--mono, ui-monospace, monospace); color: #52525b; letter-spacing: .01em; }
+.nx-due .nx-tag { color: #be185d; }
+.nx-idea .nx-tag { color: #6d28d9; }
+.nx-tag .nx-hi { font: 700 10px var(--sans); padding: 1px 5px; }
+.nx-title { font-size: 14px; font-weight: 600; color: #18181b; overflow-wrap: anywhere; line-height: 1.3; }
+.nx-meta { font-size: 12.5px; color: #71717a; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nx-when { display: none; }
+/* Phones: what is next comes right after the brief, before the charts. */
+@media (max-width: 900px) { .td-brief { order: -2; } .td-side { order: -1; padding-top: 12px !important; } }

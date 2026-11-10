@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { push, enablePush, disablePush, testPush } from '../lib/push';
 import { store } from '../lib/store';
 import Icon from './Icon.vue';
 
@@ -8,16 +9,21 @@ import Icon from './Icon.vue';
 if (!store.me || typeof store.me !== 'object') store.me = {};
 const me = store.me;
 
-// Task reminders on this device: a notification 10 minutes before timed items.
+// Notifications on this device: reminders 10 minutes before timed items, a
+// morning brief and deadlines the evening before, even with Taskie closed
+// (Web Push). Browsers without push still get reminders while a tab is open.
 const canNotify = typeof Notification !== 'undefined';
 const remindNote = ref('');
+const on = computed(() => (push.supported ? push.on : !!store.planner.remind));
 async function toggleRemind() {
   remindNote.value = '';
-  if (!store.planner.remind && canNotify && Notification.permission !== 'granted') {
+  if (on.value) { if (push.supported) await disablePush(); store.planner.remind = false; return; }
+  if (push.supported) { if (await enablePush()) store.planner.remind = true; return; }
+  if (canNotify && Notification.permission !== 'granted') {
     const p = await Notification.requestPermission().catch(() => 'denied');
     if (p !== 'granted') { remindNote.value = 'Notifications are blocked for this site in your browser settings.'; return; }
   }
-  store.planner.remind = !store.planner.remind;
+  store.planner.remind = true;
 }
 </script>
 
@@ -34,15 +40,16 @@ async function toggleRemind() {
     </div>
   </section>
   <section class="acct-sec t-g" data-test="profile-remind">
-    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="bell" :size="12" /></span>Task reminders</p><span class="muted small">On this device</span></div>
+    <div class="acct-sec-head"><p class="kicker"><span class="acct-ico" aria-hidden="true"><Icon name="bell" :size="12" /></span>Task reminders</p><span class="muted small">Laptop and phone</span></div>
     <div class="you-remind">
       <div>
-        <b>Remind me before timed items</b>
-        <p class="muted small">A notification 10 minutes before anything with a time, while a Taskie tab is open.</p>
-        <p v-if="!canNotify" class="muted small">This browser cannot show notifications.</p>
-        <p v-if="remindNote" class="small pln-err" role="alert">{{ remindNote }}</p>
+        <b>Notifications on this device</b>
+        <p class="muted small">10 minutes before anything with a time, a short brief at 8 AM and deadlines the evening before{{ push.supported ? ', even when Taskie is closed' : ', while a Taskie tab is open' }}. Turn it on for each laptop and phone.</p>
+        <p v-if="!canNotify && !push.supported" class="muted small">This browser cannot show notifications. On iPhone or iPad, add Taskie to the Home Screen first (Share, Add to Home Screen).</p>
+        <p v-if="remindNote || push.note" class="small" :class="push.on && !remindNote ? 'pln-ok' : 'pln-err'" role="status">{{ remindNote || push.note }}</p>
+        <button v-if="push.on" type="button" class="btn small" data-test="push-test" @click="testPush"><Icon name="bell" :size="14" />Send a test</button>
       </div>
-      <button v-if="canNotify" type="button" class="you-switch" role="switch" :aria-checked="!!store.planner.remind" data-test="remind" @click="toggleRemind"><i /></button>
+      <button type="button" class="you-switch" role="switch" :aria-checked="on" :disabled="push.busy" data-test="remind" @click="toggleRemind"><i /></button>
     </div>
   </section>
 </template>

@@ -1,18 +1,19 @@
-// Reminders on this device: while Taskie is open, a notification shortly
-// before anything with a time. Turned on in your profile; nothing is sent
-// through a server, so reminders only arrive while a Taskie tab is open.
+// Reminders while a Taskie tab is open, for browsers without push. With push
+// on (push.js), the server sends them instead, even when Taskie is closed.
 // During Lock In, what gets through follows your choice in Settings;
 // the rest is held and summed up when the session ends.
 import { store } from './store';
 import { occurrences, today, toMins, timeLabel } from './tasks';
 import { focusGate } from './focus';
+import { push } from './push';
 
 const LEAD_MINS = 10;
 const sent = new Set();
 let timer = null;
 
 function check() {
-  if (!store.planner?.remind || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  // With push on, Taskie's server sends reminders (one copy, on every device).
+  if (push.on || !store.planner?.remind || typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const now = new Date();
   const m = now.getHours() * 60 + now.getMinutes();
   for (const x of occurrences(today(), today())) {

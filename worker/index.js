@@ -10,6 +10,7 @@ import { modelSource, modelResponse } from './models.js';
 import { makeDigest, profileFromAccount } from './digest.js';
 import { cloudSplit, SPLIT_MODEL } from './cloudai.js';
 import { novaHear, geminiCorrect, geminiJson } from './hear.js';
+import { vapidKeys, pushTables, wake, queue, scheduledPush } from './push.js';
 import { geminiResearch, geminiSplit, audioTypeOk, checkKey, tidyKey, keyShapeOk } from './gemini.js';
 
 const SESSION_COOKIE = '__Host-budgie_session';
@@ -558,6 +559,42 @@ Task: ${clean(title, 160)}. Kind: ${clean(kind, 20) || 'task'}.${/^\d{4}-\d{2}-\
       return json({ steps: tidy(d.steps), via: 'llama' });
     } catch { return fail(502, 'Steps could not be written right now.'); }
   }
+  // --- notifications on laptops and phones (Web Push; see push.js) ---
+  if (path === '/api/push/key' && method === 'GET') return json({ key: (await vapidKeys(env)).publicKey });
+  if (path === '/api/push/subscribe' && method === 'POST') {
+    const { subscription, tz } = await body(request);
+    const endpoint = String(subscription?.endpoint || '');
+    // Only the browsers' own push services: never an arbitrary address.
+    let host = '';
+    try { const u = new URL(endpoint); host = u.protocol === 'https:' ? u.hostname : ''; } catch { /* not a URL */ }
+    if (!/(^|\.)(fcm\.googleapis\.com|push\.services\.mozilla\.com|push\.apple\.com|notify\.windows\.com|push\.api\.chromium\.org)$/.test(host)) return fail(400, 'That is not a browser push address.');
+    await pushTables(env);
+    await env.DB.prepare('INSERT INTO push_subs (endpoint, user_id, tz, ua, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, tz = excluded.tz, ua = excluded.ua, fails = 0')
+      .bind(endpoint.slice(0, 800), user.id, String(tz || 'UTC').slice(0, 60), String(request.headers.get('User-Agent') || '').slice(0, 200), now()).run();
+    // At most 10 devices per person.
+    await env.DB.prepare('DELETE FROM push_subs WHERE user_id = ? AND endpoint NOT IN (SELECT endpoint FROM push_subs WHERE user_id = ? ORDER BY created_at DESC LIMIT 10)').bind(user.id, user.id).run();
+    return json({ ok: true });
+  }
+  if (path === '/api/push/unsubscribe' && method === 'POST') {
+    const { endpoint } = await body(request);
+    await pushTables(env);
+    await env.DB.prepare('DELETE FROM push_subs WHERE endpoint = ? AND user_id = ?').bind(String(endpoint || ''), user.id).run();
+    return json({ ok: true });
+  }
+  if (path === '/api/push/test' && method === 'POST') {
+    const key = `push-test:${user.id}`;
+    if (await tooManyAttempts(env, key, 20)) return fail(429, 'Enough tests for this hour.');
+    await countFailure(env, key);
+    await queue(env, user.id, `t:${now()}`, 'Taskie is on 🔔', 'Reminders, your morning brief and deadlines will show up here.', '/');
+    return json({ sent: await wake(env, user.id) });
+  }
+  // The service worker asks for what was queued when a push wakes it.
+  if (path === '/api/notify/pending' && method === 'GET') {
+    await pushTables(env);
+    const { results = [] } = await env.DB.prepare('SELECT id, title, body, url, key FROM notify_queue WHERE user_id = ? AND delivered = 0 ORDER BY id LIMIT 6').bind(user.id).all();
+    if (results.length) await env.DB.prepare(`UPDATE notify_queue SET delivered = 1 WHERE user_id = ? AND id IN (${results.map(() => '?').join(',')})`).bind(user.id, ...results.map(r => r.id)).run();
+    return json({ items: results.map(r => ({ title: r.title, body: r.body, url: r.url, tag: r.key })) });
+  }
   // What's next: a few fresh, specific ideas from the person's own planner (Gemini; Taskie's own AI otherwise).
   if (path === '/api/ai/next' && method === 'POST') {
     const key = `ai-next:${user.id}`;
@@ -770,6 +807,8 @@ export default {
     return env.ASSETS.fetch(request);
   },
   async scheduled(event, env, ctx) {
+    // Every 5 minutes: reminders, morning briefs and deadline heads-ups to people's devices.
+    if (event.cron === '*/5 * * * *') { ctx.waitUntil(scheduledPush(env)); return; }
     if (DIGESTS_LIVE) ctx.waitUntil(scheduledDigests(env));
   },
 };

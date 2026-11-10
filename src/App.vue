@@ -22,6 +22,7 @@ import AdminPage from './components/AdminPage.vue';
 import { refreshFeeds } from './lib/calendar';
 import { ensureColor } from './lib/profile';
 import { startReminders } from './lib/reminders';
+import { setupPush } from './lib/push';
 import { account, startAccount, dropRecoveryCodes } from './lib/account';
 import { focus, mmss } from './lib/focus';
 import { capture } from './lib/capture';
@@ -57,7 +58,7 @@ watch(() => account.status, s => { if (s === 'signed-in') detectAI(); }, { immed
 let started = false;
 watch(() => account.sync, s => {
   if (account.status !== 'signed-in' || s !== 'saved') return;
-  refreshFeeds(); startReminders(); ensureColor();
+  refreshFeeds(); startReminders(); setupPush(); ensureColor();
   if (!started) { started = true; }
 });
 watch(() => [account.status, account.sync, store.guide?.done, account.recoveryCodes], () => {

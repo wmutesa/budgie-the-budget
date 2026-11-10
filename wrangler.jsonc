@@ -1,5 +1,5 @@
 {
-  // Budgie is a Vue site plus a small Worker for personal accounts.
+  // Taskie is a Vue site plus a small Worker for personal accounts.
   // Cloudflare's GitHub integration deploys every push to main by running
   // `npx wrangler deploy`, which first runs the build command below.
   "name": "budgie",
@@ -24,9 +24,10 @@
       "migrations_dir": "migrations"
     }
   ],
-  // Cloudflare's own AI models: Whisper writes down what is said, live, while you record.
+  // Cloudflare's own AI models: Deepgram Nova-3 hears recordings; Llama splits notes.
   "ai": { "binding": "AI" },
-  // New digests on Mondays and Thursdays at 11:00 UTC (see worker/digest.js).
-  "triggers": { "crons": ["0 11 * * 1,4"] },
+  // Every 5 minutes: notifications (worker/push.js). Mondays and Thursdays at
+  // 11:00 UTC: digests (worker/digest.js, on hold).
+  "triggers": { "crons": ["*/5 * * * *", "0 11 * * 1,4"] },
   "observability": { "enabled": true }
 }
