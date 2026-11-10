@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted } from 'vue';
 import { store } from '../lib/store';
 import { today, isoDay } from '../lib/tasks';
-import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss } from '../lib/focus';
+import { focus, startFocus, finishFocus, stopFocus, toggleFocus, extendFocus, openMini, canMini, mmss, plannedMins } from '../lib/focus';
 import Icon from './Icon.vue';
 import { catColor } from '../lib/cats';
 import BlockField from './BlockField.vue';
@@ -53,6 +53,11 @@ const LINES = [
 const line = computed(() => (focus.ended ? 'Time is up. Stretch, sip, then go again or call it done.' : !focus.running ? 'Paused. The timer waits. It is very patient.' : LINES[(focus.task?.title?.length || 0) % LINES.length]));
 const minsToday = computed(() => (store.focusLog || []).filter(x => isoDay(new Date(x.at)) === today()).reduce((n, x) => n + (x.mins || 0), 0));
 const less = () => { if (focus.left > 5 * 60) extendFocus(-5); };
+// The session's length against the activity's own: "+10 min" or "−5 min" when changed.
+const planned = computed(() => plannedMins(focus.task));
+const change = computed(() => Math.round(focus.total / 60) - planned.value);
+const changeText = computed(() => (change.value > 0 ? `+${change.value} min` : change.value < 0 ? `−${-change.value} min` : ''));
+const backToPlan = () => startFocus(focus.task, planned.value);
 const minimize = () => { focus.min = true; };
 const esc = e => { if (e.key === 'Escape' && focus.task && !focus.min) minimize(); };
 onMounted(() => document.addEventListener('keydown', esc));
@@ -95,7 +100,10 @@ onUnmounted(() => document.removeEventListener('keydown', esc));
         <p class="lk-line">{{ line }}</p>
         <div class="lk-acts">
           <button type="button" class="lk-chip strong" data-test="timer-done" @click="finishFocus"><Icon name="check" :size="16" />Done</button>
-          <button v-for="m in [15, 25, 50]" :key="m" type="button" class="lk-chip" :data-test="`lock-len-${m}`" @click="startFocus(focus.task, m)">{{ m }} min</button>
+          <button type="button" class="lk-chip" title="Five minutes less" :disabled="focus.ended || focus.left <= 5 * 60" data-test="lock-less" @click="less">−5 min</button>
+          <span class="lk-plan" data-test="lock-plan"><b>{{ Math.round(focus.total / 60) }} min</b><span>{{ changeText ? `${changeText} on the plan` : focus.task?.mins ? 'as planned' : 'no length set' }}</span></span>
+          <button type="button" class="lk-chip" title="Five more minutes" data-test="lock-more" @click="extendFocus(5)">+5 min</button>
+          <button v-if="change" type="button" class="lk-chip ghost" :title="`Back to the planned ${planned} minutes`" data-test="lock-reset" @click="backToPlan">Back to {{ planned }} min</button>
           <button v-if="canMini" type="button" class="lk-chip" :class="{ on: focus.mini }" title="Keep the timer on top of other windows" data-test="timer-float" @click="openMini"><Icon name="external" :size="16" />Float</button>
           <button type="button" class="lk-chip ghost" data-test="timer-stop" @click="stopFocus"><Icon name="x" :size="16" />Bail</button>
         </div>

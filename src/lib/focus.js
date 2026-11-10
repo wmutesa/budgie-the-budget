@@ -68,11 +68,18 @@ function run() {
   countdown = setInterval(tick, 1000);
 }
 
-export function startFocus(t, mins = 25) {
+// Lock In runs for the activity's own length (its minutes, or its start to end),
+// 25 minutes when it has none. The person can add or take away time from there.
+export function plannedMins(t) {
+  const m = Number(t?.mins);
+  if (Number.isFinite(m) && m >= 5) return Math.min(m, 240);
+  return 25;
+}
+export function startFocus(t, mins = plannedMins(t)) {
   if (focus.task) logSession();
   stopAlarm();
   askToNotify();
-  Object.assign(focus, { task: t, total: mins * 60, left: mins * 60, running: true, spent: 0, ended: false, min: false });
+  Object.assign(focus, { task: t, planned: plannedMins(t), total: mins * 60, left: mins * 60, running: true, spent: 0, ended: false, min: false });
   endsAt = Date.now() + mins * 60 * 1000;
   lastTick = Date.now();
   run();

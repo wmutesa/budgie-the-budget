@@ -322,18 +322,24 @@ async function run(url) {
   await lockRow.locator('[data-test="row-lockin"]').click();
   assert.ok(await page.$('.lk[data-test="timer"]'), 'Lock In opens over the whole page');
   assert.equal(await page.$('[data-test="nav-focus"]'), null, 'there is no Focus page any more');
-  assert.ok((await page.textContent('[data-test="timer"]')).includes(lockName) && /2[45]:\d\d/.test(await page.textContent('[data-test="timer"]')), 'a Lock In timer starts for that activity');
+  // It runs for the activity's own length (25 minutes when it has none).
+  const planMins = Number((await page.textContent('[data-test="lock-plan"] b')).match(/\d+/)[0]);
+  const lcd = () => page.textContent('[data-test="timer"] .lk-lcd-text');
+  const near = (t, m) => new RegExp(`^(${m}|${m - 1}):\\d\\d$`).test(t);
+  assert.ok((await page.textContent('[data-test="timer"]')).includes(lockName) && near(await lcd(), planMins), `a Lock In timer starts for that activity, for its own ${planMins} minutes (${await lcd()})`);
+  assert.match(await page.textContent('[data-test="lock-plan"]'), /as planned|no length set/, 'it says the length is the planned one');
   // The tab shows the countdown, its icon becomes a ring, and pause and +5 work.
-  assert.match(await page.title(), /^⏱ 2[45]:\d\d · /, `the tab title counts down (${await page.title()})`);
-  assert.match(await page.textContent('[data-test="nb-focus"]'), /2[45]:\d\d/, 'the top bar shows the countdown');
+  assert.match(await page.title(), /^⏱ \d+:\d\d · /, `the tab title counts down (${await page.title()})`);
+  assert.match(await page.textContent('[data-test="nb-focus"]'), /\d+:\d\d/, 'the top bar shows the countdown');
   assert.equal(await page.$('[data-test="bell-count"]'), null, 'the bell count stays quiet while locked in');
   assert.match(await page.getAttribute('link[rel="icon"]', 'href'), /^data:image\/png/, 'the tab icon shows the time left');
   await page.click('[data-test="timer-toggle"]');
   assert.match(await page.title(), /^⏸ /, 'a paused session shows in the title');
-  await page.click('[data-test="timer-more"]');
-  assert.match(await page.textContent('[data-test="timer"] .lk-lcd-text'), /^(29|30):\d\d$/, 'five more minutes are added');
-  await page.click('[data-test="lock-len-15"]');
-  assert.match(await page.textContent('[data-test="timer"] .lk-lcd-text'), /^1[45]:\d\d$/, 'a 15-minute session starts over');
+  await page.click('[data-test="lock-more"]');
+  assert.ok(near(await lcd(), planMins + 5), `five more minutes are added (${await lcd()})`);
+  assert.match(await page.textContent('[data-test="lock-plan"]'), /\+5 min on the plan/, 'and it shows the change against the plan');
+  await page.click('[data-test="lock-reset"]');
+  assert.ok(near(await lcd(), planMins), 'Back to the plan starts over at the planned length');
   // Minimised, it lives in the top bar; the pill brings it back.
   await page.click('[data-test="timer-min"]');
   assert.equal(await page.$('.lk[data-test="timer"]'), null, 'minimising hides the overlay');
