@@ -4581,3 +4581,21 @@ a.sch-link:hover { text-decoration: underline !important; text-decoration-color:
 .lf-save:focus-visible { outline: 2px solid #a78bfa; outline-offset: 2px; }
 .lf-remove { height: 32px; padding: 0 12px; border-radius: 999px !important; }
 .lf-remove:hover { background: #fef2f2; }
+/* A linked title or step keeps its look, with a small arrow; double-click opens it. */
+.has-link::after { content: '↗'; display: inline-block; margin-left: 4px; font-size: .78em; color: #a78bfa; transform: translateY(-1px); pointer-events: none; }
+.sch-steps li.done .has-link { text-decoration: inherit; }
+/* Tour card in the app's style: a white square card, soft border and shadow, fully rounded buttons. */
+.gt-card { border: 1px solid #e4e4e7 !important; border-radius: 0 !important; box-shadow: 0 24px 60px -24px rgba(24, 24, 27, .35) !important; padding: 18px 20px !important; }
+.gt-card::before, .gt-card::after { display: none !important; }
+.gt-card h2, .gt-card h3 { letter-spacing: -.01em; }
+.gt-acts button, .gt-acts .btn { height: 34px !important; padding: 0 18px !important; border-radius: 999px !important; font: 600 13px var(--sans) !important; border: 1px solid #e4e4e7 !important; background: #fff !important; color: #18181b !important; box-shadow: none !important; }
+.gt-acts [data-test="guide-next"] { background: #18181b !important; border-color: #18181b !important; color: #fff !important; }
+.gt-acts [data-test="guide-next"]:hover { background: #6d28d9 !important; border-color: #6d28d9 !important; }
+.gt-skip { color: #71717a !important; text-decoration: none !important; border-radius: 999px !important; }
+.gt-skip:hover { color: #18181b !important; }
+.gt-hole { border-radius: 10px !important; box-shadow: 0 0 0 4px rgba(167, 139, 250, .45), 0 0 0 9999px rgba(24, 24, 27, .4) !important; border: 0 !important; }
+.gt-card { box-sizing: border-box !important; }
+.gt-card * { box-sizing: border-box; max-width: 100%; }
+.gt-card { grid-template-columns: minmax(0, 1fr) !important; }
+.gt-dots { display: flex !important; gap: 4px !important; min-width: 0; }
+.gt-dots i, .gt-dots span { flex: 1 1 0 !important; min-width: 0 !important; width: auto !important; }

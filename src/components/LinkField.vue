@@ -43,7 +43,6 @@ onUnmounted(() => { document.removeEventListener('mousedown', outside); document
       <label class="lf-row"><Icon name="link" :size="14" /><input v-model="draft" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a link (docs, Canvas, Zoom…)" aria-label="Link" data-test="link-input" @input="bad = false" /></label>
       <p v-if="bad" class="lf-bad">That does not look like a web address.</p>
       <div class="lf-foot">
-        <a v-if="modelValue" class="lf-open" :href="modelValue" target="_blank" rel="noopener noreferrer"><Icon name="external" :size="13" />Open</a>
         <button v-if="modelValue" type="button" class="lf-remove" data-test="link-remove" @click="remove">Remove</button>
         <button type="submit" class="lf-save" data-test="link-save">Save</button>
       </div>
