@@ -4474,3 +4474,35 @@ button:has(> .ico-plus), a:has(> .ico-plus) { border-radius: 999px !important; }
 .hp3-panel .hp3-signin { margin: 0 !important; }
 .hp3-panel-foot { margin-top: auto !important; }
 @media (prefers-reduced-motion: reduce) { .hp3-panel { transition: none; } }
+
+/* ---------- Home in light mode: same layout, ink on paper ---------- */
+.hp3 { background: #fafafa; color: #09090b; }
+.hp3::after { background: radial-gradient(circle at 1px 1px, rgba(9, 9, 11, .07) 1px, transparent 0) 0 0 / 18px 18px; }
+.hp3-lines i { border-right-color: rgba(9, 9, 11, .07); }
+.hp3-glow { opacity: .9; }
+.hp3-glow i { background: radial-gradient(circle, rgba(167, 139, 250, .22), transparent 65%); }
+.hp3-glow i:nth-child(2) { background: radial-gradient(circle, rgba(196, 181, 253, .35), transparent 65%); }
+.hp3-glow i:nth-child(3), .hp3-glow i:nth-child(4) { background: radial-gradient(circle, rgba(228, 228, 231, .9), transparent 65%); }
+.hp3-logo { color: #09090b; }
+.hp3-logo path { stroke: #09090b; }
+.hp3-kinds li { color: rgba(9, 9, 11, .28); }
+.hp3-kinds li.on { color: #09090b; }
+.hp3-menu { color: #09090b; }
+.hp3-menu span { border-color: #09090b; }
+.hp3-mono { color: rgba(9, 9, 11, .5); }
+.hp3-copy h1 { color: #09090b; }
+.hp3-sub { color: #52525b; }
+.hp3-cta { background: #09090b; border-color: #09090b; color: #fff; }
+.hp3-cta-ico { background: #fff; border-color: #09090b; }
+.hp3-cta-ico i { background: #09090b; box-shadow: 4px 4px 0 #09090b, 0 8px 0 #09090b; }
+.hp3-cta:hover { background: #6d28d9; border-color: #6d28d9; }
+.hp3-facts { border-top-color: rgba(9, 9, 11, .08); }
+.hp3-fact b { color: #09090b; }
+.hp3-fact span { color: #71717a; }
+.hp3-fact i { border-color: rgba(9, 9, 11, .4); }
+.hp3-scrim { background: rgba(250, 250, 250, .6); }
+.hp3-panel { background: #fff; border-left-color: #e4e4e7; box-shadow: -30px 0 60px -30px rgba(9, 9, 11, .2); }
+.hp3-close { border-color: #e4e4e7; }
+.hp3-close i { background: #09090b; }
+.hp3-panel .hp3-signin { border: 1px solid #e4e4e7 !important; }
+.hp3-panel:not(.open) { box-shadow: none !important; visibility: hidden; transition: transform .32s cubic-bezier(.2, .8, .2, 1), visibility 0s .32s; }
