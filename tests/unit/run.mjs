@@ -435,6 +435,15 @@ await check('links: a web address in a title becomes the task\'s link; only http
   assert.equal(cleanLink('javascript:alert(1)'), '');
   assert.equal(cleanLink('not a link'), '');
 });
+const { rpFor } = await import('../../worker/index.js');
+await check('passkeys: the domain is RP_ID (and its subdomains) when set; otherwise the address itself', () => {
+  const app = new URL('https://app.taskie.app/x');
+  assert.equal(rpFor({ RP_ID: 'taskie.app' }, app).rpID, 'taskie.app', 'a subdomain uses the pinned domain');
+  assert.equal(rpFor({ RP_ID: 'taskie.app' }, new URL('https://taskie.app/')).rpID, 'taskie.app');
+  assert.equal(rpFor({ RP_ID: 'taskie.app' }, new URL('https://budgie.me.workers.dev/')).rpID, 'budgie.me.workers.dev', 'another address keeps its own passkeys');
+  assert.equal(rpFor({}, app).rpID, 'app.taskie.app', 'without RP_ID, the address decides');
+  assert.equal(rpFor({ RP_ID: ' .Taskie.App. ' }, app).rpID, 'taskie.app', 'the setting is tidied');
+});
 const { ACCENTS, defaultAccent } = await import('../../src/lib/dictation.js');
 await check('accents cover many kinds of English', () => {
   for (const c of ['en-US', 'en-GB', 'en-IN', 'en-NG', 'en-KE', 'en-ZA', 'en-AU']) assert.ok(ACCENTS.some(([x]) => x === c), c);
