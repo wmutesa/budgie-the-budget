@@ -29,6 +29,7 @@ export const MODELS = {
   cpu: { url: 'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
     path: '/api/model/hf/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf', name: 'Qwen 2.5 (processor)', size: 'about 490 MB', mb: 700, good: 'any browser' },
 };
+const AUTO_KEY = 'taskie.aiDownload'; // 'yes' once someone chose Download now on this device
 const FAIL_KEY = 'budgie.aiFailed'; // when the last automatic start failed, to avoid retrying on every visit
 const STALL_MS = 90 * 1000;          // give up if a download makes no progress for this long
 // For each task, which models to try, in order.
@@ -282,6 +283,7 @@ async function browserChat(key, messages, { temperature = 0, max_tokens = 200, j
 // Download and start the browser models in the background.
 export async function startBrowserModels({ force = false } = {}) {
   if (!ai.enabled) return;
+  if (force) write(AUTO_KEY, 'yes'); // asked for: from now on it starts with this device
   const info = await checkDevice();
   if (!info.ok) {
     // No usable graphics chip: run on the processor instead.
@@ -315,11 +317,18 @@ export async function startBrowserModels({ force = false } = {}) {
 }
 
 // ---------- on and off ----------
+// Taskie's server AI does the work for everyone, so the on-device model (hundreds of
+// megabytes) is downloaded only when someone asks for it on this device, not at every sign-in.
 export async function detectAI() {
   ai.enabled = read(OFF_KEY) !== 'off';
   if (!ai.enabled) { refreshLabel(); return; }
   await detectOllama();
-  startBrowserModels();
+  if (read(AUTO_KEY) === 'yes') return startBrowserModels();
+  // Not started here: say so, and offer the download in the AI settings.
+  if (ai.small.state === 'idle') Object.assign(ai.small, { state: 'waiting', error: '' });
+  if (ai.cpu.state === 'idle') Object.assign(ai.cpu, { state: 'waiting', error: '' });
+  ai.note = 'The on-device helper is not downloaded. Taskie’s own AI does the work for everyone; download the helper only if you want it to work offline.';
+  refreshLabel();
 }
 
 export async function setAIEnabled(on) {
