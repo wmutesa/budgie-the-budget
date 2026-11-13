@@ -260,25 +260,27 @@ await check('it does not split what belongs together', () => {
   assert.deepEqual(rows.map(r => r.text), ['Call mom and dad tomorrow', 'Meet Sam between 2 and 4pm on Thursday', 'Gym Monday and Wednesday', 'Finish the first draft by Friday', 'Book a table for next Tuesday']);
 });
 const { itemLine } = await import('../../src/lib/itemline.js');
+const iso = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+const D = { lab: iso(3), mid: iso(7), call: iso(6), run: iso(120) }; // dates from today, so the test does not go stale
 await check("Gemini's items become planner items with their kind, date, time, repeat and course", () => {
   const items = [
-    { title: 'Lab report', kind: 'assignment', date: '2026-11-12', time: '17:00', minutes: 90, repeat: '', days: [], course: 'Chemistry' },
-    { title: 'Midterm', kind: 'exam', date: '2026-11-16', time: '', minutes: 0, repeat: '', days: [], course: 'History' },
+    { title: 'Lab report', kind: 'assignment', date: D.lab, time: '17:00', minutes: 90, repeat: '', days: [], course: 'Chemistry' },
+    { title: 'Midterm', kind: 'exam', date: D.mid, time: '', minutes: 0, repeat: '', days: [], course: 'History' },
     { title: 'Gym', kind: 'routine', date: '', time: '18:00', minutes: 60, repeat: 'weekly', days: ['mon', 'wed', 'fri'], course: '' },
     { title: 'Read before bed', kind: 'routine', date: '', time: '22:00', minutes: 0, repeat: 'daily', days: [], course: '' },
-    { title: 'Run a 10K', kind: 'goal', date: '2027-03-01', time: '', minutes: 0, repeat: '', days: [], course: '' },
-    { title: 'Call mom', kind: 'task', date: '2026-11-15', time: '', minutes: 0, repeat: '', days: [], course: '' },
+    { title: 'Run a 10K', kind: 'goal', date: D.run, time: '', minutes: 0, repeat: '', days: [], course: '' },
+    { title: 'Call mom', kind: 'task', date: D.call, time: '', minutes: 0, repeat: '', days: [], course: '' },
     { title: 'Piano lesson', kind: 'class', date: '', time: '16:00', minutes: 45, repeat: 'weekly', days: ['thu'], course: 'Music' },
   ];
   const rows = routeAll(items.map(itemLine).join('\n'));
   assert.equal(rows.length, 7, rows.map(r => r.text).join(' | '));
   const [lab, mid, gym, read, run, call, piano] = rows;
-  assert.deepEqual([lab.dest, lab.task.title, lab.task.date, lab.task.time, lab.task.mins, lab.task.project, lab.task.kind], ['task', 'Lab Report', '2026-11-12', '17:00', 90, 'Chemistry', 'assignment']);
-  assert.deepEqual([mid.task.title, mid.task.date, mid.task.kind, mid.task.project], ['Midterm', '2026-11-16', 'exam', 'History']);
+  assert.deepEqual([lab.dest, lab.task.title, lab.task.date, lab.task.time, lab.task.mins, lab.task.project, lab.task.kind], ['task', 'Lab Report', D.lab, '17:00', 90, 'Chemistry', 'assignment']);
+  assert.deepEqual([mid.task.title, mid.task.date, mid.task.kind, mid.task.project], ['Midterm', D.mid, 'exam', 'History']);
   assert.deepEqual([gym.dest, gym.task.repeat?.days, gym.task.time], ['routine', [1, 3, 5], '18:00']);
   assert.deepEqual([read.dest, read.task.repeat?.every], ['routine', 'day']);
   assert.equal(run.dest, 'goal');
-  assert.deepEqual([call.task.title, call.task.date], ['Call Mom', '2026-11-15']);
+  assert.deepEqual([call.task.title, call.task.date], ['Call Mom', D.call]);
   assert.deepEqual([piano.dest, piano.task.repeat?.days, piano.task.project], ['routine', [4], 'Music'], 'one weekly day repeats too');
 });
 const { geminiSplit } = await import('../../worker/gemini.js');
