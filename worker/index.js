@@ -58,9 +58,18 @@ async function body(request) {
   try { return await request.json(); } catch { return {}; }
 }
 
-// The site's own address decides the passkey domain, so it works on
-// workers.dev, a custom domain and localhost without configuration.
-const rp = url => ({ rpID: url.hostname, origin: url.origin, rpName: 'Taskie' });
+// A passkey belongs to a domain (its "relying party" ID). Without configuration the
+// domain is the address the site is opened at, so a new address needs new passkeys.
+// Set RP_ID to a domain you own (for example taskie.app) and passkeys work on that
+// domain and on every subdomain of it, so renaming the app or moving the site
+// does not strand anyone's passkeys. Any other address keeps its own passkeys.
+export const rpFor = (env, url) => {
+  const host = url.hostname.toLowerCase();
+  const pinned = String(env?.RP_ID || '').trim().toLowerCase().replace(/^\.+|\.+$/g, '');
+  const rpID = pinned && (host === pinned || host.endsWith(`.${pinned}`)) ? pinned : host;
+  return { rpID, origin: url.origin, rpName: 'Taskie' };
+};
+const rp = (url, env) => rpFor(env, url);
 
 // ---------- recovery codes ----------
 // Ten characters from an alphabet without look-alikes (no 0/O, 1/I/L), shown as XXXXX-XXXXX.
@@ -262,7 +271,7 @@ async function routes(request, env, url) {
     const { token } = await body(request);
     const invite = await findInvite(env, token);
     if (!invite) return fail(404, 'This invite link is not valid. It may have expired or been used already.');
-    const { rpID, rpName } = rp(url);
+    const { rpID, rpName } = rp(url, env);
     const userId = invite.user_id || crypto.randomUUID();
     const existing = invite.user_id
       ? (await env.DB.prepare('SELECT id, transports FROM credentials WHERE user_id = ?').bind(userId).all()).results
@@ -286,7 +295,7 @@ async function routes(request, env, url) {
     if (!saved) return fail(400, 'That took too long. Try again.');
     const invite = await findInvite(env, token);
     if (!invite || invite.id !== saved.data.inviteId) return fail(404, 'This invite link is not valid any more.');
-    const { rpID, origin } = rp(url);
+    const { rpID, origin } = rp(url, env);
     let result;
     try {
       result = await verifyRegistrationResponse({ response, expectedChallenge: saved.challenge, expectedOrigin: origin, expectedRPID: rpID });
@@ -342,7 +351,7 @@ async function routes(request, env, url) {
 
   // --- sign in with a passkey ---
   if (path === '/api/login/options' && method === 'POST') {
-    const { rpID } = rp(url);
+    const { rpID } = rp(url, env);
     const options = await generateAuthenticationOptions({ rpID, userVerification: 'preferred' });
     const challengeId = await saveChallenge(env, 'login', options.challenge);
     return json({ challengeId, options });
@@ -354,7 +363,7 @@ async function routes(request, env, url) {
     if (!saved) return fail(400, 'That took too long. Try again.');
     const cred = response?.id ? await env.DB.prepare('SELECT * FROM credentials WHERE id = ?').bind(String(response.id)).first() : null;
     if (!cred) return fail(401, 'This passkey is not registered with Taskie. Ask for an invite.');
-    const { rpID, origin } = rp(url);
+    const { rpID, origin } = rp(url, env);
     let result;
     try {
       result = await verifyAuthenticationResponse({

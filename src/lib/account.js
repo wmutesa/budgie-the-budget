@@ -230,7 +230,16 @@ export async function registerWithInvite() {
 
 export async function signIn() {
   const { challengeId, options } = await api('/api/login/options', { method: 'POST', body: {} });
-  const response = await startAuthentication({ optionsJSON: options });
+  let response;
+  try { response = await startAuthentication({ optionsJSON: options }); } catch (e) {
+    // Passkeys belong to an address. The phone offers none here when Taskie was made at another address.
+    if (e?.name === 'NotAllowedError') {
+      const err = new Error(`No passkey for Taskie at this address, or the prompt was closed. Passkeys belong to the address they were made at. Sign in where you already are and tap Settings, Devices & security, Add a device; or use a recovery code (Lost your device?) here.`);
+      err.name = 'NoPasskeyHere';
+      throw err;
+    }
+    throw e;
+  }
   const { user } = await api('/api/login/verify', { method: 'POST', body: { challengeId, response } });
   await becomeSignedIn(user);
 }
